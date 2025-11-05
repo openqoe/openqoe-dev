@@ -1,0 +1,30 @@
+{
+  "name": "openqoe-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for OpenQoE event ingest and forwarding",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "qoe",
+    "observability",
+    "prometheus",
+    "loki"
+  ],
+  "author": "openqoe-core",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231025.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.2.2",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.18.0"
+  }
+}

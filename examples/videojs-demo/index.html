@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenQoE Video.js Demo - SDK Event Tester</title>
+
+    <!-- Video.js CSS -->
+    <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet" />
+
+    <!-- Same styling as HTML5 demo - reusing the exact same styles -->
+    <link rel="stylesheet" href="../html5-demo/styles.css">
+
+    <style>
+        /* Video.js specific overrides */
+        .video-js {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .vjs-big-play-button {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 OpenQoE Video.js Event Tester</h1>
+            <p class="subtitle">Test and visualize Video.js SDK events in real-time</p>
+            <p style="margin-top: 10px; font-size: 14px; color: #aaa;">
+                <span class="status-indicator active"></span>
+                <span id="status">SDK Active (Video.js) - Events displayed locally only</span>
+            </p>
+        </header>
+
+        <div class="warning-banner">
+            <strong>⚠️ Testing Mode - Video.js Player</strong>
+            Events are captured and displayed locally. No data is sent to any backend.
+        </div>
+
+        <div class="url-input-section">
+            <h2>🎥 Load Your Video</h2>
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="video-url-input"
+                    placeholder="Enter video URL (MP4, HLS with .m3u8, DASH with .mpd)"
+                    value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                >
+                <button class="btn btn-success" onclick="loadVideo()">Load Video</button>
+                <button class="btn" onclick="clearVideo()">Clear</button>
+            </div>
+            <div class="sample-urls">
+                <small style="color: #888; margin-right: 10px;">Quick samples:</small>
+                <button class="sample-url-btn" onclick="loadSampleVideo(0)">MP4: Big Buck Bunny</button>
+                <button class="sample-url-btn" onclick="loadSampleVideo(1)">HLS: Test Stream</button>
+                <button class="sample-url-btn" onclick="loadSampleVideo(2)">MP4: Sintel</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Column: Player -->
+            <div class="player-section">
+                <h2>Video.js Player</h2>
+
+                <video
+                    id="video"
+                    class="video-js vjs-default-skin vjs-big-play-centered"
+                    controls
+                    preload="auto"
+                    data-setup='{}'>
+                </video>
+
+                <div class="controls">
+                    <button onclick="videoControls.play()">▶ Play</button>
+                    <button onclick="videoControls.pause()">⏸ Pause</button>
+                    <button onclick="videoControls.seek(0)">⏮ Reset</button>
+                    <button onclick="videoControls.seek(-10)">⏪ -10s</button>
+                    <button onclick="videoControls.seek(30)">⏩ +30s</button>
+                    <button onclick="videoControls.changeQuality()">🎚️ Quality</button>
+                    <button onclick="videoControls.simulateError()">❌ Error</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Current Time</div>
+                        <div class="stat-value" id="stat-time">0:00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Duration</div>
+                        <div class="stat-value" id="stat-duration">--:--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Buffer</div>
+                        <div class="stat-value" id="stat-buffered">0s</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">State</div>
+                        <div class="stat-value" id="stat-state">Idle</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Events Captured</div>
+                        <div class="stat-value" id="stat-events">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Quality</div>
+                        <div class="stat-value" id="stat-quality">Auto</div>
+                    </div>
+                </div>
+
+                <div class="session-info">
+                    <h3>Session Information</h3>
+                    <div class="session-row">
+                        <span class="session-label">Player Type:</span>
+                        <span class="session-value">Video.js</span>
+                    </div>
+                    <div class="session-row">
+                        <span class="session-label">Session ID:</span>
+                        <span class="session-value" id="session-id">Not initialized</span>
+                    </div>
+                    <div class="session-row">
+                        <span class="session-label">View ID:</span>
+                        <span class="session-value" id="view-id">Not initialized</span>
+                    </div>
+                    <div class="session-row">
+                        <span class="session-label">Viewer ID:</span>
+                        <span class="session-value" id="viewer-id">Not initialized</span>
+                    </div>
+                    <div class="session-row">
+                        <span class="session-label">Video ID:</span>
+                        <span class="session-value" id="video-id-display">Not loaded</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Events (same as HTML5) -->
+            <div class="events-section">
+                <h2>
+                    Captured Events
+                    <span class="badge live">LIVE</span>
+                </h2>
+
+                <div class="events-controls">
+                    <button class="btn" onclick="videoControls.clearLogs()">Clear Events</button>
+                    <button class="btn" onclick="videoControls.downloadEvents()">Download JSON</button>
+                    <button class="btn" onclick="videoControls.toggleAutoScroll()">
+                        <span id="autoscroll-text">Auto-scroll: ON</span>
+                    </button>
+                </div>
+
+                <div class="events-container" id="events-container">
+                    <div class="no-events">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
+                        </svg>
+                        <div>No events captured yet</div>
+                        <div style="font-size: 12px; margin-top: 5px;">Load a video and start playing to see events</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video.js Library -->
+    <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+
+    <!-- OpenQoE SDK -->
+    <script src="../../sdk/dist/index.umd.js"></script>
+
+    <script>
+        // Sample videos (MP4 and HLS)
+        const sampleVideos = [
+            {
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                type: 'video/mp4',
+                id: 'big-buck-bunny',
+                title: 'Big Buck Bunny',
+                duration: 596
+            },
+            {
+                url: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8',
+                type: 'application/x-mpegURL',
+                id: 'apple-bipbop-test',
+                title: 'Apple BipBop Test Stream (HLS)',
+                duration: null
+            },
+            {
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+                type: 'video/mp4',
+                id: 'sintel',
+                title: 'Sintel',
+                duration: 888
+            }
+        ];
+
+        // Global variables
+        let player = null;
+        let qoe = null;
+        let eventCount = 0;
+        let capturedEvents = [];
+        let autoScroll = true;
+        let lastEventTime = Date.now();
+        let eventRate = 0;
+
+        // Get elements
+        const eventsContainer = document.getElementById('events-container');
+
+        // Initialize Video.js player
+        function initializePlayer() {
+            if (player) {
+                player.dispose();
+            }
+            player = videojs('video', {
+                controls: true,
+                autoplay: false,
+                preload: 'auto',
+                fluid: false,
+                responsive: true
+            });
+        }
+
+        // Load sample video
+        function loadSampleVideo(index) {
+            const sample = sampleVideos[index];
+            document.getElementById('video-url-input').value = sample.url;
+            loadVideo(sample);
+        }
+
+        // Load video from URL
+        function loadVideo(sampleData = null) {
+            const urlInput = document.getElementById('video-url-input');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                alert('Please enter a video URL');
+                return;
+            }
+
+            // Initialize player if not exists
+            if (!player) {
+                initializePlayer();
+            }
+
+            // Clear previous SDK
+            if (qoe) {
+                qoe.destroy();
+                qoe = null;
+            }
+
+            // Determine video metadata and type
+            let videoId, videoTitle, videoType;
+            if (sampleData) {
+                videoId = sampleData.id;
+                videoTitle = sampleData.title;
+                videoType = sampleData.type;
+            } else {
+                // Extract from URL
+                const filename = url.split('/').pop().split('?')[0];
+                videoId = filename.replace(/\.[^/.]+$/, '');
+                videoTitle = videoId.replace(/[-_]/g, ' ');
+
+                // Detect type from extension
+                if (url.includes('.m3u8')) {
+                    videoType = 'application/x-mpegURL';
+                } else if (url.includes('.mpd')) {
+                    videoType = 'application/dash+xml';
+                } else {
+                    videoType = 'video/mp4';
+                }
+            }
+
+            // Set video source
+            player.src({
+                src: url,
+                type: videoType
+            });
+
+            // Initialize OpenQoE SDK
+            qoe = new OpenQoE.OpenQoE({
+                orgId: 'demo-org',
+                playerId: 'videojs-event-tester',
+                endpointUrl: 'http://localhost:9999/events',
+                debug: true,
+                logLevel: 'debug',
+                batchSize: 100,
+                batchInterval: 999999
+            });
+
+            // Intercept transport send
+            if (qoe.transport) {
+                qoe.transport.send = function(events) {
+                    events.forEach(event => {
+                        addEventToLog(event);
+                        capturedEvents.push(event);
+                    });
+                    return Promise.resolve();
+                };
+            }
+
+            // Attach to Video.js player
+            qoe.attachPlayer('videojs', player, {
+                videoId: videoId,
+                videoTitle: videoTitle
+            });
+
+            // Update session info
+            setTimeout(() => {
+                document.getElementById('session-id').textContent = qoe.getSessionId() || 'N/A';
+                document.getElementById('view-id').textContent = qoe.getViewId() || 'N/A';
+                document.getElementById('viewer-id').textContent = qoe.getViewerId?.() || 'N/A';
+                document.getElementById('video-id-display').textContent = videoId;
+            }, 500);
+
+            // Reset stats
+            clearLogs();
+        }
+
+        // Clear video
+        function clearVideo() {
+            if (qoe) {
+                qoe.destroy();
+                qoe = null;
+            }
+            if (player) {
+                player.pause();
+                player.src('');
+            }
+            clearLogs();
+            document.getElementById('video-url-input').value = '';
+            document.getElementById('stat-state').textContent = 'Idle';
+        }
+
+        // Add event to log (same as HTML5)
+        function addEventToLog(event) {
+            const noEvents = eventsContainer.querySelector('.no-events');
+            if (noEvents) {
+                noEvents.remove();
+            }
+
+            const entry = document.createElement('div');
+            entry.className = `event-entry ${event.event_type}`;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+
+            const dataObj = {
+                event_time: event.event_time,
+                viewer_time: event.viewer_time,
+                playback_time: event.playback_time,
+                ...event.data
+            };
+
+            Object.keys(dataObj).forEach(key => {
+                if (dataObj[key] === undefined || dataObj[key] === null) {
+                    delete dataObj[key];
+                }
+            });
+
+            const dataJson = JSON.stringify(dataObj, null, 2);
+
+            entry.innerHTML = `
+                <div class="event-header">
+                    <span class="event-type ${event.event_type}">${event.event_type}</span>
+                    <span class="event-time">${timeStr}</span>
+                </div>
+                <div class="event-data">${dataJson}</div>
+            `;
+
+            eventsContainer.insertBefore(entry, eventsContainer.firstChild);
+
+            eventCount++;
+            document.getElementById('stat-events').textContent = eventCount;
+
+            const now_ms = Date.now();
+            if (now_ms - lastEventTime < 1000) {
+                eventRate++;
+            } else {
+                document.getElementById('stat-rate').textContent = eventRate + '/s';
+                eventRate = 1;
+                lastEventTime = now_ms;
+            }
+
+            if (autoScroll) {
+                entry.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            while (eventsContainer.children.length > 50) {
+                eventsContainer.removeChild(eventsContainer.lastChild);
+            }
+        }
+
+        // Clear logs
+        function clearLogs() {
+            eventsContainer.innerHTML = `
+                <div class="no-events">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
+                    </svg>
+                    <div>No events captured yet</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Load a video and start playing to see events</div>
+                </div>
+            `;
+            eventCount = 0;
+            capturedEvents = [];
+            eventRate = 0;
+            document.getElementById('stat-events').textContent = '0';
+        }
+
+        // Update stats periodically
+        setInterval(() => {
+            if (!player) return;
+
+            const formatTime = (seconds) => {
+                if (isNaN(seconds) || !isFinite(seconds)) return '--:--';
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            document.getElementById('stat-time').textContent = formatTime(player.currentTime());
+            document.getElementById('stat-duration').textContent = formatTime(player.duration());
+
+            const buffered = player.buffered();
+            let bufferLength = 0;
+            if (buffered.length > 0) {
+                const currentTime = player.currentTime();
+                for (let i = 0; i < buffered.length; i++) {
+                    if (currentTime >= buffered.start(i) && currentTime <= buffered.end(i)) {
+                        bufferLength = buffered.end(i) - currentTime;
+                        break;
+                    }
+                }
+            }
+            document.getElementById('stat-buffered').textContent = bufferLength.toFixed(1) + 's';
+
+            let state = 'Idle';
+            if (player.currentSrc()) {
+                if (player.ended()) state = 'Ended';
+                else if (player.paused()) state = 'Paused';
+                else if (player.seeking()) state = 'Seeking';
+                else state = 'Playing';
+            }
+            document.getElementById('stat-state').textContent = state;
+        }, 250);
+
+        // Video controls
+        const videoControls = {
+            play: () => {
+                if (!player || !player.currentSrc()) {
+                    alert('Please load a video first');
+                    return;
+                }
+                player.play();
+            },
+            pause: () => player && player.pause(),
+            seek: (offset) => {
+                if (!player || !player.currentSrc()) return;
+                if (offset === 0) {
+                    player.currentTime(0);
+                } else {
+                    const newTime = Math.max(0, Math.min(player.duration(), player.currentTime() + offset));
+                    player.currentTime(newTime);
+                }
+            },
+            changeQuality: () => {
+                alert('Quality selection depends on stream format (HLS/DASH). This is a placeholder for demonstration.');
+            },
+            simulateError: () => {
+                if (!player || !player.currentSrc()) {
+                    alert('Please load a video first');
+                    return;
+                }
+                alert('Simulating error event...');
+                player.trigger('error');
+            },
+            clearLogs: () => clearLogs(),
+            downloadEvents: () => {
+                if (capturedEvents.length === 0) {
+                    alert('No events to download');
+                    return;
+                }
+                const dataStr = JSON.stringify(capturedEvents, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `openqoe-videojs-events-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            },
+            toggleAutoScroll: () => {
+                autoScroll = !autoScroll;
+                document.getElementById('autoscroll-text').textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+            }
+        };
+
+        // Keyboard shortcuts (same as HTML5)
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    player && (player.paused() ? videoControls.play() : videoControls.pause());
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    videoControls.seek(-10);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    videoControls.seek(30);
+                    break;
+                case 'c':
+                case 'C':
+                    videoControls.clearLogs();
+                    break;
+            }
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initializePlayer();
+            loadSampleVideo(0);
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (qoe) {
+                qoe.destroy();
+            }
+            if (player) {
+                player.dispose();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Secrets and environment variables
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# Wrangler
+.wrangler/
+wrangler.toml.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.esbuild/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/

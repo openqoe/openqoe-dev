@@ -1,0 +1,12 @@
+# Grafana Mimir Runtime Configuration
+# This file can be updated without restarting Mimir
+# Changes are picked up dynamically
+
+# Override per-tenant limits at runtime if needed
+overrides: {}
+
+# Example overrides (commented out):
+# overrides:
+#   tenant1:
+#     ingestion_rate: 100000
+#     max_global_series_per_user: 1000000

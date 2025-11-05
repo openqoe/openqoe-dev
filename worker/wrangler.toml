@@ -1,0 +1,65 @@
+name = "openqoe-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Enable local development preview
+# Set to false in production to prevent accidental deployments to *.workers.dev
+workers_dev = true
+
+# KV Namespace for cardinality tracking
+# IMPORTANT: Replace IDs with actual KV namespace IDs from your Cloudflare dashboard
+# Create KV namespaces with: wrangler kv:namespace create CARDINALITY_KV
+[[kv_namespaces]]
+binding = "CARDINALITY_KV"
+id = "your_kv_namespace_id"  # Replace with production KV namespace ID
+preview_id = "your_preview_kv_namespace_id"  # Replace with preview KV namespace ID
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+# Set these using 'wrangler secret put <NAME>' or in the Cloudflare dashboard
+# For local development, use .dev.vars file (see .dev.vars.example)
+#
+# DESTINATION CONFIGURATION (choose one):
+#
+# Option 1: Self-Hosted (Mimir + Loki)
+#   MIMIR_URL - Mimir push endpoint (default: http://mimir:9009/api/v1/push)
+#   MIMIR_USERNAME - Basic auth username (optional)
+#   MIMIR_PASSWORD - Basic auth password (optional)
+#   LOKI_URL - Loki push endpoint (default: http://loki:3100/loki/api/v1/push)
+#   LOKI_USERNAME - Basic auth username (optional)
+#   LOKI_PASSWORD - Basic auth password (optional)
+#
+# Option 2: Grafana Cloud (Recommended for Production)
+#   GRAFANA_CLOUD_INSTANCE_ID - Your Grafana Cloud instance ID (required)
+#   GRAFANA_CLOUD_API_KEY - Your Grafana Cloud API key (required)
+#   GRAFANA_CLOUD_METRICS_URL - Metrics endpoint URL from stack details (required)
+#   GRAFANA_CLOUD_LOGS_URL - Logs endpoint URL from stack details (required)
+#
+# AUTHENTICATION (optional):
+#   API_KEY - API key for securing the worker endpoint
+#
+# CARDINALITY GOVERNANCE (optional):
+#   CARDINALITY_LIMITS - JSON string with custom cardinality limits
+#
+# BACKWARD COMPATIBILITY (deprecated):
+#   PROMETHEUS_URL - Use MIMIR_URL instead
+#   PROMETHEUS_USERNAME - Use MIMIR_USERNAME instead
+#   PROMETHEUS_PASSWORD - Use MIMIR_PASSWORD instead
+# ============================================================================
+
+# ============================================================================
+# Deployment Environments
+# ============================================================================
+# Uncomment and configure for your deployment environments
+# Replace example.com with your actual domain
+
+# [env.production]
+# name = "openqoe-worker-prod"
+# route = { pattern = "ingest.yourdomain.com/*", zone_name = "yourdomain.com" }
+# workers_dev = false
+
+# [env.staging]
+# name = "openqoe-worker-staging"
+# route = { pattern = "ingest-staging.yourdomain.com/*", zone_name = "yourdomain.com" }
+# workers_dev = false

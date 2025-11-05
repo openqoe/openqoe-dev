@@ -1,0 +1,458 @@
+{
+  "dashboard": {
+    "title": "OpenQoE - Live Streaming",
+    "tags": ["openqoe", "live", "streaming", "qoe"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "org_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total, org_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "stream_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total{org_id=~\"$org_id\",content_type=\"live\"}, video_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "interval",
+          "type": "interval",
+          "auto": true,
+          "auto_count": 30,
+          "auto_min": "10s",
+          "options": [
+            { "text": "10s", "value": "10s" },
+            { "text": "30s", "value": "30s" },
+            { "text": "1m", "value": "1m" },
+            { "text": "5m", "value": "5m" }
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Current Viewers",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "count by (org_id) (openqoe_heartbeat_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"} offset 30s)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "blue" },
+                { "value": 100, "color": "green" },
+                { "value": 1000, "color": "yellow" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Peak Viewers",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "max_over_time((count by (org_id) (openqoe_heartbeat_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"} offset 30s))[$__range:])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "purple" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Avg Join Time",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "openqoe:video_startup_seconds:p50{org_id=~\"$org_id\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 2, "color": "yellow" },
+                { "value": 4, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Live Error Rate",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_errors_total{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) / sum(rate(openqoe_events_total{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 0.01, "color": "yellow" },
+                { "value": 0.05, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Concurrent Viewers Over Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 16, "x": 0, "y": 4 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "count by (org_id) (openqoe_heartbeat_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"} offset 30s)",
+            "legendFormat": "Concurrent Viewers",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "scheme",
+              "showPoints": "never"
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Viewers by Device",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "count by (device_category) (openqoe_heartbeat_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"} offset 30s)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "displayLabels": ["name", "percent"]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Join Time P95 (Live)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(openqoe_video_startup_seconds_bucket{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) by (le))",
+            "legendFormat": "Join Time P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(openqoe_video_startup_seconds_bucket{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) by (le))",
+            "legendFormat": "Join Time P50",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 2, "color": "yellow" },
+                { "value": 4, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Live Rebuffer Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_rebuffer_events_total{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) / sum(rate(openqoe_views_started_total{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval]))",
+            "legendFormat": "Rebuffer Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 0.05, "color": "yellow" },
+                { "value": 0.1, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Geographic Distribution",
+        "type": "geomap",
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "count by (country_code) (openqoe_heartbeat_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"} offset 30s)",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "view": {
+            "id": "coords",
+            "lat": 0,
+            "lon": 0,
+            "zoom": 1
+          },
+          "basemap": {
+            "type": "default"
+          },
+          "layers": [
+            {
+              "type": "markers",
+              "config": {
+                "size": {
+                  "fixed": 5,
+                  "min": 2,
+                  "max": 15
+                },
+                "color": {
+                  "fixed": "blue"
+                },
+                "fillOpacity": 0.4,
+                "showLegend": true
+              }
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 10, "color": "yellow" },
+                { "value": 100, "color": "red" }
+              ]
+            },
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Bitrate Distribution (Live)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(openqoe_bitrate_bps_bucket{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) by (le)) / 1000000",
+            "legendFormat": "P95 Bitrate",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(openqoe_bitrate_bps_bucket{org_id=~\"$org_id\",video_id=~\"$stream_id\",content_type=\"live\"}[$interval])) by (le)) / 1000000",
+            "legendFormat": "P50 Bitrate",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Mbps",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Recent Live Stream Errors",
+        "type": "logs",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "{org_id=~\"$org_id\", video_id=~\"$stream_id\", content_type=\"live\", event_type=\"error\"} | json | line_format \"{{.data_error_family}}: {{.data_error_message}} (stream={{.video_id}}, session={{.session_id}})\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      }
+    ]
+  }
+}

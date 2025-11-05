@@ -1,0 +1,222 @@
+# OpenQoE Recording Rules
+# Pre-aggregate expensive queries for better dashboard performance
+
+groups:
+  # Video Startup Time (VST) Percentiles
+  - name: video_startup_time
+    interval: 30s
+    rules:
+      # P50 (median) by org and player
+      - record: openqoe:video_startup_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_video_startup_seconds_bucket[5m])
+            )
+          )
+
+      # P95 by org and player
+      - record: openqoe:video_startup_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_video_startup_seconds_bucket[5m])
+            )
+          )
+
+      # P99 by org and player
+      - record: openqoe:video_startup_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_video_startup_seconds_bucket[5m])
+            )
+          )
+
+      # P95 by device category
+      - record: openqoe:video_startup_seconds:p95:by_device
+        expr: |
+          histogram_quantile(0.95,
+            sum by (org_id, player_id, device_category, le) (
+              rate(openqoe_video_startup_seconds_bucket[5m])
+            )
+          )
+
+      # Average VST (for quick reference)
+      - record: openqoe:video_startup_seconds:avg
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_video_startup_seconds_sum[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_video_startup_seconds_count[5m])
+          )
+
+  # Rebuffer Duration Percentiles
+  - name: rebuffer_duration
+    interval: 30s
+    rules:
+      # P50 rebuffer duration
+      - record: openqoe:rebuffer_duration_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_rebuffer_duration_seconds_bucket[5m])
+            )
+          )
+
+      # P95 rebuffer duration
+      - record: openqoe:rebuffer_duration_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_rebuffer_duration_seconds_bucket[5m])
+            )
+          )
+
+      # Average rebuffer duration
+      - record: openqoe:rebuffer_duration_seconds:avg
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_rebuffer_duration_seconds_sum[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_rebuffer_duration_seconds_count[5m])
+          )
+
+  # Seek Latency Percentiles
+  - name: seek_latency
+    interval: 30s
+    rules:
+      # P50 seek latency
+      - record: openqoe:seek_latency_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_seek_latency_seconds_bucket[5m])
+            )
+          )
+
+      # P95 seek latency
+      - record: openqoe:seek_latency_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (org_id, player_id, le) (
+              rate(openqoe_seek_latency_seconds_bucket[5m])
+            )
+          )
+
+  # Rebuffer Rate (expensive calculation)
+  - name: rebuffer_rate
+    interval: 30s
+    rules:
+      # Rebuffers per view
+      - record: openqoe:rebuffer_rate:per_view
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_rebuffer_events_total[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+      # Rebuffers per view by device
+      - record: openqoe:rebuffer_rate:per_view:by_device
+        expr: |
+          sum by (org_id, player_id, device_category) (
+            rate(openqoe_rebuffer_events_total[5m])
+          ) /
+          sum by (org_id, player_id, device_category) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+  # Completion Rate
+  - name: completion_rate
+    interval: 30s
+    rules:
+      # Overall completion rate
+      - record: openqoe:completion_rate
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_views_completed_total[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+      # Completion rate by device
+      - record: openqoe:completion_rate:by_device
+        expr: |
+          sum by (org_id, player_id, device_category) (
+            rate(openqoe_views_completed_total[5m])
+          ) /
+          sum by (org_id, player_id, device_category) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+      # Completion rate by video
+      - record: openqoe:completion_rate:by_video
+        expr: |
+          sum by (org_id, player_id, video_id) (
+            rate(openqoe_views_completed_total[5m])
+          ) /
+          sum by (org_id, player_id, video_id) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+  # Error Rate
+  - name: error_rate
+    interval: 30s
+    rules:
+      # Overall error rate (errors per view)
+      - record: openqoe:error_rate:per_view
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_errors_total[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+      # Error rate by type
+      - record: openqoe:error_rate:per_view:by_family
+        expr: |
+          sum by (org_id, player_id, error_family) (
+            rate(openqoe_errors_total[5m])
+          ) /
+          sum by (org_id, player_id, error_family) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+  # Watch Time Aggregates
+  - name: watch_time
+    interval: 30s
+    rules:
+      # Average watch time per view
+      - record: openqoe:watch_time_seconds:avg_per_view
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_playing_time_seconds[5m])
+          ) /
+          sum by (org_id, player_id) (
+            rate(openqoe_views_started_total[5m])
+          )
+
+      # Total watch time (hours per 5m)
+      - record: openqoe:watch_time_hours:total
+        expr: |
+          sum by (org_id, player_id) (
+            rate(openqoe_playing_time_seconds[5m])
+          ) / 3600
+
+  # Concurrent Views (for live streaming)
+  - name: concurrent_views
+    interval: 10s
+    rules:
+      # Current concurrent viewers
+      - record: openqoe:concurrent_views:current
+        expr: |
+          count by (org_id, player_id) (
+            openqoe_heartbeat_playing_time_seconds
+              offset 30s
+          )

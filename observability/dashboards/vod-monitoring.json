@@ -1,0 +1,810 @@
+{
+  "dashboard": {
+    "title": "OpenQoE - VOD Monitoring",
+    "tags": ["openqoe", "vod", "video", "qoe"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 2,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "org_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total, org_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "player_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total{org_id=~\"$org_id\"}, player_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "video_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total{org_id=~\"$org_id\",player_id=~\"$player_id\"}, video_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "device_category",
+          "type": "custom",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "options": [
+            { "text": "Desktop", "value": "desktop" },
+            { "text": "Mobile", "value": "mobile" },
+            { "text": "Tablet", "value": "tablet" },
+            { "text": "TV", "value": "tv" }
+          ]
+        },
+        {
+          "name": "interval",
+          "type": "interval",
+          "auto": true,
+          "auto_count": 30,
+          "auto_min": "1m",
+          "options": [
+            { "text": "1m", "value": "1m" },
+            { "text": "5m", "value": "5m" },
+            { "text": "15m", "value": "15m" },
+            { "text": "1h", "value": "1h" }
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Views",
+        "description": "Total number of video views started in the selected time range",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_views_started_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Completion Rate",
+        "description": "Percentage of videos watched to completion",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "avg(openqoe_completion_rate{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 0.5, "color": "yellow" },
+                { "value": 0.7, "color": "green" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Avg Video Startup Time",
+        "description": "Median (P50) video startup time - time from play request to first frame",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "openqoe:video_startup_seconds:p50{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 2, "color": "yellow" },
+                { "value": 3, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "description": "Percentage of events that resulted in errors",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_errors_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) / sum(rate(openqoe_events_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "decimals": 2,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 0.01, "color": "yellow" },
+                { "value": 0.05, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Video Startup Time Percentiles",
+        "description": "Video startup time across P50, P95, and P99 percentiles using recording rules",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "openqoe:video_startup_seconds:p50{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "openqoe:video_startup_seconds:p95{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}",
+            "legendFormat": "P95",
+            "refId": "B"
+          },
+          {
+            "expr": "openqoe:video_startup_seconds:p99{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}",
+            "legendFormat": "P99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 2, "color": "yellow" },
+                { "value": 3, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "VST Distribution Heatmap",
+        "description": "Heatmap showing distribution of video startup times over time",
+        "type": "heatmap",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_video_startup_seconds_bucket{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "calculate": false,
+          "cellGap": 2,
+          "color": {
+            "exponent": 0.5,
+            "fill": "dark-orange",
+            "mode": "scheme",
+            "scheme": "Spectral",
+            "steps": 128
+          },
+          "exemplars": {
+            "color": "rgba(255,0,255,0.7)"
+          },
+          "filterValues": {
+            "le": 1e-9
+          },
+          "legend": {
+            "show": true
+          },
+          "rowsFrame": {
+            "layout": "auto"
+          },
+          "tooltip": {
+            "show": true,
+            "yHistogram": false
+          },
+          "yAxis": {
+            "axisPlacement": "left",
+            "decimals": 2,
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "VST by Device",
+        "description": "P95 video startup time breakdown by device category using recording rule",
+        "type": "barchart",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "openqoe:video_startup_seconds:p95:by_device{org_id=~\"$org_id\",player_id=~\"$player_id\"}",
+            "legendFormat": "{{device_category}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "color": { "mode": "palette-classic" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 2, "color": "yellow" },
+                { "value": 3, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "xTickLabelRotation": 0,
+          "xTickLabelSpacing": 100,
+          "showValue": "always",
+          "stacking": "none",
+          "groupWidth": 0.7,
+          "barWidth": 0.97
+        }
+      },
+      {
+        "id": 8,
+        "title": "Rebuffer Rate",
+        "description": "Percentage of views that experienced rebuffering events",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_rebuffer_events_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) / sum(rate(openqoe_views_started_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval]))",
+            "legendFormat": "Rebuffer Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "decimals": 2,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 0.05, "color": "yellow" },
+                { "value": 0.1, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Rebuffer Duration",
+        "description": "P50 and P95 duration of rebuffering events in seconds",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(openqoe_rebuffer_duration_seconds_bucket{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) by (le))",
+            "legendFormat": "P50 Duration",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(openqoe_rebuffer_duration_seconds_bucket{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) by (le))",
+            "legendFormat": "P95 Duration",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 1, "color": "yellow" },
+                { "value": 3, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Rebuffering Events Counter",
+        "description": "Total count of rebuffering events in the selected time range",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_rebuffer_events_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 100, "color": "yellow" },
+                { "value": 500, "color": "red" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "auto",
+          "textMode": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Error Rate Timeline",
+        "description": "Error rate over time showing trends",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_errors_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])) / sum(rate(openqoe_events_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval]))",
+            "legendFormat": "Error Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "decimals": 3,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 0.01, "color": "yellow" },
+                { "value": 0.05, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Errors by Type",
+        "description": "Breakdown of errors by error_family category",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum by (error_family) (increase(openqoe_errors_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "legendFormat": "{{error_family}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "displayLabels": ["percent"],
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Recent Errors",
+        "description": "Log timeline of recent error events with details",
+        "type": "logs",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "{org_id=~\"$org_id\", player_id=~\"$player_id\", event_type=\"error\"} | json | line_format \"{{.data_error_family}}: {{.data_error_message}} (video={{.video_id}}, session={{.session_id}})\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 14,
+        "title": "Bitrate Over Time",
+        "description": "Average video bitrate in Mbps",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "avg(openqoe_bitrate_bps{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}) / 1000000",
+            "legendFormat": "Avg Bitrate (Mbps)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Mbps",
+            "decimals": 2,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        }
+      },
+      {
+        "id": 15,
+        "title": "Resolution Distribution",
+        "description": "Percentage of views at each resolution level",
+        "type": "barchart",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum by (resolution) (increase(openqoe_resolution_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range])) / ignoring(resolution) group_left sum(increase(openqoe_resolution_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "legendFormat": "{{resolution}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "decimals": 1,
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "xTickLabelRotation": 0,
+          "xTickLabelSpacing": 100,
+          "showValue": "always",
+          "stacking": "none",
+          "groupWidth": 0.7,
+          "barWidth": 0.97
+        },
+        "transformations": [
+          {
+            "id": "sortBy",
+            "options": {
+              "sort": [
+                {
+                  "field": "resolution",
+                  "desc": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Dropped Frames",
+        "description": "Rate of dropped frames during playback",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "rate(openqoe_dropped_frames_total{org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$interval])",
+            "legendFormat": "Dropped Frames/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "fps",
+            "decimals": 2,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 1, "color": "yellow" },
+                { "value": 5, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 17,
+        "title": "25% Quartile Reached",
+        "description": "Number of viewers who reached 25% of video content",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 44 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_quartile_reached_total{quartile=\"25\",org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                { "value": null, "color": "green" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 18,
+        "title": "50% Quartile Reached",
+        "description": "Number of viewers who reached 50% of video content",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 6, "y": 44 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_quartile_reached_total{quartile=\"50\",org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                { "value": null, "color": "yellow" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 19,
+        "title": "75% Quartile Reached",
+        "description": "Number of viewers who reached 75% of video content",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 44 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_quartile_reached_total{quartile=\"75\",org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                { "value": null, "color": "orange" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 20,
+        "title": "100% Completed",
+        "description": "Number of viewers who completed watching the entire video",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 44 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_quartile_reached_total{quartile=\"100\",org_id=~\"$org_id\",player_id=~\"$player_id\",device_category=~\"$device_category\"}[$__range]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                { "value": null, "color": "blue" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 21,
+        "title": "Views by Device",
+        "description": "Distribution of views across different device categories",
+        "type": "piechart",
+        "gridPos": { "h": 6, "w": 24, "x": 0, "y": 50 },
+        "datasource": "Mimir",
+        "targets": [
+          {
+            "expr": "sum by (device_category) (increase(openqoe_views_started_total{org_id=~\"$org_id\",player_id=~\"$player_id\"}[$__range]))",
+            "legendFormat": "{{device_category}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "displayLabels": ["name", "percent"],
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      }
+    ]
+  }
+}

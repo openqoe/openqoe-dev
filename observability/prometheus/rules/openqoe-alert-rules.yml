@@ -1,0 +1,310 @@
+# OpenQoE Alert Rules
+# Production-ready alerts for video QoE monitoring
+
+groups:
+  # Critical Quality Alerts
+  - name: quality_critical
+    interval: 30s
+    rules:
+      # High Video Startup Time (VST)
+      - alert: HighVideoStartupTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openqoe_video_startup_seconds_bucket[5m])) by (le, org_id, player_id)
+          ) > 3
+        for: 5m
+        labels:
+          severity: critical
+          component: player
+          metric: video_startup_time
+        annotations:
+          summary: "High video startup time detected"
+          description: "P95 video startup time is {{ $value | humanizeDuration }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 3 seconds."
+          impact: "Users experiencing slow video loading, likely to abandon playback"
+          runbook: "https://docs.openqoe.com/runbooks/high-vst"
+
+      # Very High Video Startup Time (Warning threshold)
+      - alert: ElevatedVideoStartupTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openqoe_video_startup_seconds_bucket[5m])) by (le, org_id, player_id)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: player
+          metric: video_startup_time
+        annotations:
+          summary: "Elevated video startup time"
+          description: "P95 video startup time is {{ $value | humanizeDuration }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 2 seconds."
+          impact: "Degraded user experience during video initialization"
+
+      # High Rebuffer Rate
+      - alert: HighRebufferRate
+        expr: |
+          sum(rate(openqoe_rebuffer_events_total[5m])) by (org_id, player_id)
+          /
+          sum(rate(openqoe_views_started_total[5m])) by (org_id, player_id)
+          > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: streaming
+          metric: rebuffer_rate
+        annotations:
+          summary: "High rebuffer rate detected"
+          description: "Rebuffer rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 10%."
+          impact: "More than 10% of views experiencing buffering interruptions"
+          runbook: "https://docs.openqoe.com/runbooks/high-rebuffer-rate"
+
+      # Elevated Rebuffer Rate (Warning)
+      - alert: ElevatedRebufferRate
+        expr: |
+          sum(rate(openqoe_rebuffer_events_total[5m])) by (org_id, player_id)
+          /
+          sum(rate(openqoe_views_started_total[5m])) by (org_id, player_id)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: streaming
+          metric: rebuffer_rate
+        annotations:
+          summary: "Elevated rebuffer rate"
+          description: "Rebuffer rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 5%."
+          impact: "Users experiencing increased buffering interruptions"
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(openqoe_errors_total[5m])) by (org_id, player_id)
+          /
+          sum(rate(openqoe_events_total[5m])) by (org_id, player_id)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: player
+          metric: error_rate
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 5%."
+          impact: "More than 5% of events are errors, indicating systemic issues"
+          runbook: "https://docs.openqoe.com/runbooks/high-error-rate"
+
+      # Network Errors Spike
+      - alert: NetworkErrorsSpike
+        expr: |
+          sum(rate(openqoe_errors_total{error_family="network"}[5m])) by (org_id, player_id)
+          /
+          sum(rate(openqoe_events_total[5m])) by (org_id, player_id)
+          > 0.02
+        for: 3m
+        labels:
+          severity: warning
+          component: network
+          metric: network_errors
+        annotations:
+          summary: "Network error spike detected"
+          description: "Network error rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}."
+          impact: "Potential CDN or network connectivity issues"
+
+  # Business Impact Alerts
+  - name: business_impact
+    interval: 1m
+    rules:
+      # Low Completion Rate
+      - alert: LowCompletionRate
+        expr: |
+          avg(openqoe_completion_rate) by (org_id, player_id, video_id) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: engagement
+          metric: completion_rate
+        annotations:
+          summary: "Low video completion rate"
+          description: "Completion rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, video={{ $labels.video_id }}. Threshold: 50%."
+          impact: "Low viewer engagement, potential content or quality issues"
+          runbook: "https://docs.openqoe.com/runbooks/low-completion"
+
+      # Very Low Completion Rate (Critical)
+      - alert: VeryLowCompletionRate
+        expr: |
+          avg(openqoe_completion_rate) by (org_id, player_id, video_id) < 0.25
+        for: 5m
+        labels:
+          severity: critical
+          component: engagement
+          metric: completion_rate
+        annotations:
+          summary: "Very low video completion rate"
+          description: "Completion rate is {{ $value | humanizePercentage }} for org={{ $labels.org_id }}, video={{ $labels.video_id }}. Threshold: 25%."
+          impact: "Severe engagement issues, viewers abandoning content"
+
+      # Dropping Watch Time
+      - alert: DroppingWatchTime
+        expr: |
+          (
+            sum(rate(openqoe_playing_time_seconds[30m])) by (org_id)
+            -
+            sum(rate(openqoe_playing_time_seconds[30m] offset 1h)) by (org_id)
+          )
+          /
+          sum(rate(openqoe_playing_time_seconds[30m] offset 1h)) by (org_id)
+          < -0.3
+        for: 15m
+        labels:
+          severity: warning
+          component: engagement
+          metric: watch_time
+        annotations:
+          summary: "Watch time dropping significantly"
+          description: "Watch time has decreased by {{ $value | humanizePercentage }} for org={{ $labels.org_id }} compared to 1 hour ago."
+          impact: "Overall engagement declining, potential quality issues"
+
+  # Performance Alerts
+  - name: performance
+    interval: 1m
+    rules:
+      # High Seek Latency
+      - alert: HighSeekLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openqoe_seek_latency_seconds_bucket[5m])) by (le, org_id, player_id)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: player
+          metric: seek_latency
+        annotations:
+          summary: "High seek latency detected"
+          description: "P95 seek latency is {{ $value | humanizeDuration }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 2 seconds."
+          impact: "Users experiencing slow scrubbing/seeking operations"
+
+      # High Dropped Frames Rate
+      - alert: HighDroppedFramesRate
+        expr: |
+          sum(rate(openqoe_dropped_frames_total[5m])) by (org_id, player_id, device_category) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: rendering
+          metric: dropped_frames
+        annotations:
+          summary: "High dropped frames rate"
+          description: "Dropped frames rate is {{ $value }} fps for org={{ $labels.org_id }}, device={{ $labels.device_category }}."
+          impact: "Visual playback quality degradation, potential device or bitrate issues"
+
+      # Long Rebuffer Duration
+      - alert: LongRebufferDuration
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openqoe_rebuffer_duration_seconds_bucket[5m])) by (le, org_id, player_id)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: streaming
+          metric: rebuffer_duration
+        annotations:
+          summary: "Long rebuffer duration detected"
+          description: "P95 rebuffer duration is {{ $value | humanizeDuration }} for org={{ $labels.org_id }}, player={{ $labels.player_id }}. Threshold: 5 seconds."
+          impact: "Extended buffering interruptions affecting user experience"
+
+  # Live Streaming Alerts
+  - name: live_streaming
+    interval: 10s
+    rules:
+      # No Concurrent Viewers (Stream May Be Down)
+      - alert: NoLiveConcurrentViewers
+        expr: |
+          sum(openqoe_concurrent_views_current) by (org_id, stream_id) == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: live_streaming
+          metric: concurrent_viewers
+        annotations:
+          summary: "No concurrent viewers for live stream"
+          description: "Live stream {{ $labels.stream_id }} for org={{ $labels.org_id }} has zero viewers."
+          impact: "Stream may be down or experiencing critical issues"
+          runbook: "https://docs.openqoe.com/runbooks/no-live-viewers"
+
+      # Concurrent Viewers Dropped Significantly
+      - alert: LiveViewersDrop
+        expr: |
+          (
+            sum(openqoe_concurrent_views_current) by (org_id, stream_id)
+            -
+            sum(openqoe_concurrent_views_current offset 5m) by (org_id, stream_id)
+          )
+          /
+          sum(openqoe_concurrent_views_current offset 5m) by (org_id, stream_id)
+          < -0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: live_streaming
+          metric: concurrent_viewers
+        annotations:
+          summary: "Live stream viewership dropped sharply"
+          description: "Concurrent viewers dropped by {{ $value | humanizePercentage }} for stream={{ $labels.stream_id }}."
+          impact: "Potential stream quality or delivery issue causing viewer abandonment"
+
+      # High Live Join Time
+      - alert: HighLiveJoinTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openqoe_video_startup_seconds_bucket{content_type="live"}[5m])) by (le, org_id, stream_id)
+          ) > 5
+        for: 3m
+        labels:
+          severity: warning
+          component: live_streaming
+          metric: join_time
+        annotations:
+          summary: "High live stream join time"
+          description: "P95 join time is {{ $value | humanizeDuration }} for stream={{ $labels.stream_id }}. Threshold: 5 seconds."
+          impact: "Users experiencing slow live stream startup"
+
+  # Data Pipeline Alerts (for Phase 2 - Worker Health)
+  - name: pipeline_health
+    interval: 1m
+    rules:
+      # No Events Received (Worker or SDK Issue)
+      - alert: NoEventsReceived
+        expr: |
+          rate(openqoe_events_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: worker
+          metric: event_ingestion
+        annotations:
+          summary: "No QoE events being received"
+          description: "Worker has received zero events for 5 minutes for org={{ $labels.org_id }}."
+          impact: "Data pipeline broken, no monitoring data available"
+          runbook: "https://docs.openqoe.com/runbooks/no-events"
+
+      # Events Dropped Significantly
+      - alert: EventsDroppedSignificantly
+        expr: |
+          (
+            rate(openqoe_events_total[5m])
+            -
+            rate(openqoe_events_total[5m] offset 30m)
+          )
+          /
+          rate(openqoe_events_total[5m] offset 30m)
+          < -0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: worker
+          metric: event_ingestion
+        annotations:
+          summary: "Event ingestion dropped significantly"
+          description: "Event rate decreased by {{ $value | humanizePercentage }} for org={{ $labels.org_id }}."
+          impact: "Potential SDK deployment issue or traffic drop"

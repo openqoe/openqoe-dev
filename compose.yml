@@ -1,0 +1,95 @@
+# OpenQoE Self-Hosted Stack
+# Includes: Mimir (metrics) + Loki (logs) + Grafana (visualization)
+# Use this for complete local/on-prem deployment
+#
+# Start: docker compose up -d
+# Stop: docker compose down
+# View logs: docker compose logs -f
+
+services:
+  # Mimir - Scalable metrics storage (Prometheus-compatible)
+  # Same backend as Grafana Cloud Metrics
+  mimir:
+    image: grafana/mimir:2.11.0
+    container_name: openqoe-mimir
+    ports:
+      - "9009:9009"  # HTTP endpoint
+    volumes:
+      - ./observability/mimir/mimir-config.yml:/etc/mimir/config.yml
+      - ./observability/mimir/runtime.yml:/etc/mimir/runtime.yml
+      - mimir_data:/data
+    command:
+      - '-config.file=/etc/mimir/config.yml'
+      - '-target=all'
+    restart: unless-stopped
+    networks:
+      - openqoe
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9009/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Loki - Log aggregation
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: openqoe-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - openqoe
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: openqoe-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./observability/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      mimir:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    networks:
+      - openqoe
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mimir_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  openqoe:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

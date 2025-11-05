@@ -1,0 +1,783 @@
+{
+  "dashboard": {
+    "title": "OpenQoE - Impact Explorer",
+    "tags": ["openqoe", "business", "impact", "engagement", "analytics"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "1m",
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "org_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total, org_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "video_id",
+          "type": "query",
+          "datasource": "Mimir",
+          "query": "label_values(openqoe_events_total{org_id=~\"$org_id\"}, video_id)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1
+        },
+        {
+          "name": "content_type",
+          "type": "custom",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "options": [
+            { "text": "VOD", "value": "vod" },
+            { "text": "Live", "value": "live" },
+            { "text": "Clip", "value": "clip" }
+          ]
+        },
+        {
+          "name": "interval",
+          "type": "interval",
+          "auto": true,
+          "auto_count": 30,
+          "auto_min": "5m",
+          "options": [
+            { "text": "5m", "value": "5m" },
+            { "text": "15m", "value": "15m" },
+            { "text": "1h", "value": "1h" },
+            { "text": "6h", "value": "6h" },
+            { "text": "1d", "value": "1d" }
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Watch Time (Hours)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": "Mimir",
+        "description": "Total accumulated watch time across all sessions",
+        "targets": [
+          {
+            "expr": "sum(increase(openqoe_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$__range])) / 3600",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "decimals": 0,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "blue" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Avg Session Duration",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": "Mimir",
+        "description": "Average viewing session duration",
+        "targets": [
+          {
+            "expr": "openqoe:watch_time_seconds:avg_per_view{org_id=~\"$org_id\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 1,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "red" },
+                { "value": 30, "color": "yellow" },
+                { "value": 120, "color": "green" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Overall Completion Rate",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": "Mimir",
+        "description": "Percentage of videos watched to completion",
+        "targets": [
+          {
+            "expr": "openqoe:completion_rate{org_id=~\"$org_id\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 0.5, "color": "yellow" },
+                { "value": 0.7, "color": "green" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 4,
+        "title": "Estimated Revenue Impact",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": "Mimir",
+        "description": "Estimated revenue based on watch time (assuming $0.005 per hour)",
+        "targets": [
+          {
+            "expr": "(sum(increase(openqoe_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$__range])) / 3600) * 0.005",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Watch Time Trend",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 16, "x": 0, "y": 4 },
+        "datasource": "Mimir",
+        "description": "Total watch time over the selected period",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$interval])) / 3600",
+            "legendFormat": "Watch Time (hours/interval)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "showPoints": "never",
+              "gradientMode": "opacity"
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Sessions vs Completions",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+        "datasource": "Mimir",
+        "description": "Comparison of started vs completed viewing sessions",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_views_started_total{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$interval]))",
+            "legendFormat": "Started",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(openqoe_views_completed_total{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$interval]))",
+            "legendFormat": "Completed",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "cps",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Started" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "Completed" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Completion Rate by Video",
+        "type": "barchart",
+        "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+        "datasource": "Mimir",
+        "description": "Top videos ranked by completion rate",
+        "targets": [
+          {
+            "expr": "topk(10, openqoe:completion_rate:by_video{org_id=~\"$org_id\"})",
+            "legendFormat": "{{video_id}}",
+            "refId": "A",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "red" },
+                { "value": 0.5, "color": "yellow" },
+                { "value": 0.7, "color": "green" }
+              ]
+            },
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showValue": "always",
+          "legend": {
+            "displayMode": "hidden"
+          }
+        },
+        "transformations": [
+          {
+            "id": "sortBy",
+            "options": {
+              "sort": [
+                {
+                  "field": "Value",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Completion Rate by Device",
+        "type": "piechart",
+        "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+        "datasource": "Mimir",
+        "description": "Completion rate comparison across device categories",
+        "targets": [
+          {
+            "expr": "openqoe:completion_rate:by_device{org_id=~\"$org_id\"}",
+            "legendFormat": "{{device_category}}",
+            "refId": "A",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit"
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "desktop" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "mobile" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "tablet" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "tv" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "displayLabels": ["name", "percent"]
+        }
+      },
+      {
+        "id": 9,
+        "title": "Quality Impact: Startup Time vs Completion Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+        "datasource": "Mimir",
+        "description": "Correlation between video startup time and viewer completion rate",
+        "targets": [
+          {
+            "expr": "openqoe:video_startup_seconds:p95{org_id=~\"$org_id\"}",
+            "legendFormat": "Startup Time P95 (s)",
+            "refId": "A"
+          },
+          {
+            "expr": "openqoe:completion_rate{org_id=~\"$org_id\"} * 10",
+            "legendFormat": "Completion Rate (scaled 10x)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byFrameRefID", "options": "A" },
+              "properties": [
+                { "id": "unit", "value": "s" },
+                { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byFrameRefID", "options": "B" },
+              "properties": [
+                { "id": "unit", "value": "percentunit" },
+                { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Quality Impact: Rebuffering vs Engagement",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+        "datasource": "Mimir",
+        "description": "Correlation between rebuffer rate and viewer watch time",
+        "targets": [
+          {
+            "expr": "openqoe:rebuffer_rate:per_view{org_id=~\"$org_id\"}",
+            "legendFormat": "Rebuffer Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "openqoe:watch_time_seconds:avg_per_view{org_id=~\"$org_id\"} / 60",
+            "legendFormat": "Avg Watch Time (min)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byFrameRefID", "options": "A" },
+              "properties": [
+                { "id": "unit", "value": "percentunit" },
+                { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byFrameRefID", "options": "B" },
+              "properties": [
+                { "id": "unit", "value": "m" },
+                { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Top Videos by Watch Time",
+        "type": "table",
+        "gridPos": { "h": 10, "w": 12, "x": 0, "y": 30 },
+        "datasource": "Mimir",
+        "description": "Videos generating the most total watch time",
+        "targets": [
+          {
+            "expr": "topk(15, sum by (video_id) (increase(openqoe_playing_time_seconds{org_id=~\"$org_id\",content_type=~\"$content_type\"}[$__range])))",
+            "refId": "A",
+            "instant": true,
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Value" },
+              "properties": [
+                { "id": "unit", "value": "s" },
+                { "id": "displayName", "value": "Total Watch Time" },
+                { "id": "custom.displayMode", "value": "gradient-gauge" }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "video_id" },
+              "properties": [
+                { "id": "displayName", "value": "Video ID" },
+                { "id": "custom.width", "value": 400 }
+              ]
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "org_id": true,
+                "player_id": true
+              },
+              "indexByName": {
+                "video_id": 0,
+                "Value": 1
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "sort": [
+                {
+                  "field": "Value",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "footer": {
+            "show": false
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Worst Performing Content (Low Completion)",
+        "type": "table",
+        "gridPos": { "h": 10, "w": 12, "x": 12, "y": 30 },
+        "datasource": "Mimir",
+        "description": "Videos with the lowest completion rates requiring attention",
+        "targets": [
+          {
+            "expr": "bottomk(15, openqoe:completion_rate:by_video{org_id=~\"$org_id\"})",
+            "refId": "A",
+            "instant": true,
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Value" },
+              "properties": [
+                { "id": "unit", "value": "percentunit" },
+                { "id": "displayName", "value": "Completion Rate" },
+                { "id": "custom.displayMode", "value": "color-background" },
+                { "id": "thresholds", "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": null, "color": "red" },
+                    { "value": 0.3, "color": "orange" },
+                    { "value": 0.5, "color": "yellow" }
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "video_id" },
+              "properties": [
+                { "id": "displayName", "value": "Video ID" },
+                { "id": "custom.width", "value": 400 }
+              ]
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "org_id": true,
+                "player_id": true
+              },
+              "indexByName": {
+                "video_id": 0,
+                "Value": 1
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "sort": [
+                {
+                  "field": "Value",
+                  "desc": false
+                }
+              ]
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "footer": {
+            "show": false
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Quartile Completion Analysis",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+        "datasource": "Mimir",
+        "description": "Viewer drop-off at each quartile of video playback",
+        "targets": [
+          {
+            "expr": "sum(rate(openqoe_quartile_reached_total{org_id=~\"$org_id\",video_id=~\"$video_id\",quartile=\"25\"}[$interval]))",
+            "legendFormat": "25% Reached",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(openqoe_quartile_reached_total{org_id=~\"$org_id\",video_id=~\"$video_id\",quartile=\"50\"}[$interval]))",
+            "legendFormat": "50% Reached",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(openqoe_quartile_reached_total{org_id=~\"$org_id\",video_id=~\"$video_id\",quartile=\"75\"}[$interval]))",
+            "legendFormat": "75% Reached",
+            "refId": "C"
+          },
+          {
+            "expr": "sum(rate(openqoe_views_completed_total{org_id=~\"$org_id\",video_id=~\"$video_id\"}[$interval]))",
+            "legendFormat": "100% Completed",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "cps",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "25% Reached" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "light-blue", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "50% Reached" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "75% Reached" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "dark-blue", "mode": "fixed" } }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "100% Completed" },
+              "properties": [
+                { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "values": ["min", "max", "mean"]
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Revenue Impact Over Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+        "datasource": "Mimir",
+        "description": "Estimated revenue trend based on watch time monetization",
+        "targets": [
+          {
+            "expr": "(sum(rate(openqoe_playing_time_seconds{org_id=~\"$org_id\",video_id=~\"$video_id\",content_type=~\"$content_type\"}[$interval])) / 3600) * 0.005",
+            "legendFormat": "Estimated Revenue ($/interval)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 30,
+              "showPoints": "never",
+              "gradientMode": "opacity"
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      }
+    ]
+  }
+}
