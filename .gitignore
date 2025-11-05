@@ -76,3 +76,6 @@ Thumbs.db
 
 # Cloudflare KV local storage
 .mf/
+
+# Website (deployed separately to Cloudflare Pages)
+/website/
