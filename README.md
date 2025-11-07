@@ -9,7 +9,7 @@
 
 > **Production-grade video quality monitoring for web video players with comprehensive business and technical metrics, accurate percentile calculations, and real-time alerting.**
 
-> **This project needs acrtive contribution from the experts in video tech, players and opensource developers. Let's build it together**
+> **This project needs active contribution from the experts in video tech, players and opensource developers. Let's build it together**
 
 ---
 

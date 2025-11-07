@@ -12,8 +12,8 @@ multitenancy_enabled: false
 server:
   http_listen_port: 9009
   log_level: info
-  grpc_server_max_recv_msg_size: 104857600  # 100MB
-  grpc_server_max_send_msg_size: 104857600  # 100MB
+  grpc_server_max_recv_msg_size: 104857600 # 100MB
+  grpc_server_max_send_msg_size: 104857600 # 100MB
 
 # Distributor configuration (receives remote write)
 distributor:
@@ -37,7 +37,7 @@ blocks_storage:
     dir: /data/blocks
   tsdb:
     dir: /data/tsdb
-    retention_period: 30d
+    retention_period: 720h #30d in hour because 30d was incompatible with the retention period
 
 # Compactor configuration
 compactor:
@@ -88,7 +88,6 @@ limits:
 
   # Query limits
   max_query_lookback: 30d
-  max_query_length: 30d
   max_query_parallelism: 32
   max_cache_freshness: 10m
 
