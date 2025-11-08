@@ -54,7 +54,7 @@ function handleCORS(request: Request): Response {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Content-Type, Content-Length, Authorization, X-API-Key, X-SDK-Version,",
+        "Content-Type, Content-Length, Authorization, X-API-Key, X-SDK-Version",
       "Access-Control-Max-Age": "86400",
     },
   });
@@ -261,7 +261,8 @@ function jsonResponse(data: any, status: number = 200): Response {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Content-Length, Authorization, X-API-Key, X-SDK-Version",
     },
   });
 }
