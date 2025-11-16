@@ -1,6 +1,7 @@
 name = "openqoe-worker"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-09-23"
 
 # Enable local development preview
 # Set to false in production to prevent accidental deployments to *.workers.dev
