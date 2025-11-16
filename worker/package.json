@@ -21,10 +21,13 @@
   "author": "openqoe-core",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20231025.0",
-    "@types/node": "^20.10.0",
-    "typescript": "^5.2.2",
-    "vitest": "^1.0.0",
-    "wrangler": "^3.18.0"
+    "@cloudflare/workers-types": "^4.20251115.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.9",
+    "wrangler": "^4.47.0"
+  },
+  "dependencies": {
+    "protobufjs": "^7.5.4",
+    "snappyjs": "^0.7.0"
   }
 }

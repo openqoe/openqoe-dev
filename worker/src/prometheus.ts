@@ -2,11 +2,11 @@
  * Prometheus Integration Module
  */
 
-import { loadSync } from "protobufjs";
+import snappy from "snappyjs";
 import { CardinalityService } from "./cardinality";
 import { Config } from "./config";
 import { BaseEvent, PrometheusTimeSeries } from "./types";
-import snappy from "snappy";
+import { encodeWriteRequest, WriteRequest } from "./remote-proto-bundle";
 export class PrometheusService {
   private config: Config;
   private cardinalityService: CardinalityService;
@@ -588,11 +588,9 @@ export class PrometheusService {
    */
   private async encodeRemoteWriteRequest(
     timeSeries: PrometheusTimeSeries[],
-  ): Promise<Buffer> {
-    const root = loadSync("../proto/remote.proto");
-    const WriteRequest = root.lookupType("prometheus.WriteRequest");
-    const writeReq = WriteRequest.create({ timeseries: timeSeries });
-    const buffer = WriteRequest.encode(writeReq).finish();
+  ): Promise<Uint8Array<ArrayBufferLike>> {
+    const writeRequest: WriteRequest = { timeseries: timeSeries };
+    const buffer = encodeWriteRequest(writeRequest);
     return snappy.compress(buffer);
   }
 
