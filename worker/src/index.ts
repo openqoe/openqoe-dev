@@ -3,14 +3,13 @@
  * Main entry point for event ingestion and forwarding
  */
 
-import { Env, IngestResponse } from "./types";
-import { Config } from "./config";
 import { AuthService } from "./auth";
-import { ValidationService } from "./validation";
 import { CardinalityService } from "./cardinality";
-import { PrometheusService } from "./prometheus";
+import { Config } from "./config";
 import { LokiService } from "./loki";
-import { DestinationManager } from "./destinations";
+import { PrometheusService } from "./prometheus";
+import { Env } from "./types";
+import { ValidationService } from "./validation";
 
 export default {
   async fetch(
