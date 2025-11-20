@@ -2,11 +2,11 @@
  * Prometheus Integration Module
  */
 
-import { BaseEvent, PrometheusTimeSeries } from './types';
-import { Config } from './config';
+import snappy from "snappyjs";
 import { CardinalityService } from './cardinality';
-import { Env } from './types';
-
+import { Config } from './config';
+import PrometheusDef from "./prometheus-defs/request";
+import { BaseEvent, PrometheusTimeSeries } from './types';
 export class PrometheusService {
   private config: Config;
   private cardinalityService: CardinalityService;
@@ -464,8 +464,10 @@ export class PrometheusService {
     const payload = this.encodeRemoteWriteRequest(timeSeries);
 
     const headers: Record<string, string> = {
+      'Content-Encoding': 'snappy',
       'Content-Type': 'application/json',
-      'X-Prometheus-Remote-Write-Version': '0.1.0'
+      'X-Prometheus-Remote-Write-Version': '2.0.0'
+
     };
 
     // Add authentication if configured
@@ -515,8 +517,12 @@ export class PrometheusService {
    * For standard Prometheus remote write, you would need Protobuf + Snappy compression.
    * Mimir and Grafana Cloud both support this JSON format for easier integration.
    */
-  private encodeRemoteWriteRequest(timeSeries: PrometheusTimeSeries[]): string {
-    return JSON.stringify({ timeseries: timeSeries });
+  private encodeRemoteWriteRequest(timeSeries: PrometheusTimeSeries[]): ArrayBuffer {
+    let message = PrometheusDef.io.prometheus.write.v2.Request.create({
+      timeseries: timeSeries
+    })
+    let buffer = PrometheusDef.io.prometheus.write.v2.Request.encode(message).finish();
+    return snappy.compress(buffer) as ArrayBuffer;
   }
 
   /**
