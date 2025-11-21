@@ -519,31 +519,12 @@ export class PrometheusService {
    */
   async sendToPrometheus(timeSeries: PrometheusTimeSeries[]): Promise<void> {
     const prometheusConfig = this.config.getPrometheusConfig();
-
-    if (!prometheusConfig.url) {
-      console.warn("Prometheus URL not configured, skipping send");
-      return;
-    }
-    console.log("time series to send: ");
-    timeSeries.forEach((series: PrometheusTimeSeries) => {
-      console.log("Labels:");
-      series.labels.forEach((label) => {
-        console.log(`${label.name}: ${label.value}`);
-      });
-      console.log("Samples:");
-      series.samples.forEach((sample) => {
-        console.log(`Value: ${sample.value}, Timestamp: ${sample.timestamp}`);
-      });
-    });
     const mimirTimeSeries = this.convertToMimirTimeSeries(timeSeries);
-    // Encode as JSON - Mimir/Grafana Cloud supports JSON format via /api/v1/push endpoint
-    // Note: This uses Mimir's JSON API, not the standard Prometheus remote write protocol
     const payload = this.encodeRemoteWriteRequest(mimirTimeSeries);
-
     const headers: Record<string, string> = {
       "Content-Encoding": "snappy",
       "Content-Type": "application/json",
-      "X-Prometheus-Remote-Write-Version": "2.0.0",
+      "X-Prometheus-Remote-Write-Version": "0.1.0",
     };
 
     // Add authentication if configured
@@ -579,7 +560,6 @@ export class PrometheusService {
           `Prometheus remote write failed: ${response.status} ${errorText}`,
         );
       }
-
       console.log(`Sent ${timeSeries.length} time series to Prometheus`);
     } catch (error) {
       clearTimeout(timeoutId);
@@ -590,6 +570,12 @@ export class PrometheusService {
     }
   }
 
+  /**
+   *
+   * @param timeSeries
+   * converts normalized plain text time series data into mimir compatible data format
+   * @returns MimirDef.cortexpb.ITimeSeries[]
+   */
   convertToMimirTimeSeries(
     timeSeries: PrometheusTimeSeries[],
   ): MimirDef.cortexpb.ITimeSeries[] {
@@ -606,11 +592,9 @@ export class PrometheusService {
     });
   }
   /**
-   * Encode remote write request as JSON
-   *
-   * Note: This uses Mimir's native JSON API (/api/v1/push) which accepts JSON payloads.
-   * For standard Prometheus remote write, you would need Protobuf + Snappy compression.
-   * Mimir and Grafana Cloud both support this JSON format for easier integration.
+   * @param timeSeries
+   * Encode remote write request as Protobuf encoded Snappy compressed data.
+   * @returns ArrayBuffer
    */
   private encodeRemoteWriteRequest(
     timeSeries: MimirDef.cortexpb.ITimeSeries[],
