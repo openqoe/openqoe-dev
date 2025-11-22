@@ -10,29 +10,24 @@ services:
   # Mimir - Scalable metrics storage (Prometheus-compatible)
   # Same backend as Grafana Cloud Metrics
   mimir:
-    image: grafana/mimir:2.11.0
+    image: grafana/mimir:3.0.0
     container_name: openqoe-mimir
     ports:
-      - "9009:9009"  # HTTP endpoint
+      - "9009:9009" # HTTP endpoint
     volumes:
       - ./observability/mimir/mimir-config.yml:/etc/mimir/config.yml
       - ./observability/mimir/runtime.yml:/etc/mimir/runtime.yml
       - mimir_data:/data
     command:
-      - '-config.file=/etc/mimir/config.yml'
-      - '-target=all'
+      - "-config.file=/etc/mimir/config.yml"
+      - "-target=all"
     restart: unless-stopped
     networks:
       - openqoe
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9009/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # Loki - Log aggregation
   loki:
-    image: grafana/loki:2.9.3
+    image: grafana/loki:3.5.8
     container_name: openqoe-loki
     ports:
       - "3100:3100"
@@ -44,14 +39,22 @@ services:
     networks:
       - openqoe
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3100/ready",
+        ]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
   # Grafana - Visualization and dashboards
   grafana:
-    image: grafana/grafana:10.2.2
+    image: grafana/grafana:12.1
     container_name: openqoe-grafana
     ports:
       - "3000:3000"
@@ -68,13 +71,21 @@ services:
     restart: unless-stopped
     depends_on:
       mimir:
-        condition: service_healthy
+        condition: service_started
       loki:
         condition: service_healthy
     networks:
       - openqoe
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
