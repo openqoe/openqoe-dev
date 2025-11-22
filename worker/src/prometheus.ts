@@ -556,6 +556,8 @@ export class PrometheusService {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Erroneous payload");
+        console.error(JSON.stringify(timeSeries));
         throw new Error(
           `Prometheus remote write failed: ${response.status} ${errorText}`,
         );
