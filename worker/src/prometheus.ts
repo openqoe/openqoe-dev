@@ -556,8 +556,11 @@ export class PrometheusService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Erroneous payload");
-        console.error(JSON.stringify(timeSeries));
+        console.error("Erroneous payload input");
+        console.log("readable input");
+        console.log(JSON.stringify(timeSeries));
+        console.log("machine input");
+        console.error(JSON.stringify(mimirTimeSeries));
         throw new Error(
           `Prometheus remote write failed: ${response.status} ${errorText}`,
         );
@@ -590,7 +593,12 @@ export class PrometheusService {
             value: textEncoder.encode(label.value),
           };
         });
-      return { labels: Uint8ArrayTypelabels, samples: ts.samples };
+      const MimirSamples: MimirDef.cortexpb.ISample[] = ts.samples.map(
+        (sample) => {
+          return { value: sample.value, timestampMs: sample.timestamp };
+        },
+      );
+      return { labels: Uint8ArrayTypelabels, samples: MimirSamples };
     });
   }
   /**
