@@ -24,12 +24,6 @@ services:
     restart: unless-stopped
     networks:
       - openqoe
-    healthcheck:
-      test:
-        ["CMD-SHELL", "curl -fs http://localhost:9009/ready | grep -q ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   # Loki - Log aggregation
   loki:
@@ -45,9 +39,17 @@ services:
     networks:
       - openqoe
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:3100/ready"]
-      interval: 15s
-      timeout: 10s
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3100/ready",
+        ]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   # Grafana - Visualization and dashboards
@@ -69,7 +71,7 @@ services:
     restart: unless-stopped
     depends_on:
       mimir:
-        condition: service_healthy
+        condition: service_started
       loki:
         condition: service_healthy
     networks:
