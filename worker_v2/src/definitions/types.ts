@@ -11,6 +11,7 @@ export interface Env {
   // Mimir is Prometheus-compatible - same backend as Grafana Cloud Metrics
   MIMIR_URL?: string; // Preferred: Mimir endpoint
   PROMETHEUS_URL?: string; // Backward compat: Falls back to Prometheus
+  OTEL_URL?: string; // Self-Hosted Open Telemetry Collector
   MIMIR_USERNAME?: string;
   MIMIR_PASSWORD?: string;
   PROMETHEUS_USERNAME?: string; // Backward compat

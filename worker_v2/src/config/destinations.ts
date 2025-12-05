@@ -21,6 +21,12 @@ export interface DestinationConfig {
     password?: string;
     headers?: Record<string, string>;
   };
+  openTelemetry: {
+    url: string;
+    username?: string;
+    password?: string;
+    headers?: Record<string, string>;
+  };
 }
 
 export class DestinationManager {
@@ -106,6 +112,12 @@ export class DestinationManager {
           "X-Scope-OrgID": instanceId,
         },
       },
+      openTelemetry: {
+        url: this.env.OTEL_URL || "http://otel:4318",
+        headers: {
+          "X-Scope-OrgID": instanceId,
+        },
+      },
     };
   }
 
@@ -117,29 +129,23 @@ export class DestinationManager {
    * Note: Mimir is Prometheus-compatible and is the same backend used by Grafana Cloud
    */
   private getSelfHostedConfig(): DestinationConfig {
-    // Prefer MIMIR_URL, fall back to PROMETHEUS_URL for backward compatibility
-    const metricsUrl =
-      this.env.MIMIR_URL ||
-      this.env.PROMETHEUS_URL ||
-      "http://mimir:9009/api/v1/push";
-
-    // Prefer MIMIR credentials, fall back to PROMETHEUS credentials
-    const metricsUsername =
-      this.env.MIMIR_USERNAME || this.env.PROMETHEUS_USERNAME;
-    const metricsPassword =
-      this.env.MIMIR_PASSWORD || this.env.PROMETHEUS_PASSWORD;
-
     return {
       type: "self-hosted",
       metrics: {
-        url: metricsUrl,
-        username: metricsUsername,
-        password: metricsPassword,
+        url:
+          this.env.MIMIR_URL ||
+          this.env.PROMETHEUS_URL ||
+          "http://mimir:9009/api/v1/push",
+        username: this.env.MIMIR_USERNAME || this.env.PROMETHEUS_USERNAME,
+        password: this.env.MIMIR_PASSWORD || this.env.PROMETHEUS_PASSWORD,
       },
       logs: {
         url: this.env.LOKI_URL || "http://loki:3100/loki/api/v1/push",
         username: this.env.LOKI_USERNAME,
         password: this.env.LOKI_PASSWORD,
+      },
+      openTelemetry: {
+        url: this.env.OTEL_URL || "http://otel:4318",
       },
     };
   }

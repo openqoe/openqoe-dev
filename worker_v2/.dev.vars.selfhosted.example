@@ -6,6 +6,9 @@
 MIMIR_URL=http://localhost:9009/api/v1/push
 LOKI_URL=http://localhost:3100/loki/api/v1/push
 
+# Self-Hosted Open Telememetry Collector
+OTEL_URL=http://localhost:4318
+
 # Backward compatibility: PROMETHEUS_URL also works
 # PROMETHEUS_URL=http://localhost:9009/api/v1/push
 
