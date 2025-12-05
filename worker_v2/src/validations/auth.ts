@@ -2,7 +2,7 @@
  * Authentication Module
  */
 
-import { Config } from './config';
+import { Config } from "../config/config";
 
 export class AuthService {
   private config: Config;
@@ -26,10 +26,10 @@ export class AuthService {
     }
 
     // Check Authorization header
-    const authHeader = request.headers.get('Authorization');
+    const authHeader = request.headers.get("Authorization");
     if (authHeader) {
       // Support both "Bearer <token>" and "<token>" formats
-      const token = authHeader.startsWith('Bearer ')
+      const token = authHeader.startsWith("Bearer ")
         ? authHeader.substring(7)
         : authHeader;
 
@@ -39,7 +39,7 @@ export class AuthService {
     }
 
     // Check X-API-Key header
-    const apiKeyHeader = request.headers.get('X-API-Key');
+    const apiKeyHeader = request.headers.get("X-API-Key");
     if (apiKeyHeader === apiKey) {
       return true;
     }
@@ -54,15 +54,15 @@ export class AuthService {
     return new Response(
       JSON.stringify({
         success: false,
-        message: 'Unauthorized: Invalid or missing API key'
+        message: "Unauthorized: Invalid or missing API key",
       }),
       {
         status: 401,
         headers: {
-          'Content-Type': 'application/json',
-          'WWW-Authenticate': 'Bearer realm="OpenQoE"'
-        }
-      }
+          "Content-Type": "application/json",
+          "WWW-Authenticate": 'Bearer realm="OpenQoE"',
+        },
+      },
     );
   }
 }

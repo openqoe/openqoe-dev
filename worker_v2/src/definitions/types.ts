@@ -9,22 +9,22 @@ export interface Env {
 
   // Self-Hosted Destinations (Mimir + Loki)
   // Mimir is Prometheus-compatible - same backend as Grafana Cloud Metrics
-  MIMIR_URL?: string;                    // Preferred: Mimir endpoint
-  PROMETHEUS_URL?: string;               // Backward compat: Falls back to Prometheus
+  MIMIR_URL?: string; // Preferred: Mimir endpoint
+  PROMETHEUS_URL?: string; // Backward compat: Falls back to Prometheus
   MIMIR_USERNAME?: string;
   MIMIR_PASSWORD?: string;
-  PROMETHEUS_USERNAME?: string;          // Backward compat
-  PROMETHEUS_PASSWORD?: string;          // Backward compat
+  PROMETHEUS_USERNAME?: string; // Backward compat
+  PROMETHEUS_PASSWORD?: string; // Backward compat
   LOKI_URL?: string;
   LOKI_USERNAME?: string;
   LOKI_PASSWORD?: string;
 
   // Grafana Cloud Destinations (Mimir + Loki)
-  GRAFANA_CLOUD_INSTANCE_ID?: string;    // Your Grafana Cloud instance ID (e.g., "123456")
-  GRAFANA_CLOUD_API_KEY?: string;        // Grafana Cloud API key
-  GRAFANA_CLOUD_REGION?: string;         // Region (e.g., "us-central1", "eu-west1")
-  GRAFANA_CLOUD_METRICS_URL?: string;    // Override Mimir URL (optional)
-  GRAFANA_CLOUD_LOGS_URL?: string;       // Override Loki URL (optional)
+  GRAFANA_CLOUD_INSTANCE_ID?: string; // Your Grafana Cloud instance ID (e.g., "123456")
+  GRAFANA_CLOUD_API_KEY?: string; // Grafana Cloud API key
+  GRAFANA_CLOUD_REGION?: string; // Region (e.g., "us-central1", "eu-west1")
+  GRAFANA_CLOUD_METRICS_URL?: string; // Override Mimir URL (optional)
+  GRAFANA_CLOUD_LOGS_URL?: string; // Override Loki URL (optional)
 
   // Authentication
   API_KEY?: string;
@@ -135,14 +135,14 @@ export interface CMCDData {
 }
 
 // Prometheus types
-export interface PrometheusMetric {
+export interface Metric {
   metric: string;
   labels: Record<string, string>;
   value: number;
   timestamp: number;
 }
 
-export interface PrometheusSample {
+export interface Sample {
   labels: Record<string, string>;
   samples: Array<{
     value: number;
@@ -150,7 +150,7 @@ export interface PrometheusSample {
   }>;
 }
 
-export interface PrometheusTimeSeries {
+export interface TimeSeries {
   labels: Array<{
     name: string;
     value: string;
@@ -162,7 +162,7 @@ export interface PrometheusTimeSeries {
 }
 
 export interface PrometheusRemoteWriteRequest {
-  timeseries: PrometheusTimeSeries[];
+  timeseries: TimeSeries[];
 }
 
 // Loki types
@@ -182,7 +182,7 @@ export interface CardinalityConfig {
 
 export interface CardinalityLimit {
   max_cardinality: number;
-  action: 'allow' | 'bucket' | 'hash' | 'drop';
+  action: "allow" | "bucket" | "hash" | "drop";
   bucket_size?: number; // for 'bucket' action
 }
 

@@ -2,8 +2,8 @@
  * Cardinality Governance Module
  */
 
-import { Config } from './config';
-import { Env } from './types';
+import { Config } from "../config/config";
+import { Env } from "../definitions/types";
 
 export class CardinalityService {
   private config: Config;
@@ -17,7 +17,10 @@ export class CardinalityService {
   /**
    * Apply cardinality governance to a dimension value
    */
-  async applyGovernance(dimension: string, value: string): Promise<string | null> {
+  async applyGovernance(
+    dimension: string,
+    value: string,
+  ): Promise<string | null> {
     const limit = this.config.getCardinalityLimit(dimension);
 
     if (!limit) {
@@ -26,16 +29,16 @@ export class CardinalityService {
     }
 
     switch (limit.action) {
-      case 'allow':
+      case "allow":
         return await this.handleAllow(dimension, value, limit.max_cardinality);
 
-      case 'bucket':
+      case "bucket":
         return this.handleBucket(dimension, value, limit.bucket_size || 1000);
 
-      case 'hash':
+      case "hash":
         return this.handleHash(value);
 
-      case 'drop':
+      case "drop":
         return null;
 
       default:
@@ -46,7 +49,11 @@ export class CardinalityService {
   /**
    * Handle 'allow' action - track cardinality and allow if under limit
    */
-  private async handleAllow(dimension: string, value: string, maxCardinality: number): Promise<string | null> {
+  private async handleAllow(
+    dimension: string,
+    value: string,
+    maxCardinality: number,
+  ): Promise<string | null> {
     const key = `cardinality:${dimension}`;
 
     try {
@@ -63,7 +70,9 @@ export class CardinalityService {
 
       // Check if adding this value would exceed limit
       if (existingSet.size >= maxCardinality) {
-        console.warn(`Cardinality limit reached for ${dimension}: ${existingSet.size}/${maxCardinality}`);
+        console.warn(
+          `Cardinality limit reached for ${dimension}: ${existingSet.size}/${maxCardinality}`,
+        );
         return this.handleHash(value); // Fall back to hash
       }
 
@@ -72,7 +81,7 @@ export class CardinalityService {
       await this.env.CARDINALITY_KV.put(
         key,
         JSON.stringify(Array.from(existingSet)),
-        { expirationTtl: 86400 } // 24 hours TTL
+        { expirationTtl: 86400 }, // 24 hours TTL
       );
 
       return value;
@@ -85,7 +94,11 @@ export class CardinalityService {
   /**
    * Handle 'bucket' action - bucket values into ranges
    */
-  private handleBucket(dimension: string, value: string, bucketSize: number): string {
+  private handleBucket(
+    dimension: string,
+    value: string,
+    bucketSize: number,
+  ): string {
     // For numeric values, bucket into ranges
     const numValue = parseFloat(value);
     if (!isNaN(numValue)) {
@@ -122,10 +135,10 @@ export class CardinalityService {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    return Math.abs(hash).toString(16).padStart(8, '0');
+    return Math.abs(hash).toString(16).padStart(8, "0");
   }
 
   /**
@@ -135,7 +148,7 @@ export class CardinalityService {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
     return Math.abs(hash);
@@ -144,7 +157,9 @@ export class CardinalityService {
   /**
    * Apply governance to all dimensions in a label set
    */
-  async applyGovernanceToLabels(labels: Record<string, string>): Promise<Record<string, string>> {
+  async applyGovernanceToLabels(
+    labels: Record<string, string>,
+  ): Promise<Record<string, string>> {
     const governed: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(labels)) {
@@ -160,7 +175,9 @@ export class CardinalityService {
   /**
    * Get current cardinality stats for a dimension
    */
-  async getCardinalityStats(dimension: string): Promise<{ count: number; values: string[] }> {
+  async getCardinalityStats(
+    dimension: string,
+  ): Promise<{ count: number; values: string[] }> {
     const key = `cardinality:${dimension}`;
 
     try {

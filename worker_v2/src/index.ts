@@ -3,14 +3,13 @@
  * Main entry point for event ingestion and forwarding
  */
 
-import { Env, IngestResponse } from "./types";
-import { Config } from "./config";
-import { AuthService } from "./auth";
-import { ValidationService } from "./validation";
-import { CardinalityService } from "./cardinality";
-import { PrometheusService } from "./prometheus";
-import { LokiService } from "./loki";
-import { DestinationManager } from "./destinations";
+import { AuthService } from "./validations/auth";
+import { CardinalityService } from "./validations/cardinality";
+import { Config } from "./config/config";
+import { Env } from "./definitions/types";
+import { LokiService } from "./compute/loki";
+import { MetricsService } from "./compute/metrics";
+import { ValidationService } from "./validations/validation";
 
 export default {
   async fetch(
@@ -76,7 +75,7 @@ async function handleIngest(
     const authService = new AuthService(config);
     const validationService = new ValidationService();
     const cardinalityService = new CardinalityService(config, env);
-    const prometheusService = new PrometheusService(config, cardinalityService);
+    const prometheusService = new MetricsService(config, cardinalityService);
     const lokiService = new LokiService(config, cardinalityService);
 
     // Authenticate
@@ -154,7 +153,7 @@ async function handleIngest(
  */
 async function processEvents(
   events: any[],
-  prometheusService: PrometheusService,
+  prometheusService: MetricsService,
   lokiService: LokiService,
 ): Promise<void> {
   try {

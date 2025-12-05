@@ -3,11 +3,11 @@
  */
 
 import snappy from "snappyjs";
-import { CardinalityService } from "./cardinality";
-import { Config } from "./config";
-import MimirDef from "./mimir-defs/request";
-import { BaseEvent, PrometheusTimeSeries } from "./types";
-export class PrometheusService {
+import { CardinalityService } from "../validations/cardinality";
+import { Config } from "../config/config";
+import MimirDef from "../definitions/mimir-defs/request";
+import { BaseEvent, TimeSeries } from "../definitions/types";
+export class MetricsService {
   private config: Config;
   private cardinalityService: CardinalityService;
 
@@ -19,8 +19,8 @@ export class PrometheusService {
   /**
    * Transform events to Prometheus metrics
    */
-  async transformEvents(events: BaseEvent[]): Promise<PrometheusTimeSeries[]> {
-    const timeSeries: PrometheusTimeSeries[] = [];
+  async transformEvents(events: BaseEvent[]): Promise<TimeSeries[]> {
+    const timeSeries: TimeSeries[] = [];
 
     for (const event of events) {
       const metrics = await this.eventToMetrics(event);
@@ -33,10 +33,8 @@ export class PrometheusService {
   /**
    * Convert single event to Prometheus metrics
    */
-  private async eventToMetrics(
-    event: BaseEvent,
-  ): Promise<PrometheusTimeSeries[]> {
-    const metrics: PrometheusTimeSeries[] = [];
+  private async eventToMetrics(event: BaseEvent): Promise<TimeSeries[]> {
+    const metrics: TimeSeries[] = [];
     const baseLabels = await this.extractBaseLabels(event);
     const timestamp = event.event_time;
 
@@ -415,7 +413,7 @@ export class PrometheusService {
     labels: Record<string, string>,
     value: number,
     timestamp: number,
-  ): Promise<PrometheusTimeSeries> {
+  ): Promise<TimeSeries> {
     return {
       labels: [
         { name: "__name__", value: name },
@@ -440,8 +438,8 @@ export class PrometheusService {
     value: number,
     timestamp: number,
     buckets: number[],
-  ): Promise<PrometheusTimeSeries[]> {
-    const series: PrometheusTimeSeries[] = [];
+  ): Promise<TimeSeries[]> {
+    const series: TimeSeries[] = [];
 
     // Create bucket metrics (le = "less than or equal")
     for (const bucket of buckets) {
@@ -517,7 +515,7 @@ export class PrometheusService {
   /**
    * Send metrics to Prometheus remote write endpoint
    */
-  async sendToPrometheus(timeSeries: PrometheusTimeSeries[]): Promise<void> {
+  async sendToPrometheus(timeSeries: TimeSeries[]): Promise<void> {
     const prometheusConfig = this.config.getPrometheusConfig();
     const mimirTimeSeries = this.convertToMimirTimeSeries(timeSeries);
     const payload = this.encodeRemoteWriteRequest(mimirTimeSeries);
@@ -582,7 +580,7 @@ export class PrometheusService {
    * @returns MimirDef.cortexpb.ITimeSeries[]
    */
   convertToMimirTimeSeries(
-    timeSeries: PrometheusTimeSeries[],
+    timeSeries: TimeSeries[],
   ): MimirDef.cortexpb.ITimeSeries[] {
     const textEncoder = new TextEncoder();
     return timeSeries.map((ts) => {

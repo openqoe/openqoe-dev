@@ -2,32 +2,36 @@
  * Event Validation Module
  */
 
-import { BaseEvent, IngestRequest } from './types';
+import { BaseEvent, IngestRequest } from "../definitions/types";
 
 export class ValidationService {
   /**
    * Validate ingest request
    */
-  validateRequest(body: any): { valid: boolean; errors: string[]; data?: IngestRequest } {
+  validateRequest(body: any): {
+    valid: boolean;
+    errors: string[];
+    data?: IngestRequest;
+  } {
     const errors: string[] = [];
 
     if (!body) {
-      errors.push('Request body is empty');
+      errors.push("Request body is empty");
       return { valid: false, errors };
     }
 
     if (!Array.isArray(body.events)) {
-      errors.push('events must be an array');
+      errors.push("events must be an array");
       return { valid: false, errors };
     }
 
     if (body.events.length === 0) {
-      errors.push('events array is empty');
+      errors.push("events array is empty");
       return { valid: false, errors };
     }
 
     if (body.events.length > 1000) {
-      errors.push('events array too large (max 1000 events per request)');
+      errors.push("events array too large (max 1000 events per request)");
       return { valid: false, errors };
     }
 
@@ -44,24 +48,24 @@ export class ValidationService {
     return {
       valid: true,
       errors: [],
-      data: body as IngestRequest
+      data: body as IngestRequest,
     };
   }
 
   // Valid event types
   private static readonly VALID_EVENT_TYPES = [
-    'playerready',
-    'viewstart',
-    'playing',
-    'pause',
-    'seek',
-    'stall_start',
-    'stall_end',
-    'ended',
-    'error',
-    'quartile',
-    'heartbeat',
-    'quality_change'
+    "playerready",
+    "viewstart",
+    "playing",
+    "pause",
+    "seek",
+    "stall_start",
+    "stall_end",
+    "ended",
+    "error",
+    "quartile",
+    "heartbeat",
+    "quality_change",
   ];
 
   /**
@@ -72,37 +76,41 @@ export class ValidationService {
     const prefix = `Event ${index}:`;
 
     // Required fields
-    if (!event.event_type || typeof event.event_type !== 'string') {
+    if (!event.event_type || typeof event.event_type !== "string") {
       errors.push(`${prefix} event_type is required and must be a string`);
-    } else if (!ValidationService.VALID_EVENT_TYPES.includes(event.event_type)) {
-      errors.push(`${prefix} event_type "${event.event_type}" is not a valid event type. Valid types: ${ValidationService.VALID_EVENT_TYPES.join(', ')}`);
+    } else if (
+      !ValidationService.VALID_EVENT_TYPES.includes(event.event_type)
+    ) {
+      errors.push(
+        `${prefix} event_type "${event.event_type}" is not a valid event type. Valid types: ${ValidationService.VALID_EVENT_TYPES.join(", ")}`,
+      );
     }
 
-    if (!event.event_time || typeof event.event_time !== 'number') {
+    if (!event.event_time || typeof event.event_time !== "number") {
       errors.push(`${prefix} event_time is required and must be a number`);
     }
 
-    if (!event.viewer_time || typeof event.viewer_time !== 'number') {
+    if (!event.viewer_time || typeof event.viewer_time !== "number") {
       errors.push(`${prefix} viewer_time is required and must be a number`);
     }
 
-    if (!event.org_id || typeof event.org_id !== 'string') {
+    if (!event.org_id || typeof event.org_id !== "string") {
       errors.push(`${prefix} org_id is required and must be a string`);
     }
 
-    if (!event.player_id || typeof event.player_id !== 'string') {
+    if (!event.player_id || typeof event.player_id !== "string") {
       errors.push(`${prefix} player_id is required and must be a string`);
     }
 
-    if (!event.view_id || typeof event.view_id !== 'string') {
+    if (!event.view_id || typeof event.view_id !== "string") {
       errors.push(`${prefix} view_id is required and must be a string`);
     }
 
-    if (!event.session_id || typeof event.session_id !== 'string') {
+    if (!event.session_id || typeof event.session_id !== "string") {
       errors.push(`${prefix} session_id is required and must be a string`);
     }
 
-    if (!event.viewer_id || typeof event.viewer_id !== 'string') {
+    if (!event.viewer_id || typeof event.viewer_id !== "string") {
       errors.push(`${prefix} viewer_id is required and must be a string`);
     }
 
@@ -132,7 +140,7 @@ export class ValidationService {
 
     for (const [key, value] of Object.entries(event)) {
       if (value !== null && value !== undefined) {
-        if (typeof value === 'object' && !Array.isArray(value)) {
+        if (typeof value === "object" && !Array.isArray(value)) {
           // Recursively sanitize objects
           sanitized[key] = this.sanitizeObject(value);
         } else {
@@ -152,7 +160,7 @@ export class ValidationService {
 
     for (const [key, value] of Object.entries(obj)) {
       if (value !== null && value !== undefined) {
-        if (typeof value === 'object' && !Array.isArray(value)) {
+        if (typeof value === "object" && !Array.isArray(value)) {
           sanitized[key] = this.sanitizeObject(value);
         } else {
           sanitized[key] = value;

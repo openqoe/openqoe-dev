@@ -3,9 +3,9 @@
  * Supports both self-hosted and Grafana Cloud
  */
 
-import { Env } from './types';
+import { Env } from "../definitions/types";
 
-export type DestinationType = 'self-hosted' | 'grafana-cloud';
+export type DestinationType = "self-hosted" | "grafana-cloud";
 
 export interface DestinationConfig {
   type: DestinationType;
@@ -36,7 +36,7 @@ export class DestinationManager {
   getDestinationConfig(): DestinationConfig {
     const destinationType = this.getDestinationType();
 
-    if (destinationType === 'grafana-cloud') {
+    if (destinationType === "grafana-cloud") {
       return this.getGrafanaCloudConfig();
     }
 
@@ -48,11 +48,14 @@ export class DestinationManager {
    */
   private getDestinationType(): DestinationType {
     // Check if Grafana Cloud URLs are set
-    if (this.env.GRAFANA_CLOUD_METRICS_URL || this.env.GRAFANA_CLOUD_INSTANCE_ID) {
-      return 'grafana-cloud';
+    if (
+      this.env.GRAFANA_CLOUD_METRICS_URL ||
+      this.env.GRAFANA_CLOUD_INSTANCE_ID
+    ) {
+      return "grafana-cloud";
     }
 
-    return 'self-hosted';
+    return "self-hosted";
   }
 
   /**
@@ -72,37 +75,37 @@ export class DestinationManager {
     // Validate required fields
     if (!instanceId || !apiKey) {
       throw new Error(
-        'Grafana Cloud configuration incomplete: GRAFANA_CLOUD_INSTANCE_ID and GRAFANA_CLOUD_API_KEY are required'
+        "Grafana Cloud configuration incomplete: GRAFANA_CLOUD_INSTANCE_ID and GRAFANA_CLOUD_API_KEY are required",
       );
     }
 
     if (!metricsUrl || !logsUrl) {
       throw new Error(
-        'Grafana Cloud URLs are required: Set GRAFANA_CLOUD_METRICS_URL and GRAFANA_CLOUD_LOGS_URL.\n' +
-        'Get these from: Grafana Cloud Portal → Your Stack → Details\n' +
-        '- Metrics URL: Copy from "Prometheus" section → "Remote Write Endpoint"\n' +
-        '- Logs URL: Copy from "Loki" section → "URL"'
+        "Grafana Cloud URLs are required: Set GRAFANA_CLOUD_METRICS_URL and GRAFANA_CLOUD_LOGS_URL.\n" +
+          "Get these from: Grafana Cloud Portal → Your Stack → Details\n" +
+          '- Metrics URL: Copy from "Prometheus" section → "Remote Write Endpoint"\n' +
+          '- Logs URL: Copy from "Loki" section → "URL"',
       );
     }
 
     return {
-      type: 'grafana-cloud',
+      type: "grafana-cloud",
       metrics: {
         url: metricsUrl,
         username: instanceId,
         password: apiKey,
         headers: {
-          'X-Scope-OrgID': instanceId
-        }
+          "X-Scope-OrgID": instanceId,
+        },
       },
       logs: {
         url: logsUrl,
         username: instanceId,
         password: apiKey,
         headers: {
-          'X-Scope-OrgID': instanceId
-        }
-      }
+          "X-Scope-OrgID": instanceId,
+        },
+      },
     };
   }
 
@@ -115,24 +118,29 @@ export class DestinationManager {
    */
   private getSelfHostedConfig(): DestinationConfig {
     // Prefer MIMIR_URL, fall back to PROMETHEUS_URL for backward compatibility
-    const metricsUrl = this.env.MIMIR_URL || this.env.PROMETHEUS_URL || 'http://mimir:9009/api/v1/push';
+    const metricsUrl =
+      this.env.MIMIR_URL ||
+      this.env.PROMETHEUS_URL ||
+      "http://mimir:9009/api/v1/push";
 
     // Prefer MIMIR credentials, fall back to PROMETHEUS credentials
-    const metricsUsername = this.env.MIMIR_USERNAME || this.env.PROMETHEUS_USERNAME;
-    const metricsPassword = this.env.MIMIR_PASSWORD || this.env.PROMETHEUS_PASSWORD;
+    const metricsUsername =
+      this.env.MIMIR_USERNAME || this.env.PROMETHEUS_USERNAME;
+    const metricsPassword =
+      this.env.MIMIR_PASSWORD || this.env.PROMETHEUS_PASSWORD;
 
     return {
-      type: 'self-hosted',
+      type: "self-hosted",
       metrics: {
         url: metricsUrl,
         username: metricsUsername,
-        password: metricsPassword
+        password: metricsPassword,
       },
       logs: {
-        url: this.env.LOKI_URL || 'http://loki:3100/loki/api/v1/push',
+        url: this.env.LOKI_URL || "http://loki:3100/loki/api/v1/push",
         username: this.env.LOKI_USERNAME,
-        password: this.env.LOKI_PASSWORD
-      }
+        password: this.env.LOKI_PASSWORD,
+      },
     };
   }
 
@@ -144,25 +152,25 @@ export class DestinationManager {
     const config = this.getDestinationConfig();
 
     if (!config.metrics.url) {
-      errors.push('Metrics URL is not configured');
+      errors.push("Metrics URL is not configured");
     }
 
     if (!config.logs.url) {
-      errors.push('Logs URL is not configured');
+      errors.push("Logs URL is not configured");
     }
 
-    if (config.type === 'grafana-cloud') {
+    if (config.type === "grafana-cloud") {
       if (!this.env.GRAFANA_CLOUD_INSTANCE_ID) {
-        errors.push('Grafana Cloud Instance ID is required');
+        errors.push("Grafana Cloud Instance ID is required");
       }
       if (!this.env.GRAFANA_CLOUD_API_KEY) {
-        errors.push('Grafana Cloud API Key is required');
+        errors.push("Grafana Cloud API Key is required");
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 }

@@ -2,8 +2,8 @@
  * Configuration Module
  */
 
-import { Env, CardinalityConfig, CardinalityLimit } from './types';
-import { DestinationManager } from './destinations';
+import { Env, CardinalityConfig, CardinalityLimit } from "../definitions/types";
+import { DestinationManager } from "./destinations";
 
 export class Config {
   private env: Env;
@@ -28,40 +28,52 @@ export class Config {
       return {
         limits: {
           // Allow low-cardinality dimensions
-          'org_id': { max_cardinality: 1000, action: 'allow' },
-          'player_id': { max_cardinality: 10000, action: 'allow' },
-          'env': { max_cardinality: 10, action: 'allow' },
-          'app_name': { max_cardinality: 100, action: 'allow' },
-          'event_type': { max_cardinality: 20, action: 'allow' },
+          org_id: { max_cardinality: 1000, action: "allow" },
+          player_id: { max_cardinality: 10000, action: "allow" },
+          env: { max_cardinality: 10, action: "allow" },
+          app_name: { max_cardinality: 100, action: "allow" },
+          event_type: { max_cardinality: 20, action: "allow" },
 
           // Bucket medium-cardinality dimensions
-          'video_id': { max_cardinality: 100000, action: 'bucket', bucket_size: 10000 },
-          'video_title': { max_cardinality: 100000, action: 'bucket', bucket_size: 10000 },
+          video_id: {
+            max_cardinality: 100000,
+            action: "bucket",
+            bucket_size: 10000,
+          },
+          video_title: {
+            max_cardinality: 100000,
+            action: "bucket",
+            bucket_size: 10000,
+          },
 
           // Hash high-cardinality dimensions
-          'session_id': { max_cardinality: Infinity, action: 'hash' },
-          'view_id': { max_cardinality: Infinity, action: 'hash' },
-          'viewer_id': { max_cardinality: Infinity, action: 'hash' },
+          session_id: { max_cardinality: Infinity, action: "hash" },
+          view_id: { max_cardinality: Infinity, action: "hash" },
+          viewer_id: { max_cardinality: Infinity, action: "hash" },
 
           // Device/Browser - allow common values, hash others
-          'device_category': { max_cardinality: 10, action: 'allow' },
-          'browser_family': { max_cardinality: 20, action: 'allow' },
-          'os_family': { max_cardinality: 20, action: 'allow' },
+          device_category: { max_cardinality: 10, action: "allow" },
+          browser_family: { max_cardinality: 20, action: "allow" },
+          os_family: { max_cardinality: 20, action: "allow" },
 
           // Network - bucket by country/region
-          'network_country': { max_cardinality: 250, action: 'allow' },
-          'network_region': { max_cardinality: 1000, action: 'bucket', bucket_size: 100 },
+          network_country: { max_cardinality: 250, action: "allow" },
+          network_region: {
+            max_cardinality: 1000,
+            action: "bucket",
+            bucket_size: 100,
+          },
 
           // Drop very high cardinality
-          'video_source_url': { max_cardinality: 0, action: 'drop' }
-        }
+          video_source_url: { max_cardinality: 0, action: "drop" },
+        },
       };
     }
 
     try {
       return JSON.parse(this.env.CARDINALITY_LIMITS);
     } catch (e) {
-      console.error('Failed to parse CARDINALITY_LIMITS, using defaults', e);
+      console.error("Failed to parse CARDINALITY_LIMITS, using defaults", e);
       return this.loadCardinalityConfig();
     }
   }
@@ -121,7 +133,9 @@ export class Config {
 
     // Validate KV namespace binding
     if (!this.env.CARDINALITY_KV) {
-      errors.push('CARDINALITY_KV namespace is not bound. Add it to wrangler.toml [[kv_namespaces]] section.');
+      errors.push(
+        "CARDINALITY_KV namespace is not bound. Add it to wrangler.toml [[kv_namespaces]] section.",
+      );
     }
 
     // Validate destination configuration using DestinationManager
@@ -133,12 +147,12 @@ export class Config {
     // If there are validation errors, throw with all details
     if (errors.length > 0) {
       throw new Error(
-        'Configuration validation failed:\n' +
-        errors.map(e => `  - ${e}`).join('\n') +
-        '\n\nPlease check your environment variables and wrangler.toml configuration.'
+        "Configuration validation failed:\n" +
+          errors.map((e) => `  - ${e}`).join("\n") +
+          "\n\nPlease check your environment variables and wrangler.toml configuration.",
       );
     }
 
-    console.log('Configuration validated successfully');
+    console.log("Configuration validated successfully");
   }
 }
