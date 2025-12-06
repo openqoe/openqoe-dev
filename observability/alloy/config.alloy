@@ -1,0 +1,58 @@
+// =========================================================
+// RECEIVERS
+// =========================================================
+
+otelcol.receiver.otlp "receiver" {
+    grpc {}
+    http {}
+
+    output {
+      metrics = [otelcol.processor.batch.processor.input]
+      logs = [otelcol.processor.batch.processor.input]
+    }
+}
+
+
+// =========================================================
+// PROCESSORS
+// =========================================================
+
+otelcol.processor.batch "processor" {
+  output {
+    metrics = [otelcol.exporter.prometheus.mimir.input]
+    logs = [otelcol.exporter.loki.loki.input]
+  }
+}
+
+
+// =========================================================
+// EXPORTERS
+// =========================================================
+
+// Metrics → Mimir (remote-write)
+otelcol.exporter.prometheus "mimir" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// Logs → Loki
+otelcol.exporter.loki "loki" {
+  forward_to = [loki.write.loki.receiver]
+}
+
+// =========================================================
+// EXPORTER IMPLEMENTATIONS
+// =========================================================
+
+// Prometheus Remote Write Exporter
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}
+
+// Loki Exporter
+loki.write "loki" {
+  endpoint {
+    url = "loki:3100"
+  }
+}

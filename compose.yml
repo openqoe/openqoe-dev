@@ -7,6 +7,38 @@
 # View logs: docker compose logs -f
 
 services:
+  # Grafana Alloy -  Open Telemetry Collector
+  alloy:
+    image: grafana/alloy:v1.12.0
+    container_name: openqoe-alloy
+    ports:
+      - "12345:12345"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
+    networks:
+      - openqoe
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:12345/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Mimir - Scalable metrics storage (Prometheus-compatible)
   # Same backend as Grafana Cloud Metrics
   mimir:
@@ -70,6 +102,8 @@ services:
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
     depends_on:
+      alloy:
+        condition: service_started
       mimir:
         condition: service_started
       loki:
@@ -91,6 +125,8 @@ services:
       retries: 3
 
 volumes:
+  alloy_data:
+    driver: local
   mimir_data:
     driver: local
   loki_data:
