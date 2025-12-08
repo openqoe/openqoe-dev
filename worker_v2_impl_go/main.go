@@ -21,7 +21,8 @@ func main() {
 	// Configuration
 	_ = godotenv.Load()
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Str("component", "openQoE-worker").Logger()
-	env := config.NewEnv()
+	ctx := context.Background()
+	env := config.NewEnv(ctx)
 
 	// Server setup
 	router := gin.Default()

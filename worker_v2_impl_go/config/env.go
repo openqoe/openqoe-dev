@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"context"
+	"os"
+)
 
 type GinMode string
 
@@ -20,9 +23,10 @@ type Env struct {
 	CARDINALITY_LIMITS        string
 	CORS_ALLOWED_ORIGINS      string
 	GIN_MODE                  GinMode
+	CONTEXT                   context.Context
 }
 
-func NewEnv() *Env {
+func NewEnv(ctx context.Context) *Env {
 	gm := GIN_MODE_DEBUG
 	if getEnv("GIN_MODE", "debug") == "release" {
 		gm = GIN_MODE_RELEASE
@@ -37,6 +41,7 @@ func NewEnv() *Env {
 		CARDINALITY_LIMITS:        getEnv("CARDINALITY_LIMITS", "default_limits"),
 		CORS_ALLOWED_ORIGINS:      getEnv("CORS_ALLOWED_ORIGINS", "*"),
 		GIN_MODE:                  gm,
+		CONTEXT:                   ctx,
 	}
 }
 

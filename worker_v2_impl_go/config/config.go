@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -13,6 +12,7 @@ type Config struct {
 	env                *Env
 	cardinalityConfig  *CardinalityConfig
 	destinationManager *DestinationManager
+	redisClient        *RedisConnection
 }
 
 func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityConfig {
@@ -60,35 +60,43 @@ func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityCo
 	}
 	return &cardinalityConfig
 }
-func validateConfiguration(env *Env, destinationManager *DestinationManager, parentLogger zerolog.Logger) {
+func validateConfiguration(env *Env, destinationManager *DestinationManager, redisClient *RedisConnection, parentLogger zerolog.Logger) {
 	var error_list []error
-	logger := parentLogger.With().Str("sub-component", "config").Logger()
 	if env.KV_STORE_URL == "" {
 		error_list = append(error_list, errors.New("key value store url is missing"))
+	}
+	if redisClient.PingRedis() != nil {
+		error_list = append(error_list, errors.New("failed to connect to redis"))
 	}
 	valid, dest_errors := destinationManager.validateConfiguration()
 	if !valid {
 		error_list = append(error_list, dest_errors...)
 	}
+	logger := parentLogger.With().Str("sub-component", "config").Logger()
 	if len(error_list) > 0 {
 		for _, err := range error_list {
-			logger.Error().
+			logger.Fatal().
 				Err(err).
-				Str("sub-component", "config").
+				Stack().
 				Msg("Configuration validation error")
 		}
-		log.Fatal("Configuration validation failed")
+		logger.Fatal().Msg("Configuration validation failed")
 	}
 	logger.Info().Msg("Configuration validation successful")
+	logger.Info().Msg("Successfully connected to Redis")
 }
 func NewConfig(env *Env, parentLogger zerolog.Logger) *Config {
-	config := &Config{
+	cardinalityConfig := loadCardinalityConfig(env, parentLogger)
+	destinationManager := NewDestinationManager(env, parentLogger)
+	redisClient := NewRedisClient(env, env.CONTEXT, parentLogger)
+
+	validateConfiguration(env, destinationManager, redisClient, parentLogger)
+	return &Config{
 		env:                env,
-		cardinalityConfig:  loadCardinalityConfig(env, parentLogger),
-		destinationManager: NewDestinationManager(env, parentLogger),
+		cardinalityConfig:  cardinalityConfig,
+		destinationManager: destinationManager,
+		redisClient:        redisClient,
 	}
-	validateConfiguration(config.env, config.destinationManager, parentLogger)
-	return config
 }
 
 func (c *Config) GetCardinalityLimit(dimension string) CardinalityLimit {
