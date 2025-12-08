@@ -7,6 +7,25 @@
 # View logs: docker compose logs -f
 
 services:
+  # kv data store
+  redis:
+    image: redis:8.4-alpine3.22
+    container_name: openqoe-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command:
+      - "redis-server"
+      - "--save"
+      -  "60"
+      - "1" 
+      - "--loglevel"
+      - "warning"
+    restart: unless-stopped
+    networks:
+      - openqoe
+
   # Grafana Alloy -  Open Telemetry Collector
   alloy:
     image: grafana/alloy:v1.12.0
@@ -23,6 +42,7 @@ services:
       - "--server.http.listen-addr=0.0.0.0:12345"
       - "--storage.path=/var/lib/alloy/data"
       - "/etc/alloy/config.alloy"
+    restart: unless-stopped
     networks:
       - openqoe
     healthcheck:
@@ -125,6 +145,8 @@ services:
       retries: 3
 
 volumes:
+  redis_data:
+    driver: local
   alloy_data:
     driver: local
   mimir_data:

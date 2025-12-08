@@ -2,15 +2,15 @@ package middlewares
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
+	"openqoe.dev/worker_v2/config"
 )
 
-func GlobalHeaders() gin.HandlerFunc {
+func GlobalHeaders(env *config.Env) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Cors Headers
-		allowed_origins := os.Getenv("CORS_ALLOWED_ORIGINS")
+		allowed_origins := env.CORS_ALLOWED_ORIGINS
 		c.Header("Access-Control-Allow-Origin", allowed_origins)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Authorization, X-API-Key, X-SDK-Version")
@@ -24,8 +24,8 @@ func GlobalHeaders() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		mode := os.Getenv("GIN_MODE")
-		if mode == "release" {
+		mode := env.GIN_MODE
+		if mode == config.GIN_MODE_RELEASE {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		c.Header("Content-Security-Policy",

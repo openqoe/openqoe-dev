@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -18,12 +18,13 @@ import (
 
 func main() {
 	_ = godotenv.Load()
+	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Str("component", "openQoE-worker").Logger()
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
 	router.Use(middlewares.GlobalHeaders())
 	v2Router := router.Group("/v2")
 	controller.RegisterRoutes(v2Router)
-	log.Info().Str("port", "8788").Msg("Starting HTTP server")
+	logger.Info().Str("port", "8788").Msg("Starting HTTP server")
 	srv := &http.Server{
 		Addr:    ":8788",
 		Handler: router.Handler(),
@@ -31,7 +32,7 @@ func main() {
 	go func() {
 		// service connections
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("listen error")
+			logger.Fatal().Err(err).Msg("listen error")
 		}
 	}()
 	// Wait for interrupt signal to gracefully shutdown the server with
@@ -42,12 +43,12 @@ func main() {
 	// kill -9 is syscall.SIGKILL but can't be caught, so don't need add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Info().Msg("shutting down server...")
+	logger.Info().Msg("shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Server Shutdown Failed")
+		logger.Fatal().Stack().Err(err).Msg("Server Shutdown Failed")
 	}
-	log.Info().Msg("Server exiting")
+	logger.Info().Msg("Server exiting")
 }
