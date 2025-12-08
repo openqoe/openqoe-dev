@@ -12,16 +12,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/controller"
 	"openqoe.dev/worker_v2/middlewares"
 )
 
 func main() {
+	// Configuration
 	_ = godotenv.Load()
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Str("component", "openQoE-worker").Logger()
+	env := config.NewEnv()
+
+	// Server setup
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
-	router.Use(middlewares.GlobalHeaders())
+	router.Use(middlewares.GlobalHeaders(env))
 	v2Router := router.Group("/v2")
 	controller.RegisterRoutes(v2Router)
 	logger.Info().Str("port", "8788").Msg("Starting HTTP server")
