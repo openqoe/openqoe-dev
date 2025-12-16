@@ -27,17 +27,22 @@ type CardinalityLimit struct {
 	Bucket_Size     int     `json:"bucket_size"`
 }
 
+type CardinalityStat struct {
+	count  int
+	values []string
+}
+
 type CardinalityConfig struct {
 	Limits map[string]CardinalityLimit
 }
 
 type CardinalityService struct {
-	config Config
-	env    Env
+	config *Config
+	env    *Env
 	logger zerolog.Logger
 }
 
-func NewCardinalityService(config Config, env Env, parentLogger zerolog.Logger) *CardinalityService {
+func NewCardinalityService(config *Config, env *Env, parentLogger zerolog.Logger) *CardinalityService {
 	logger := parentLogger.With().Str("sub-component", "cardinality_service").Logger()
 	return &CardinalityService{
 		config: config,
@@ -46,24 +51,33 @@ func NewCardinalityService(config Config, env Env, parentLogger zerolog.Logger) 
 	}
 }
 
-func (cs *CardinalityService) applyGovernance(dimension string, value string, res_chan chan<- string) {
+func (cs *CardinalityService) applyGovernance(dimension string, value string) string {
 	limit := cs.config.GetCardinalityLimit(dimension)
+	res_chan := make(chan string, 1)
 	switch limit.Action {
 	case Allow:
 		go cs.handleAllow(dimension, value, limit.Max_Cardinality, res_chan)
 	case Bucket:
-		go cs.handleBucket(dimension, value, limit.Bucket_Size, res_chan)
+		go cs.handleBucket(value, limit.Bucket_Size, res_chan)
 	case Hash:
 		go cs.handleHash(value, res_chan)
 	case Drop:
-		res_chan <- ""
+		go func() {
+			defer close(res_chan)
+			res_chan <- ""
+		}()
 	default:
-		res_chan <- value
+		go func() {
+			defer close(res_chan)
+			res_chan <- value
+		}()
 	}
+	return <-res_chan
 }
 
 // Handle 'allow' action - track cardinality and allow if under limit
 func (cs *CardinalityService) handleAllow(dimension string, value string, max_cardinality float64, res_chan chan<- string) {
+	defer close(res_chan)
 	const key = "cardinality:" // Redis key prefix
 	// Get current cardinality set from K
 	existingJson, err := cs.config.redisClient.GetValue(key)
@@ -106,10 +120,10 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 		cs.logger.Error().Err(err).Msg("Failed to set cardinality data with TTL")
 	}
 	res_chan <- value
-	return
 }
 
-func (cs *CardinalityService) handleBucket(dimension string, value string, bucket_size int, res_chan chan<- string) {
+func (cs *CardinalityService) handleBucket(value string, bucket_size int, res_chan chan<- string) {
+	defer close(res_chan)
 	num_value, err := strconv.ParseFloat(value, 64)
 
 	if err != nil {
@@ -123,6 +137,7 @@ func (cs *CardinalityService) handleBucket(dimension string, value string, bucke
 
 }
 func (cs *CardinalityService) handleHash(value string, res_chan chan<- string) {
+	defer close(res_chan)
 	res_chan <- cs.handleHashString(value)
 }
 
@@ -139,4 +154,45 @@ func (cs *CardinalityService) handleHashBucket(value string, bucket_size int) st
 
 func (cs *CardinalityService) handleHashNumber(value string) uint32 {
 	return crc32.ChecksumIEEE([]byte(value))
+}
+
+func (cs *CardinalityService) applyGovernanceToLabels(labels map[string]string) map[string]string {
+	governed := make(map[string]string)
+	for key, value := range labels {
+		governed_value := cs.applyGovernance(key, value)
+		if governed_value != "" {
+			governed[key] = governed_value
+		}
+	}
+	return governed
+}
+
+func (cs *CardinalityService) getCardinalityStats(dimension string, res_chan chan<- CardinalityStat) {
+	defer close(res_chan)
+	const key = "cardinality:"
+	existingJson, err := cs.config.redisClient.GetValue(key)
+	if err != nil || existingJson == "" {
+		cs.logger.Error().Err(err).Msg("Failed to get existing cardinality data")
+		res_chan <- CardinalityStat{count: 0, values: []string{}}
+		return
+	}
+	var values []string
+	if err := json.Unmarshal([]byte(existingJson), &values); err != nil {
+		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error getting cardinality stats")
+		res_chan <- CardinalityStat{count: 0, values: []string{}}
+		return
+	}
+	res_chan <- CardinalityStat{count: len(values), values: values}
+}
+
+func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<- bool) {
+	defer close(res_chan)
+	const key = "cardinality:"
+	err := cs.config.redisClient.DeleteValue(key)
+	if err != nil {
+		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error resetting cardinality")
+		res_chan <- false
+		return
+	}
+	res_chan <- true
 }

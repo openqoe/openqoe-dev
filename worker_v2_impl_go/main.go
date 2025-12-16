@@ -28,8 +28,9 @@ func main() {
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
 	router.Use(middlewares.GlobalHeaders(env))
-	v2Router := router.Group("/v2")
-	controller.RegisterRoutes(v2Router)
+	v2_router := router.Group("/v2")
+	controller_obj := controller.NewController(env, logger)
+	controller_obj.RegisterRoutes(v2_router)
 	logger.Info().Str("port", "8788").Msg("Starting HTTP server")
 	srv := &http.Server{
 		Addr:    ":8788",
