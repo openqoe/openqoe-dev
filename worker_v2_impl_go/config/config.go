@@ -9,10 +9,10 @@ import (
 )
 
 type Config struct {
-	env                *Env
-	cardinalityConfig  *CardinalityConfig
-	destinationManager *DestinationManager
-	redisClient        *RedisConnection
+	env                 *Env
+	cardinality_config  *CardinalityConfig
+	destination_manager *DestinationManager
+	redis_client        *RedisConnection
 }
 
 func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityConfig {
@@ -92,23 +92,23 @@ func NewConfig(env *Env, parentLogger zerolog.Logger) *Config {
 
 	validateConfiguration(env, destinationManager, redisClient, parentLogger)
 	return &Config{
-		env:                env,
-		cardinalityConfig:  cardinalityConfig,
-		destinationManager: destinationManager,
-		redisClient:        redisClient,
+		env:                 env,
+		cardinality_config:  cardinalityConfig,
+		destination_manager: destinationManager,
+		redis_client:        redisClient,
 	}
 }
 
 func (c *Config) GetCardinalityLimit(dimension string) CardinalityLimit {
-	return c.cardinalityConfig.Limits[dimension]
+	return c.cardinality_config.Limits[dimension]
 }
 
 func (c *Config) GetAllCardinalityLimits() map[string]CardinalityLimit {
-	return c.cardinalityConfig.Limits
+	return c.cardinality_config.Limits
 }
 
 func (c *Config) GetOtelConfig() *OtelConfig {
-	return c.destinationManager.GetDestinationConfig().Otel
+	return c.destination_manager.GetDestinationConfig().Otel
 }
 
 func (c *Config) GetApiKey() string {

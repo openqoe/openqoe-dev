@@ -42,8 +42,8 @@ type CardinalityService struct {
 	logger zerolog.Logger
 }
 
-func NewCardinalityService(config *Config, env *Env, parentLogger zerolog.Logger) *CardinalityService {
-	logger := parentLogger.With().Str("sub-component", "cardinality_service").Logger()
+func NewCardinalityService(config *Config, env *Env, parent_logger zerolog.Logger) *CardinalityService {
+	logger := parent_logger.With().Str("sub-component", "cardinality_service").Logger()
 	return &CardinalityService{
 		config: config,
 		env:    env,
@@ -80,42 +80,42 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 	defer close(res_chan)
 	const key = "cardinality:" // Redis key prefix
 	// Get current cardinality set from K
-	existingJson, err := cs.config.redisClient.GetValue(key)
+	existing_json, err := cs.config.redis_client.GetValue(key)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("Failed to get existing cardinality data")
 	}
 
-	existingSet := datastructure.NewSet[string]()
-	if existingJson != "" {
+	existing_set := datastructure.NewSet[string]()
+	if existing_json != "" {
 		var items []string
-		if err := json.Unmarshal([]byte(existingJson), &items); err != nil {
+		if err := json.Unmarshal([]byte(existing_json), &items); err != nil {
 			cs.logger.Error().Err(err).Msg("Failed to unmarshal existing cardinality data")
 		} else {
-			existingSet = datastructure.NewSet(items...)
+			existing_set = datastructure.NewSet(items...)
 		}
 	}
 	// Check if value already exists
-	if existingSet.Contains(value) {
+	if existing_set.Contains(value) {
 		res_chan <- value
 		return
 	}
 
 	// Check if adding this value would exceed limit
-	if existingSet.Size() >= int(max_cardinality) {
-		cs.logger.Warn().Str("dimension", dimension).Int("limit", existingSet.Size()/int(max_cardinality)).Msg("cardinality limit reached")
+	if existing_set.Size() >= int(max_cardinality) {
+		cs.logger.Warn().Str("dimension", dimension).Int("limit", existing_set.Size()/int(max_cardinality)).Msg("cardinality limit reached")
 		res_chan <- cs.handleHashString(value)
 		return
 	}
 
 	// Add to set and save back to KV
-	existingSet.Add(value)
-	items := existingSet.Items()
-	jsonData, err := json.Marshal(items)
+	existing_set.Add(value)
+	items := existing_set.Items()
+	json_data, err := json.Marshal(items)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("Failed to marshal cardinality data")
 		return
 	}
-	err = cs.config.redisClient.SetValueWithTTL(key, string(jsonData), 86400*time.Second)
+	err = cs.config.redis_client.SetValueWithTTL(key, string(json_data), 86400*time.Second)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("Failed to set cardinality data with TTL")
 	}
@@ -170,14 +170,14 @@ func (cs *CardinalityService) applyGovernanceToLabels(labels map[string]string) 
 func (cs *CardinalityService) getCardinalityStats(dimension string, res_chan chan<- CardinalityStat) {
 	defer close(res_chan)
 	const key = "cardinality:"
-	existingJson, err := cs.config.redisClient.GetValue(key)
-	if err != nil || existingJson == "" {
+	existing_json, err := cs.config.redis_client.GetValue(key)
+	if err != nil || existing_json == "" {
 		cs.logger.Error().Err(err).Msg("Failed to get existing cardinality data")
 		res_chan <- CardinalityStat{count: 0, values: []string{}}
 		return
 	}
 	var values []string
-	if err := json.Unmarshal([]byte(existingJson), &values); err != nil {
+	if err := json.Unmarshal([]byte(existing_json), &values); err != nil {
 		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error getting cardinality stats")
 		res_chan <- CardinalityStat{count: 0, values: []string{}}
 		return
@@ -188,7 +188,7 @@ func (cs *CardinalityService) getCardinalityStats(dimension string, res_chan cha
 func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<- bool) {
 	defer close(res_chan)
 	const key = "cardinality:"
-	err := cs.config.redisClient.DeleteValue(key)
+	err := cs.config.redis_client.DeleteValue(key)
 	if err != nil {
 		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error resetting cardinality")
 		res_chan <- false

@@ -4,26 +4,35 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/events"
-	"openqoe.dev/worker_v2/healthcheck"
-	"openqoe.dev/worker_v2/statistics"
+	"openqoe.dev/worker_v2/middlewares"
 )
 
 type Controller struct {
-	config             *config.Config
-	cardinalityService *config.CardinalityService
+	config              *config.Config
+	auth_service        *config.AuthService
+	cardinality_service *config.CardinalityService
 }
 
-func NewController(env *config.Env, logger zerolog.Logger) *Controller {
-	config_obj := config.NewConfig(env, logger)
+func NewController(env *config.Env, parent_logger zerolog.Logger) *Controller {
+	config_obj := config.NewConfig(env, parent_logger)
 	return &Controller{
-		config:             config_obj,
-		cardinalityService: config.NewCardinalityService(config_obj, env, logger),
+		config:              config_obj,
+		auth_service:        config.NewAuthService(config_obj, parent_logger),
+		cardinality_service: config.NewCardinalityService(config_obj, env, parent_logger),
 	}
 }
 
 func (c *Controller) RegisterRoutes(r *gin.RouterGroup) {
-	r.POST("/events", events.IngestEvents)
-	r.GET("/health", healthcheck.HandleHealth)
-	r.GET("/stats", statistics.HandleStats)
+	r.POST("/events", middlewares.Authenticate(c.auth_service), c.ingestEvents)
+	r.GET("/health", c.handleHealth)
+	r.GET("/stats", c.handleStats)
+}
+
+func (c *Controller) ingestEvents(ctx *gin.Context) {
+}
+
+func (c *Controller) handleHealth(ctx *gin.Context) {
+}
+
+func (c *Controller) handleStats(ctx *gin.Context) {
 }
