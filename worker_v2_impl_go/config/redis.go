@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
@@ -49,4 +50,24 @@ func (r *RedisConnection) SetValue(key string, value string) error {
 		return err
 	}
 	return nil
+}
+
+func (r *RedisConnection) SetValueWithTTL(key string, value string, ttl time.Duration) error {
+	err := r.client.Set(r.ctx, key, value, ttl).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RedisConnection) DeleteValue(key string) error {
+	err := r.client.Del(r.ctx, key).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RedisConnection) Close() error {
+	return r.client.Close()
 }
