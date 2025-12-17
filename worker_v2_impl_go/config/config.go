@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityConfig {
-	if env.CARDINALITY_LIMITS == "" {
+	if env.CARDINALITY_LIMITS == "default_limits" {
 		return &CardinalityConfig{
 			Limits: map[string]CardinalityLimit{
 				"org_id": {

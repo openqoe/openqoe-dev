@@ -33,7 +33,7 @@ func NewEnv(ctx context.Context) *Env {
 	}
 	return &Env{
 		KV_STORE_URL:              getEnv("KV_STORE_URL", "redis://localhost:6379"),
-		OTEL_URL:                  getEnv("OTEL_URL", ""),
+		OTEL_URL:                  getEnv("OTEL_URL", "http://localhost:4317"),
 		GRAFANA_CLOUD_INSTANCE_ID: getEnv("GRAFANA_CLOUD_INSTANCE_ID", ""),
 		GRAFANA_CLOUD_API_KEY:     getEnv("GRAFANA_CLOUD_API_KEY", ""),
 		GRAFANA_CLOUD_REGION:      getEnv("GRAFANA_CLOUD_REGION", "us"),
