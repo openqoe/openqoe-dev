@@ -50,6 +50,12 @@ func (c *Controller) ingestEvents(ctx *gin.Context) {
 }
 
 func (c *Controller) handleHealth(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, &data.HealthCheck{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Service:   "openqoe-worker",
+		Version:   "2.0.0",
+	})
 }
 
 func (c *Controller) handleStats(ctx *gin.Context) {

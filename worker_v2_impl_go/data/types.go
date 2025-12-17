@@ -1,5 +1,7 @@
 package data
 
+import "time"
+
 type DeviceInfo struct {
 	Name         string `json:"name"`
 	Model        string `json:"model"`
@@ -103,4 +105,11 @@ type IngestionSuccessResponse struct {
 	Message          string `json:"message"`
 	EventsReceived   int    `json:"events_received"`
 	ProcessingTimeMs int64  `json:"processing_time_ms"`
+}
+
+type HealthCheck struct {
+	Status    string    `json:"status"`
+	Timestamp time.Time `json:"timestamp"`
+	Service   string    `json:"service"`
+	Version   string    `json:"version"`
 }
