@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -15,14 +16,15 @@ type Controller struct {
 	config              *config.Config
 	auth_service        *config.AuthService
 	cardinality_service *config.CardinalityService
+	event_chan          chan<- data.IngestRequest
 }
 
-func NewController(env *config.Env, parent_logger zerolog.Logger) *Controller {
-	config_obj := config.NewConfig(env, parent_logger)
+func NewController(env *config.Env, config_obj *config.Config, ctx context.Context, event_chan chan<- data.IngestRequest, parent_logger zerolog.Logger) *Controller {
 	return &Controller{
 		config:              config_obj,
 		auth_service:        config.NewAuthService(config_obj, parent_logger),
 		cardinality_service: config.NewCardinalityService(config_obj, env, parent_logger),
+		event_chan:          event_chan,
 	}
 }
 
@@ -34,18 +36,29 @@ func (c *Controller) RegisterRoutes(r *gin.RouterGroup) {
 
 func (c *Controller) ingestEvents(ctx *gin.Context) {
 	startTime := time.Now()
+	var processing_time time.Duration
+	ingestion_events := ctx.MustGet("request").(*data.IngestRequest)
 
-	ingestionEvents := ctx.MustGet("request").(*data.IngestRequest)
+	// channel full
+	if cap(c.event_chan)-len(c.event_chan) <= 0 {
+		processing_time = time.Since(startTime)
+		ctx.JSON(http.StatusTooManyRequests, data.IngestionSuccessResponse{
+			Success:          false,
+			Message:          "Server overload",
+			EventsReceived:   len(ingestion_events.Events),
+			ProcessingTimeMs: processing_time.Milliseconds(),
+		})
+		return
+	}
 
-	// TODO: do main work
-
-	processingTime := time.Since(startTime)
+	c.event_chan <- *ingestion_events
+	processing_time = time.Since(startTime)
 
 	ctx.JSON(http.StatusAccepted, data.IngestionSuccessResponse{
 		Success:          true,
 		Message:          "Events accepted",
-		EventsReceived:   len(ingestionEvents.Events),
-		ProcessingTimeMs: processingTime.Milliseconds(),
+		EventsReceived:   len(ingestion_events.Events),
+		ProcessingTimeMs: processing_time.Milliseconds(),
 	})
 }
 

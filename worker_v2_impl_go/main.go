@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -16,14 +17,24 @@ import (
 	"openqoe.dev/worker_v2/controller"
 	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
+	"openqoe.dev/worker_v2/pool"
 )
 
 func main() {
 	// Configuration
 	_ = godotenv.Load()
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Str("component", "openQoE-worker").Logger()
-	ctx := context.Background()
-	env := config.NewEnv(ctx)
+	root_ctx, root_ctx_cancel := context.WithCancel(context.Background())
+	defer root_ctx_cancel()
+
+	env := config.NewEnv(root_ctx)
+	config_obj := config.NewConfig(env, logger)
+	event_chan := make(chan data.IngestRequest, 1000)
+
+	log.Info().Msg("Starting worker pool")
+	pool.NewWorkerPool(config_obj, root_ctx, logger, event_chan)
+
+	logger.Info().Str("port", "8788").Msg("Starting HTTP server")
 	// adding request validation
 	data.RegisterRequestValidators(logger)
 	// Server setup
@@ -31,9 +42,8 @@ func main() {
 	router.SetTrustedProxies(nil)
 	router.Use(middlewares.GlobalHeaders(env))
 	v2_router := router.Group("/v2")
-	controller_obj := controller.NewController(env, logger)
+	controller_obj := controller.NewController(env, config_obj, root_ctx, event_chan, logger)
 	controller_obj.RegisterRoutes(v2_router)
-	logger.Info().Str("port", "8788").Msg("Starting HTTP server")
 	srv := &http.Server{
 		Addr:    ":8788",
 		Handler: router.Handler(),
@@ -54,9 +64,9 @@ func main() {
 	<-quit
 	logger.Info().Msg("shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	http_ctx, http_ctx_cancel := context.WithTimeout(root_ctx, 5*time.Second)
+	defer http_ctx_cancel()
+	if err := srv.Shutdown(http_ctx); err != nil {
 		logger.Fatal().Stack().Err(err).Msg("Server Shutdown Failed")
 	}
 	logger.Info().Msg("Server exiting")

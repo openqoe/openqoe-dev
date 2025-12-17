@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strconv"
 
 	"github.com/rs/zerolog"
 )
@@ -117,4 +118,12 @@ func (c *Config) GetApiKey() string {
 
 func (c *Config) IsAuthEnabled() bool {
 	return c.env.API_KEY != "default_api_key"
+}
+
+func (c *Config) GetWorkerPoolSize() int {
+	val, err := strconv.Atoi(c.env.WORKER_POOL_SIZE)
+	if err != nil {
+		return 10 // default value
+	}
+	return val
 }
