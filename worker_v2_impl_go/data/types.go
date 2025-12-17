@@ -1,12 +1,4 @@
-package controller
-
-import (
-	"time"
-
-	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
-	"github.com/rs/zerolog"
-)
+package data
 
 type DeviceInfo struct {
 	Name         string `json:"name"`
@@ -71,10 +63,10 @@ type CMCDData struct {
 }
 
 type BaseEvent struct {
-	EventType    string `json:"event_type" binding:"required,oneof=playerready viewstart playing pause seek stall_start stall_end ended error quartile heartbeat quality_change"`
-	EventTime    int    `json:"event_time" binding:"required, timecheck"`
-	ViewerTime   int    `json:"viewer_time" binding:"required"`
-	PlaybackTime int    `json:"playback_time"`
+	EventType    string  `json:"event_type" binding:"required,oneof=playerready viewstart playing pause seek stall_start stall_end ended error quartile heartbeat quality_change"`
+	EventTime    int     `json:"event_time" binding:"required,timecheck"`
+	ViewerTime   int     `json:"viewer_time" binding:"required"`
+	PlaybackTime float64 `json:"playback_time"`
 
 	// Session identifiers
 	OrgId     string `json:"org_id" binding:"required"`
@@ -103,31 +95,12 @@ type BaseEvent struct {
 }
 
 type IngestRequest struct {
-	Events []BaseEvent `json:"events" binding:"required, min=1, max=1000, dive"`
+	Events []BaseEvent `json:"events" binding:"required,min=1,max=1000,dive"`
 }
 
-func RegisterRequestValidators(logger zerolog.Logger) {
-	const max_age = 24 * 60 * 60 * 1000
-	const max_future = 5 * 60 * 1000
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("timecheck", func(fl validator.FieldLevel) bool {
-			// Parse as time
-			p := fl.Field().String()
-			event_time, err := time.Parse(time.RFC3339, p)
-			if err != nil {
-				logger.Error().Err(err).Str("format", time.RFC3339).Msg("Failed to parse event time")
-				return false
-			}
-			now := time.Now()
-			if event_time.After(now.Add(max_future)) {
-				logger.Error().Msg("Event time is too far in the future")
-				return false
-			}
-			if event_time.Before(now.Add(max_age * -1)) {
-				logger.Error().Msg("Event time is too old (>24 hours)")
-				return false
-			}
-			return true
-		})
-	}
+type IngestionSuccessResponse struct {
+	Success          bool   `json:"success"`
+	Message          string `json:"message"`
+	EventsReceived   int    `json:"events_received"`
+	ProcessingTimeMs int64  `json:"processing_time_ms"`
 }

@@ -1,9 +1,13 @@
 package controller
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
 )
 
@@ -29,6 +33,20 @@ func (c *Controller) RegisterRoutes(r *gin.RouterGroup) {
 }
 
 func (c *Controller) ingestEvents(ctx *gin.Context) {
+	startTime := time.Now()
+
+	ingestionEvents := ctx.MustGet("request").(*data.IngestRequest)
+
+	// TODO: do main work
+
+	processingTime := time.Since(startTime)
+
+	ctx.JSON(http.StatusAccepted, data.IngestionSuccessResponse{
+		Success:          true,
+		Message:          "Events accepted",
+		EventsReceived:   len(ingestionEvents.Events),
+		ProcessingTimeMs: processingTime.Milliseconds(),
+	})
 }
 
 func (c *Controller) handleHealth(ctx *gin.Context) {

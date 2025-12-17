@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/controller"
+	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
 )
 
@@ -24,7 +25,7 @@ func main() {
 	ctx := context.Background()
 	env := config.NewEnv(ctx)
 	// adding request validation
-	controller.RegisterRequestValidators(logger)
+	data.RegisterRequestValidators(logger)
 	// Server setup
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

@@ -769,26 +769,10 @@
                 qoe = new OpenQoE.OpenQoE({
                     orgId: "demo-org",
                     playerId: "html5-event-tester",
-                    endpointUrl: "http://localhost:8787/v1/events", // Fake endpoint - won't send
+                    endpointUrl: "http://localhost:8788/v2/events", // Fake endpoint - won't send
                     debug: true,
                     logLevel: "debug",
-                    // batchSize: 100, // High batch size to prevent sending
-                    // batchInterval: 999999 // Very long interval
                 });
-
-                // Intercept transport send to capture events locally
-                // const originalSend = qoe.transport?.send || (() => {});
-                // if (qoe.transport) {
-                //     qoe.transport.send = function(events) {
-                //         // Capture events locally instead of sending
-                //         events.forEach(event => {
-                //             addEventToLog(event);
-                //             capturedEvents.push(event);
-                //         });
-                //         // Don't actually send
-                //         return Promise.resolve();
-                //     };
-                // }
 
                 // Attach to video player
                 qoe.attachPlayer("html5", video, {

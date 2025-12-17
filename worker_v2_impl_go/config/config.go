@@ -116,5 +116,5 @@ func (c *Config) GetApiKey() string {
 }
 
 func (c *Config) IsAuthEnabled() bool {
-	return c.env.API_KEY != ""
+	return c.env.API_KEY != "default_api_key"
 }
