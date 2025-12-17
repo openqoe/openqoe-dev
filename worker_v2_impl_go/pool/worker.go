@@ -47,6 +47,7 @@ func (w *Worker) worker(worker_id int) {
 			w.processEvent(event, logger)
 		case <-w.ctx.Done():
 			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		}
 	}
 }
