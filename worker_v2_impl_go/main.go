@@ -23,7 +23,8 @@ func main() {
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Str("component", "openQoE-worker").Logger()
 	ctx := context.Background()
 	env := config.NewEnv(ctx)
-
+	// adding request validation
+	controller.RegisterRequestValidators(logger)
 	// Server setup
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

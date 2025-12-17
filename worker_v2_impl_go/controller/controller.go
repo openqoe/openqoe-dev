@@ -23,7 +23,7 @@ func NewController(env *config.Env, parent_logger zerolog.Logger) *Controller {
 }
 
 func (c *Controller) RegisterRoutes(r *gin.RouterGroup) {
-	r.POST("/events", middlewares.Authenticate(c.auth_service), c.ingestEvents)
+	r.POST("/events", middlewares.Authenticate(c.auth_service), middlewares.ValidateRequest, c.ingestEvents)
 	r.GET("/health", c.handleHealth)
 	r.GET("/stats", c.handleStats)
 }
