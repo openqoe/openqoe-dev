@@ -66,7 +66,7 @@ type CMCDData struct {
 
 type BaseEvent struct {
 	EventType    string  `json:"event_type" binding:"required,oneof=playerready viewstart playing pause seek stall_start stall_end ended error quartile heartbeat quality_change"`
-	EventTime    int     `json:"event_time" binding:"required,timecheck"`
+	EventTime    int64   `json:"event_time" binding:"required,timecheck"`
 	ViewerTime   int     `json:"viewer_time" binding:"required"`
 	PlaybackTime float64 `json:"playback_time"`
 
@@ -93,7 +93,7 @@ type BaseEvent struct {
 	Cmcd    CMCDData    `json:"cmcd"`
 
 	// Event-specific data
-	Data map[string]any `json:"data"`
+	Data map[string]string `json:"data"`
 }
 
 type IngestRequest struct {

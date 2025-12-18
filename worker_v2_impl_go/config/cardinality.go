@@ -156,7 +156,7 @@ func (cs *CardinalityService) handleHashNumber(value string) uint32 {
 	return crc32.ChecksumIEEE([]byte(value))
 }
 
-func (cs *CardinalityService) applyGovernanceToLabels(labels map[string]string) map[string]string {
+func (cs *CardinalityService) ApplyGovernanceToLabels(labels map[string]string) map[string]string {
 	governed := make(map[string]string)
 	for key, value := range labels {
 		governed_value := cs.applyGovernance(key, value)
@@ -167,7 +167,7 @@ func (cs *CardinalityService) applyGovernanceToLabels(labels map[string]string) 
 	return governed
 }
 
-func (cs *CardinalityService) getCardinalityStats(dimension string, res_chan chan<- CardinalityStat) {
+func (cs *CardinalityService) GetCardinalityStats(dimension string, res_chan chan<- CardinalityStat) {
 	defer close(res_chan)
 	const key = "cardinality:"
 	existing_json, err := cs.config.redis_client.GetValue(key)
