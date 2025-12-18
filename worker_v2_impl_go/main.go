@@ -29,17 +29,14 @@ func main() {
 		},
 	).With().Timestamp().Str("component", "openQoE-worker").Logger()
 
-	root_ctx, rootCancel := context.WithCancel(context.Background())
-	defer rootCancel()
-
-	env := config.NewEnv(root_ctx)
+	env := config.NewEnv(context.Background())
 	config_obj := config.NewConfig(env, logger)
 
 	event_chan := make(chan data.IngestRequest, 1000)
 	defer close(event_chan)
 
 	logger.Info().Msg("Starting worker pool")
-	pool.NewWorkerPool(env, config_obj, root_ctx, logger, event_chan)
+	worker_pool := pool.NewWorkerPool(env, config_obj, logger, event_chan)
 
 	data.RegisterRequestValidators(logger)
 
@@ -48,7 +45,7 @@ func main() {
 	router.Use(middlewares.GlobalHeaders(env))
 
 	v2 := router.Group("/v2")
-	controller_obj := controller.NewController(env, config_obj, root_ctx, event_chan, logger)
+	controller_obj := controller.NewController(env, config_obj, event_chan, logger)
 	controller_obj.RegisterRoutes(v2)
 
 	srv := &http.Server{
@@ -69,9 +66,6 @@ func main() {
 	<-quit
 	logger.Info().Msg("shutdown signal received")
 
-	// cancel root context so workers stop
-	rootCancel()
-
 	// graceful HTTP shutdown
 	httpCtx, httpCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer httpCancel()
@@ -80,5 +74,10 @@ func main() {
 		logger.Error().Err(err).Msg("server shutdown failed")
 	}
 
-	logger.Info().Msg("server exited cleanly")
+	logger.Info().Msg("HTTP server stopped")
+
+	close(event_chan)
+	worker_pool.Wg.Wait()
+	logger.Info().Msg("all workers stopped, exiting cleanly")
+
 }

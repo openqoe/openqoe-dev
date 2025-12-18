@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -13,18 +12,16 @@ import (
 )
 
 type Controller struct {
-	config              *config.Config
-	auth_service        *config.AuthService
-	cardinality_service *config.CardinalityService
-	event_chan          chan<- data.IngestRequest
+	config       *config.Config
+	auth_service *config.AuthService
+	event_chan   chan<- data.IngestRequest
 }
 
-func NewController(env *config.Env, config_obj *config.Config, ctx context.Context, event_chan chan<- data.IngestRequest, parent_logger zerolog.Logger) *Controller {
+func NewController(env *config.Env, config_obj *config.Config, event_chan chan<- data.IngestRequest, parent_logger zerolog.Logger) *Controller {
 	return &Controller{
-		config:              config_obj,
-		auth_service:        config.NewAuthService(config_obj, parent_logger),
-		cardinality_service: config.NewCardinalityService(config_obj, env, parent_logger),
-		event_chan:          event_chan,
+		config:       config_obj,
+		auth_service: config.NewAuthService(config_obj, parent_logger),
+		event_chan:   event_chan,
 	}
 }
 

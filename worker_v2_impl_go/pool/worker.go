@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"context"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -10,54 +9,37 @@ import (
 	"openqoe.dev/worker_v2/otel"
 )
 
-type Worker struct {
-	ctx             context.Context
-	config          *config.Config
-	logger          zerolog.Logger
-	event_chan      <-chan data.IngestRequest
-	metrics_service *otel.MetricsService
-	wait_group      *sync.WaitGroup
+type WorkerPool struct {
+	Wg *sync.WaitGroup
 }
 
-func NewWorkerPool(env *config.Env, config_obj *config.Config, ctx context.Context, parent_logger zerolog.Logger, event_chan <-chan data.IngestRequest) {
+func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger zerolog.Logger, event_chan <-chan data.IngestRequest) *WorkerPool {
 	logger := parent_logger.With().Str("sub-component", "worker_pool").Logger()
 	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
-	worker_pool := &Worker{
-		ctx:             ctx,
-		config:          config_obj,
-		logger:          logger,
-		event_chan:      event_chan,
-		metrics_service: otel.NewMetricsService(config_obj, cardinality_service, logger),
-		wait_group:      &sync.WaitGroup{},
-	}
+	metrics_service := otel.NewMetricsService(config_obj, cardinality_service, logger)
+	wg := &sync.WaitGroup{}
+	pool := &WorkerPool{Wg: wg}
 	for i := 0; i < config_obj.GetWorkerPoolSize(); i++ {
-		worker_pool.wait_group.Add(1)
+		wg.Add(1)
 		logger.Debug().Int("worker id", i).Msg("Starting worker")
-		go worker_pool.worker(i)
+		go func(id int) {
+			defer wg.Done()
+			worker(id, logger, metrics_service, event_chan)
+		}(i)
+	}
+	return pool
+}
+
+func worker(worker_id int, parent_logger zerolog.Logger, metrics_service *otel.MetricsService, event_chan <-chan data.IngestRequest) {
+	logger := parent_logger.With().Str("sub-component", "worker").Int("worker id", worker_id).Logger()
+	for events_chunk := range event_chan {
+		logger.Info().Msg("Received event")
+		processEvent(events_chunk, logger)
 	}
 }
 
-func (w *Worker) worker(worker_id int) {
-	defer w.wait_group.Done()
-	logger := w.logger.With().Str("sub-component", "worker").Int("worker id", worker_id).Logger()
-	for {
-		select {
-		case event, ok := <-w.event_chan:
-			if !ok {
-				return
-			}
-			logger.Info().Msg("Received event")
-			// Process event
-			w.processEvent(event, logger)
-		case <-w.ctx.Done():
-			logger.Info().Msg("Context cancelled, stopping worker")
-			return
-		}
-	}
-}
-
-func (w *Worker) processEvent(event_stream data.IngestRequest, logger zerolog.Logger) {
-	for _, event := range event_stream.Events {
+func processEvent(events_chunk data.IngestRequest, logger zerolog.Logger) {
+	for _, event := range events_chunk.Events {
 		logger.Info().Str("event type", event.EventType).Str("view id", event.ViewId).Msg("Processing event")
 		logger.Info().Str("event type", event.EventType).Str("view id", event.ViewId).Msg("Event processing success")
 	}
