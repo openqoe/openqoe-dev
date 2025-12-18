@@ -116,7 +116,7 @@ func createMetric(name string, labels map[string]string, value float64, timestam
 	for k, v := range labels {
 		metric_labels = append(metric_labels, data.Label{Name: k, Value: v})
 	}
-	timetimeserieses = appappend(timetimeserieses, data.TimeSeries{
+	timeserieses = append(timeserieses, data.TimeSeries{
 		Labels: metric_labels,
 		Samples: []data.Sample{
 			{Value: value, Timestamp: timestamp},
