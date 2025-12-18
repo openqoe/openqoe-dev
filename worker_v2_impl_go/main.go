@@ -39,7 +39,7 @@ func main() {
 	defer close(event_chan)
 
 	logger.Info().Msg("Starting worker pool")
-	pool.NewWorkerPool(config_obj, root_ctx, logger, event_chan)
+	pool.NewWorkerPool(env, config_obj, root_ctx, logger, event_chan)
 
 	data.RegisterRequestValidators(logger)
 

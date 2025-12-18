@@ -37,16 +37,16 @@ type CardinalityConfig struct {
 }
 
 type CardinalityService struct {
-	config *Config
 	env    *Env
+	config *Config
 	logger zerolog.Logger
 }
 
-func NewCardinalityService(config *Config, env *Env, parent_logger zerolog.Logger) *CardinalityService {
+func NewCardinalityService(env *Env, config *Config, parent_logger zerolog.Logger) *CardinalityService {
 	logger := parent_logger.With().Str("sub-component", "cardinality_service").Logger()
 	return &CardinalityService{
-		config: config,
 		env:    env,
+		config: config,
 		logger: logger,
 	}
 }

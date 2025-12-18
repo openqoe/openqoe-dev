@@ -7,26 +7,30 @@ import (
 	"github.com/rs/zerolog"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/data"
+	"openqoe.dev/worker_v2/otel"
 )
 
 type Worker struct {
-	ctx           context.Context
-	config        *config.Config
-	parent_logger zerolog.Logger
-	event_chan    <-chan data.IngestRequest
-	wait_group    *sync.WaitGroup
+	ctx             context.Context
+	config          *config.Config
+	logger          zerolog.Logger
+	event_chan      <-chan data.IngestRequest
+	metrics_service *otel.MetricsService
+	wait_group      *sync.WaitGroup
 }
 
-func NewWorkerPool(config *config.Config, ctx context.Context, parent_logger zerolog.Logger, event_chan <-chan data.IngestRequest) {
+func NewWorkerPool(env *config.Env, config_obj *config.Config, ctx context.Context, parent_logger zerolog.Logger, event_chan <-chan data.IngestRequest) {
 	logger := parent_logger.With().Str("sub-component", "worker_pool").Logger()
+	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
 	worker_pool := &Worker{
-		ctx:           ctx,
-		config:        config,
-		parent_logger: logger,
-		event_chan:    event_chan,
-		wait_group:    &sync.WaitGroup{},
+		ctx:             ctx,
+		config:          config_obj,
+		logger:          logger,
+		event_chan:      event_chan,
+		metrics_service: otel.NewMetricsService(config_obj, cardinality_service, logger),
+		wait_group:      &sync.WaitGroup{},
 	}
-	for i := 0; i < config.GetWorkerPoolSize(); i++ {
+	for i := 0; i < config_obj.GetWorkerPoolSize(); i++ {
 		worker_pool.wait_group.Add(1)
 		logger.Debug().Int("worker id", i).Msg("Starting worker")
 		go worker_pool.worker(i)
@@ -35,7 +39,7 @@ func NewWorkerPool(config *config.Config, ctx context.Context, parent_logger zer
 
 func (w *Worker) worker(worker_id int) {
 	defer w.wait_group.Done()
-	logger := w.parent_logger.With().Str("sub-component", "worker").Int("worker id", worker_id).Logger()
+	logger := w.logger.With().Str("sub-component", "worker").Int("worker id", worker_id).Logger()
 	for {
 		select {
 		case event, ok := <-w.event_chan:
