@@ -1,6 +1,9 @@
 package data
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type DeviceInfo struct {
 	Name         string `json:"name"`
@@ -99,7 +102,10 @@ type BaseEvent struct {
 type IngestRequest struct {
 	Events []BaseEvent `json:"events" binding:"required,min=1,max=1000,dive"`
 }
-
+type IngestRequestWithContext struct {
+	Ctx    context.Context
+	Events []BaseEvent
+}
 type IngestionSuccessResponse struct {
 	Success          bool   `json:"success"`
 	Message          string `json:"message"`

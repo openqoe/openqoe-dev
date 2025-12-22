@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 )
 
 type AuthService struct {
 	config *Config
-	logger zerolog.Logger
+	logger *zap.Logger
 }
 
-func NewAuthService(config *Config, logger zerolog.Logger) *AuthService {
+func NewAuthService(config *Config, logger *zap.Logger) *AuthService {
 	return &AuthService{
 		config: config,
 		logger: logger,

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	datastructure "openqoe.dev/worker_v2/data_structure"
 )
 
@@ -39,11 +39,11 @@ type CardinalityConfig struct {
 type CardinalityService struct {
 	env    *Env
 	config *Config
-	logger zerolog.Logger
+	logger *zap.Logger
 }
 
-func NewCardinalityService(env *Env, config *Config, parent_logger zerolog.Logger) *CardinalityService {
-	logger := parent_logger.With().Str("sub-component", "cardinality_service").Logger()
+func NewCardinalityService(env *Env, config *Config, parent_logger *zap.Logger) *CardinalityService {
+	logger := parent_logger.With(zap.String("sub-component", "cardinality_service"))
 	return &CardinalityService{
 		env:    env,
 		config: config,
@@ -82,14 +82,14 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 	// Get current cardinality set from K
 	existing_json, err := cs.config.redis_client.GetValue(key)
 	if err != nil {
-		cs.logger.Error().Err(err).Msg("Failed to get existing cardinality data")
+		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
 	}
 
 	existing_set := datastructure.NewSet[string]()
 	if existing_json != "" {
 		var items []string
 		if err := json.Unmarshal([]byte(existing_json), &items); err != nil {
-			cs.logger.Error().Err(err).Msg("Failed to unmarshal existing cardinality data")
+			cs.logger.Error("Failed to unmarshal existing cardinality data", zap.Error(err))
 		} else {
 			existing_set = datastructure.NewSet(items...)
 		}
@@ -102,7 +102,7 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 
 	// Check if adding this value would exceed limit
 	if existing_set.Size() >= int(max_cardinality) {
-		cs.logger.Warn().Str("dimension", dimension).Int("limit", existing_set.Size()/int(max_cardinality)).Msg("cardinality limit reached")
+		cs.logger.Warn("cardinality limit reached", zap.String("dimension", dimension), zap.Int("limit", existing_set.Size()/int(max_cardinality)))
 		res_chan <- cs.handleHashString(value)
 		return
 	}
@@ -112,12 +112,12 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 	items := existing_set.Items()
 	json_data, err := json.Marshal(items)
 	if err != nil {
-		cs.logger.Error().Err(err).Msg("Failed to marshal cardinality data")
+		cs.logger.Error("Failed to marshal cardinality data", zap.Error(err))
 		return
 	}
 	err = cs.config.redis_client.SetValueWithTTL(key, string(json_data), 86400*time.Second)
 	if err != nil {
-		cs.logger.Error().Err(err).Msg("Failed to set cardinality data with TTL")
+		cs.logger.Error("Failed to set cardinality data with TTL", zap.Error(err))
 	}
 	res_chan <- value
 }
@@ -172,13 +172,13 @@ func (cs *CardinalityService) GetCardinalityStats(dimension string, res_chan cha
 	const key = "cardinality:"
 	existing_json, err := cs.config.redis_client.GetValue(key)
 	if err != nil || existing_json == "" {
-		cs.logger.Error().Err(err).Msg("Failed to get existing cardinality data")
+		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
 		res_chan <- CardinalityStat{count: 0, values: []string{}}
 		return
 	}
 	var values []string
 	if err := json.Unmarshal([]byte(existing_json), &values); err != nil {
-		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error getting cardinality stats")
+		cs.logger.Error("Error getting cardinality stats", zap.Error(err), zap.String("dimension", dimension))
 		res_chan <- CardinalityStat{count: 0, values: []string{}}
 		return
 	}
@@ -190,7 +190,7 @@ func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<-
 	const key = "cardinality:"
 	err := cs.config.redis_client.DeleteValue(key)
 	if err != nil {
-		cs.logger.Error().Err(err).Str("dimension", dimension).Msg("Error resetting cardinality")
+		cs.logger.Error("Error resetting cardinality", zap.Error(err), zap.String("dimension", dimension))
 		res_chan <- false
 		return
 	}

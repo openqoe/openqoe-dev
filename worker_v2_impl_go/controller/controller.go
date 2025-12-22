@@ -5,19 +5,20 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
+	"openqoe.dev/worker_v2/otel_service"
 )
 
 type Controller struct {
 	config       *config.Config
 	auth_service *config.AuthService
-	event_chan   chan<- data.IngestRequest
+	event_chan   chan<- data.IngestRequestWithContext
 }
 
-func NewController(env *config.Env, config_obj *config.Config, event_chan chan<- data.IngestRequest, parent_logger zerolog.Logger) *Controller {
+func NewController(env *config.Env, config_obj *config.Config, event_chan chan<- data.IngestRequestWithContext, parent_logger *zap.Logger) *Controller {
 	return &Controller{
 		config:       config_obj,
 		auth_service: config.NewAuthService(config_obj, parent_logger),
@@ -35,7 +36,10 @@ func (c *Controller) ingestEvents(ctx *gin.Context) {
 	startTime := time.Now()
 	var processing_time time.Duration
 	ingestion_events := ctx.MustGet("request").(*data.IngestRequest)
-
+	ingestion_events_with_ctx := &data.IngestRequestWithContext{
+		Ctx:    otel_service.DetachContext(ctx.Request.Context()),
+		Events: ingestion_events.Events,
+	}
 	// channel full
 	if cap(c.event_chan)-len(c.event_chan) <= 0 {
 		processing_time = time.Since(startTime)
@@ -48,7 +52,7 @@ func (c *Controller) ingestEvents(ctx *gin.Context) {
 		return
 	}
 
-	c.event_chan <- *ingestion_events
+	c.event_chan <- *ingestion_events_with_ctx
 	processing_time = time.Since(startTime)
 
 	ctx.JSON(http.StatusAccepted, data.IngestionSuccessResponse{

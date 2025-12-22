@@ -3,12 +3,12 @@ package config
 import (
 	"errors"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 )
 
 type DestinationType string
 type OtelConfig struct {
-	url string
+	Url string
 }
 type GrafanaConfig struct {
 	GrafanaCloudInstanceID string
@@ -30,15 +30,15 @@ type DestinationConfig struct {
 
 type DestinationManager struct {
 	env    *Env
-	logger zerolog.Logger
+	logger *zap.Logger
 }
 
-func NewDestinationManager(env *Env, parentLogger zerolog.Logger) *DestinationManager {
-	return &DestinationManager{env: env, logger: parentLogger.With().Str("sub-component", "DestinationManager").Logger()}
+func NewDestinationManager(env *Env, parentLogger *zap.Logger) *DestinationManager {
+	return &DestinationManager{env: env, logger: parentLogger.With((zap.String("sub-component", "DestinationManager")))}
 }
 
 func (dm *DestinationManager) GetDestinationConfig() *DestinationConfig {
-	destinationType := dm.getDestinationType()
+	destinationType := dm.GetDestinationType()
 	switch destinationType {
 	case GrafanaCloud:
 		return dm.getGrafanaConfig()
@@ -49,7 +49,7 @@ func (dm *DestinationManager) GetDestinationConfig() *DestinationConfig {
 	}
 }
 
-func (dm *DestinationManager) getDestinationType() DestinationType {
+func (dm *DestinationManager) GetDestinationType() DestinationType {
 	if dm.env.GRAFANA_CLOUD_INSTANCE_ID != "" {
 		return GrafanaCloud
 	}
@@ -58,19 +58,17 @@ func (dm *DestinationManager) getDestinationType() DestinationType {
 
 func (dm *DestinationManager) getGrafanaConfig() *DestinationConfig {
 	if dm.env.GRAFANA_CLOUD_INSTANCE_ID == "" || dm.env.GRAFANA_CLOUD_API_KEY == "" {
-		dm.logger.Fatal().
-			Str("required_fields", "GRAFANA_CLOUD_INSTANCE_ID, GRAFANA_CLOUD_API_KEY").
-			Msg("Grafana Cloud configuration incomplete")
+		dm.logger.Fatal("Grafana Cloud configuration incomplete",
+			zap.String("required_fields", "GRAFANA_CLOUD_INSTANCE_ID, GRAFANA_CLOUD_API_KEY"),
+		)
 	}
 	if dm.env.OTEL_URL == "" {
-		dm.logger.Fatal().
-			Str("required_fields", dm.env.OTEL_URL).
-			Msg("OTEL_URL is required for Metrics and Logs sending")
+		dm.logger.Fatal("OTEL_URL is required for Metrics and Logs sending", zap.String("required_fields", dm.env.OTEL_URL))
 	}
 	return &DestinationConfig{
 		DestinationType: GrafanaCloud,
 		Otel: &OtelConfig{
-			url: dm.env.OTEL_URL,
+			Url: dm.env.OTEL_URL,
 		},
 		Grafana: &GrafanaConfig{
 			GrafanaCloudInstanceID: dm.env.GRAFANA_CLOUD_INSTANCE_ID,
@@ -85,22 +83,20 @@ func (dm *DestinationManager) getGrafanaConfig() *DestinationConfig {
 
 func (dm *DestinationManager) getSelfHostedConfig() *DestinationConfig {
 	if dm.env.OTEL_URL == "" {
-		dm.logger.Fatal().
-			Str("required_fields", dm.env.OTEL_URL).
-			Msg("OTEL_URL is required for Metrics and Logs sending")
+		dm.logger.Fatal("OTEL_URL is required for Metrics and Logs sending", zap.String("required_fields", "OTEL_URL"))
 	}
 	return &DestinationConfig{
 		DestinationType: SelfHosted,
 		Otel: &OtelConfig{
-			url: dm.env.OTEL_URL,
+			Url: dm.env.OTEL_URL,
 		},
 	}
 }
 
-func (dm *DestinationManager) validateConfiguration() (bool, []error) {
+func (dm *DestinationManager) ValidateConfiguration() (bool, []error) {
 	var error_list []error
 	config := dm.GetDestinationConfig()
-	if config.Otel.url == "" {
+	if config.Otel.Url == "" {
 		error_list = append(error_list, errors.New("OTEL_URL is missing"))
 	}
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 )
 
 type RedisConnection struct {
@@ -13,18 +13,15 @@ type RedisConnection struct {
 	ctx    context.Context
 }
 
-func NewRedisClient(env *Env, ctx context.Context, parentLogger zerolog.Logger) *RedisConnection {
-	logger := parentLogger.With().Str("sub-component", "redis_client").Logger()
+func NewRedisClient(env *Env, ctx context.Context, parentLogger *zap.Logger) *RedisConnection {
+	logger := parentLogger.With(zap.String("sub-component", "redis_client"))
 	// URL: redis://<user>:<pass>@localhost:6379/<db>
 	opt, err := redis.ParseURL(env.KV_STORE_URL)
 	if err != nil {
-		logger.Fatal().
-			Err(err).
-			Str("sub-component", "redis_client").
-			Msg("Failed to parse KV_STORE_URL")
+		logger.Fatal("Failed to parse KV_STORE_URL", zap.Error(err))
 	}
 	rdb := redis.NewClient(opt)
-	logger.Info().Msg("Redis client initialized")
+	logger.Info("Redis client initialized")
 	return &RedisConnection{
 		client: rdb,
 		ctx:    ctx,

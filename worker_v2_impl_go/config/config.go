@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -16,7 +16,7 @@ type Config struct {
 	redis_client        *RedisConnection
 }
 
-func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityConfig {
+func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfig {
 	if env.CARDINALITY_LIMITS == "default_limits" {
 		return &CardinalityConfig{
 			Limits: map[string]CardinalityLimit{
@@ -53,15 +53,12 @@ func loadCardinalityConfig(env *Env, parentLogger zerolog.Logger) *CardinalityCo
 	var cardinalityConfig CardinalityConfig
 	err := json.Unmarshal(jsonData, &cardinalityConfig)
 	if err != nil {
-		logger := parentLogger.With().Str("sub-component", "config").Logger()
-		logger.Fatal().
-			Err(err).
-			Str("sub-component", "config").
-			Msg("Failed to parse CARDINALITY_LIMITS")
+		logger := parentLogger.With(zap.String("sub-component", "config"))
+		logger.Fatal("Failed to parse CARDINALITY_LIMITS", zap.Error(err))
 	}
 	return &cardinalityConfig
 }
-func validateConfiguration(env *Env, destinationManager *DestinationManager, redisClient *RedisConnection, parentLogger zerolog.Logger) {
+func validateConfiguration(env *Env, destinationManager *DestinationManager, redisClient *RedisConnection, parentLogger *zap.Logger) {
 	var error_list []error
 	if env.KV_STORE_URL == "" {
 		error_list = append(error_list, errors.New("key value store url is missing"))
@@ -69,24 +66,23 @@ func validateConfiguration(env *Env, destinationManager *DestinationManager, red
 	if redisClient.PingRedis() != nil {
 		error_list = append(error_list, errors.New("failed to connect to redis"))
 	}
-	valid, dest_errors := destinationManager.validateConfiguration()
+	valid, dest_errors := destinationManager.ValidateConfiguration()
 	if !valid {
 		error_list = append(error_list, dest_errors...)
 	}
-	logger := parentLogger.With().Str("sub-component", "config").Logger()
+	logger := parentLogger.With(zap.String("sub-component", "config"))
 	if len(error_list) > 0 {
 		for _, err := range error_list {
-			logger.Fatal().
-				Err(err).
-				Stack().
-				Msg("Configuration validation error")
+			logger.Fatal("Configuration validation error",
+				zap.Error(err),
+				zap.String("error", err.Error()))
 		}
-		logger.Fatal().Msg("Configuration validation failed")
+		logger.Fatal("Configuration validation failed")
 	}
-	logger.Info().Msg("Configuration validation successful")
-	logger.Info().Msg("Successfully connected to Redis")
+	logger.Info("Configuration validation successful")
+	logger.Info("Successfully connected to Redis")
 }
-func NewConfig(env *Env, parentLogger zerolog.Logger) *Config {
+func NewConfig(env *Env, parentLogger *zap.Logger) *Config {
 	cardinalityConfig := loadCardinalityConfig(env, parentLogger)
 	destinationManager := NewDestinationManager(env, parentLogger)
 	redisClient := NewRedisClient(env, env.CONTEXT, parentLogger)
@@ -106,6 +102,10 @@ func (c *Config) GetCardinalityLimit(dimension string) CardinalityLimit {
 
 func (c *Config) GetAllCardinalityLimits() map[string]CardinalityLimit {
 	return c.cardinality_config.Limits
+}
+
+func (c *Config) GetConfigType() DestinationType {
+	return c.destination_manager.GetDestinationType()
 }
 
 func (c *Config) GetOtelConfig() *OtelConfig {
