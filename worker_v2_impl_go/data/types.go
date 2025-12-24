@@ -96,7 +96,7 @@ type BaseEvent struct {
 	Cmcd    CMCDData    `json:"cmcd"`
 
 	// Event-specific data
-	Data map[string]string `json:"data"`
+	Data map[string]any `json:"data"`
 }
 
 type IngestRequest struct {

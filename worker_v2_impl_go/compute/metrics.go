@@ -43,43 +43,23 @@ func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeser
 	switch event.EventType {
 	case "playerready":
 		if val, ok := event.Data["player_startup_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse player_startup_time", zap.Error(err))
-			} else {
-				createMetric("openqoe_player_startup_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_player_startup_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 		if val, ok := event.Data["page_load_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse page_load_time", zap.Error(err))
-			} else {
-				createMetric("openqoe_page_load_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_page_load_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 	case "viewstart":
 		createMetric("openqoe_views_started_total", base_labels, 1, timestamp, timeserieses)
 	case "playing":
 		if val, ok := event.Data["video_startup_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse video_startup_time", zap.Error(err))
-			} else {
-				createHistogram("openqoe_video_startup_seconds", base_labels, metric_value/1000, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 30.0}, timeserieses)
-			}
+			createHistogram("openqoe_video_startup_seconds", base_labels, val.(float64)/1000, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 30.0}, timeserieses)
 		}
 		if val, ok := event.Data["bitrate"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse bitrate", zap.Error(err))
-			} else {
-				createMetric("openqoe_bitrate_bps", base_labels, metric_value, timestamp, timeserieses)
-			}
+			createMetric("openqoe_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
 		if val, ok := event.Data["resolution"]; ok {
 			var res resolution
-			err := json.Unmarshal([]byte(val), &res)
+			err := json.Unmarshal([]byte(val.(string)), &res)
 			if err != nil {
 				ms.logger.Error("Failed to unmarshal resolution", zap.Error(err))
 			}
@@ -92,71 +72,41 @@ func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeser
 	case "stall_start":
 		createMetric("openqoe_rebuffer_events_total", base_labels, 1, timestamp, timeserieses)
 		if val, ok := event.Data["buffer_length"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse buffer length", zap.Error(err))
-			} else {
-				createMetric("openqoe_buffer_length_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_buffer_length_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 	case "stall_end":
 		if val, ok := event.Data["stall_duration"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse stall duration", zap.Error(err))
-			} else {
-				createHistogram("openqoe_rebuffer_duration_seconds", base_labels, metric_value/1000.00, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0}, timeserieses)
-			}
+			createHistogram("openqoe_rebuffer_duration_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0}, timeserieses)
 		}
 	case "seek":
 		createMetric("openqoe_seeks_total", base_labels, 1, timestamp, timeserieses)
 		if val, ok := event.Data["seek_latency"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse seek_latency", zap.Error(err))
-			} else {
-				createHistogram("openqoe_seek_latency_seconds", base_labels, metric_value/1000.00, timestamp, []float64{0.1, 0.25, 0.5, 1.0, 2.0, 5.0}, timeserieses)
-			}
+			createHistogram("openqoe_seek_latency_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.1, 0.25, 0.5, 1.0, 2.0, 5.0}, timeserieses)
 		}
 
 	case "ended":
 		createMetric("openqoe_views_completed_total", base_labels, 1, timestamp, timeserieses)
 		if val, ok := event.Data["playing_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse playing_time", zap.Error(err))
-			} else {
-				createMetric("openqoe_playing_time_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 		if val, ok := event.Data["completion_rate"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse completion_rate", zap.Error(err))
-			} else {
-				createMetric("openqoe_completion_rate", base_labels, metric_value, timestamp, timeserieses)
-			}
+			createMetric("openqoe_completion_rate", base_labels, val.(float64), timestamp, timeserieses)
 		}
 		if val, ok := event.Data["rebuffer_count"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse rebuffer_count", zap.Error(err))
-			} else {
-				createMetric("openqoe_rebuffer_count", base_labels, metric_value, timestamp, timeserieses)
-			}
+			createMetric("openqoe_rebuffer_count", base_labels, val.(float64), timestamp, timeserieses)
 		}
 
 	case "error":
 		labels := maps.Clone(base_labels)
 
 		if val, ok := event.Data["error_family"]; ok {
-			labels["error_family"] = val
+			labels["error_family"] = val.(string)
 		} else {
 			labels["error_family"] = "unknown"
 		}
 
 		if val, ok := event.Data["error_code"]; ok {
-			labels["error_code"] = val
+			labels["error_code"] = val.(string)
 		} else {
 			labels["error_code"] = "unknown"
 		}
@@ -164,52 +114,33 @@ func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeser
 
 	case "heartbeat":
 		if val, ok := event.Data["playing_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse playing_time", zap.Error(err))
-			} else {
-				createMetric("openqoe_heartbeat_playing_time_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_heartbeat_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 		if val, ok := event.Data["bitrate"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse bitrate", zap.Error(err))
-			} else {
-				createMetric("openqoe_heartbeat_bitrate_bps", base_labels, metric_value, timestamp, timeserieses)
-			}
+			createMetric("openqoe_heartbeat_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
 		if val, ok := event.Data["dropped_frames"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse dropped_frames", zap.Error(err))
-			} else {
-				createMetric("openqoe_dropped_frames_total", base_labels, metric_value, timestamp, timeserieses)
-			}
+
+			createMetric("openqoe_dropped_frames_total", base_labels, val.(float64), timestamp, timeserieses)
 		}
 
 	case "quartile":
 		if val, ok := event.Data["quartile"]; ok {
 			labels := maps.Clone(base_labels)
-			labels["quartile"] = val
+			labels["quartile"] = val.(string)
 			createMetric("openqoe_quartile_reached_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
 		}
 
 	case "pause":
 		createMetric("openqoe_pause_events_total", base_labels, 1, timestamp, timeserieses)
 		if val, ok := event.Data["playing_time"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse playing_time", zap.Error(err))
-			} else {
-				createMetric("openqoe_pause_playing_time_seconds", base_labels, metric_value/1000.00, timestamp, timeserieses)
-			}
+			createMetric("openqoe_pause_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 
 	case "quality_change":
 		labels := maps.Clone(base_labels)
 		if val, ok := event.Data["trigger"]; ok && val != "" {
-			labels["trigger"] = val
+			labels["trigger"] = val.(string)
 		} else {
 			labels["trigger"] = "unknown"
 		}
@@ -217,28 +148,17 @@ func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeser
 		createMetric("openqoe_quality_changes_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
 
 		if val, ok := event.Data["new_bitrate"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse new_bitrate", zap.Error(err))
-			} else {
-				createMetric("openqoe_quality_change_bitrate_bps", base_labels, metric_value, timestamp, timeserieses)
-			}
+
+			createMetric("openqoe_quality_change_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
 		if val, ok := event.Data["old_bitrate"]; ok {
-			metric_value, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				ms.logger.Error("Failed to parse old_bitrate", zap.Error(err))
-			} else {
-				createMetric("openqoe_quality_change_old_bitrate_bps", base_labels, metric_value, timestamp, timeserieses)
-			}
-		}
-		if _, ok := event.Data["resolution"]; ok {
-			// Resolution logic repeated for quality change
-			heightStr := event.Data["height"]
-			widthStr := event.Data["width"]
+			createMetric("openqoe_quality_change_old_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 
-			height, _ := strconv.ParseInt(heightStr, 10, 64)
-			width, _ := strconv.ParseInt(widthStr, 10, 64)
+		}
+		if val, ok := event.Data["resolution"]; ok {
+			// Resolution logic repeated for quality change
+			height := val.(map[string]float64)["height"]
+			width := val.(map[string]float64)["width"]
 
 			resolution_label := getResolutionLabel(&resolution{width: width, height: height})
 			resLabels := maps.Clone(base_labels)
