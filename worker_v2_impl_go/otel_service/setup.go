@@ -17,12 +17,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, config_obj *config.Config) (func(context.Context) error, error) {
+func SetupOTelSDK(ctx context.Context, config_obj *config.Config, parent_logger *zap.Logger) (func(context.Context) error, error) {
 	var shutdownFuncs []func(context.Context) error
 	var err error
 
@@ -53,7 +54,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config) (func(context.
 		semconv.ServiceInstanceID(uuid.New().String()),
 	)
 	// Set up trace provider.
-	tracerProvider, err := newTracerProvider(ctx, config_obj, res)
+	tracerProvider, err := newTracerProvider(ctx, config_obj, res, parent_logger)
 	if err != nil {
 		handleErr(err)
 		return shutdown, err
@@ -62,7 +63,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config) (func(context.
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, config_obj, res)
+	meterProvider, err := newMeterProvider(ctx, config_obj, res, parent_logger)
 	if err != nil {
 		handleErr(err)
 		return shutdown, err
@@ -71,7 +72,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config) (func(context.
 	otel.SetMeterProvider(meterProvider)
 
 	// Set up logger provider.
-	loggerProvider, err := newLoggerProvider(ctx, config_obj, res)
+	loggerProvider, err := newLoggerProvider(ctx, config_obj, res, parent_logger)
 	if err != nil {
 		handleErr(err)
 		return shutdown, err
@@ -89,17 +90,18 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTracerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*trace.TracerProvider, error) {
+func newTracerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*trace.TracerProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
 	opts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(otelCfg.Url),
+		otlptracegrpc.WithEndpointURL(otelCfg.Url),
 		otlptracegrpc.WithCompressor("gzip"),
 	}
 
 	// 2. Add conditional options
 	if config_obj.GetConfigType() == config.SelfHosted {
+		logger.Info("Using insecure connection for tracing")
 		opts = append(opts, otlptracegrpc.WithInsecure())
 	}
 
@@ -116,17 +118,18 @@ func newTracerProvider(ctx context.Context, config_obj *config.Config, res *reso
 
 	return tracerProvider, nil
 }
-func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*metric.MeterProvider, error) {
+func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*metric.MeterProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
 	opts := []otlpmetricgrpc.Option{
-		otlpmetricgrpc.WithEndpoint(otelCfg.Url),
+		otlpmetricgrpc.WithEndpointURL(otelCfg.Url),
 		otlpmetricgrpc.WithCompressor("gzip"),
 	}
 
 	// 2. Add Insecure option only for Self-Hosted
 	if config_obj.GetConfigType() == config.SelfHosted {
+		logger.Info("Using insecure connection for metrics")
 		opts = append(opts, otlpmetricgrpc.WithInsecure())
 	}
 
@@ -145,17 +148,18 @@ func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resou
 	return meterProvider, nil
 }
 
-func newLoggerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*log.LoggerProvider, error) {
+func newLoggerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*log.LoggerProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
 	opts := []otlploggrpc.Option{
-		otlploggrpc.WithEndpoint(otelCfg.Url),
+		otlploggrpc.WithEndpointURL(otelCfg.Url),
 		otlploggrpc.WithCompressor("gzip"),
 	}
 
 	// 2. Add Insecure option only for Self-Hosted
 	if config_obj.GetConfigType() == config.SelfHosted {
+		logger.Info("Using insecure connection for logs")
 		opts = append(opts, otlploggrpc.WithInsecure())
 	}
 

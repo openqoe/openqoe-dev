@@ -5,12 +5,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/controller"
@@ -23,10 +26,11 @@ import (
 func main() {
 	_ = godotenv.Load()
 	logger := otel_service.NewOtelHookeedWorkerLogger()
-	env := config.NewEnv(context.Background())
+	root_ctx := context.Background()
+	env := config.NewEnv(root_ctx)
 	config_obj := config.NewConfig(env, logger)
-	otel_shutdown, err := otel_service.SetupOTelSDK(context.Background(), config_obj)
-
+	otel_shutdown, err := otel_service.SetupOTelSDK(root_ctx, config_obj, logger)
+	startProcessMetrics(logger)
 	event_chan := make(chan data.IngestRequestWithContext, 1000)
 	defer close(event_chan)
 
@@ -89,4 +93,31 @@ func main() {
 	}
 
 	logger.Info("exiting cleanly")
+}
+
+func startProcessMetrics(log *zap.Logger) {
+	meter := otel.GetMeterProvider().Meter("hangout.storage.metrics")
+	heapMemUsage, _ := meter.Float64ObservableGauge("go_heap_memory_usage")
+	stackMemUsage, _ := meter.Float64ObservableGauge("go_stack_memory_usage")
+	goRoutineCount, _ := meter.Int64ObservableGauge("go_goroutines_count")
+	gcCount, _ := meter.Int64ObservableGauge("go_gc_cycle_count")
+	gcPause, _ := meter.Float64ObservableGauge("go_gc_all_stop_pause_time_sum")
+
+	_, err := meter.RegisterCallback(
+		func(ctx context.Context, o metric.Observer) error {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			o.ObserveFloat64(heapMemUsage, float64(m.Alloc))
+			o.ObserveFloat64(stackMemUsage, float64(m.StackInuse))
+			o.ObserveInt64(goRoutineCount, int64(runtime.NumGoroutine()))
+			o.ObserveFloat64(gcPause, float64(m.PauseTotalNs))
+			o.ObserveInt64(gcCount, int64(m.NumGC))
+
+			return nil
+		},
+		heapMemUsage, stackMemUsage, goRoutineCount, gcCount, gcPause,
+	)
+	if err != nil {
+		log.Error("failed to register metrics callback", zap.Error(err))
+	}
 }

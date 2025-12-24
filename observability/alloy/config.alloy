@@ -4,7 +4,6 @@
 
 otelcol.receiver.otlp "receiver" {
     grpc {}
-    http {}
 
     output {
       metrics = [otelcol.processor.batch.processor.input]
@@ -55,4 +54,8 @@ loki.write "loki" {
   endpoint {
     url = "loki:3100"
   }
+}
+
+livedebugging {
+  enabled = true
 }

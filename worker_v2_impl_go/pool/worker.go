@@ -44,8 +44,10 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 		// For each event chunk
 		time_series := metrics_service.ComputeMetrics(events_chunk)
 		if len(time_series) > 0 {
-			logger.Debug("Sending time series to cardinality service")
+			logger.Info("Sending time series to cardinality service")
 			// more work to do here
+		} else {
+			logger.Info("No time series to send")
 		}
 		span.End()
 	}
