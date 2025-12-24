@@ -1,7 +1,6 @@
 package compute
 
 import (
-	"encoding/json"
 	"maps"
 	"strconv"
 	"time"
@@ -29,144 +28,135 @@ func (ms *MetricsService) ComputeMetrics(events_chunk data.IngestRequestWithCont
 	timeserieses := []data.TimeSeries{}
 	for _, event := range events_chunk.Events {
 		ms.logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
-		ms.transformEventsToMetrics(event, timeserieses)
+		timeserieses = ms.transformEventsToMetrics(event, timeserieses)
 		ms.logger.Info("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}
 	return timeserieses
 }
 
-func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeserieses []data.TimeSeries) {
+func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeserieses []data.TimeSeries) []data.TimeSeries {
 	base_labels := ms.extractBaseLabels(event)
 	timestamp := time.UnixMilli(event.EventTime)
 
-	createMetric("openqoe_events_total", base_labels, 1, timestamp, timeserieses)
+	timeserieses = createMetric("openqoe_events_total", base_labels, 1, timestamp, timeserieses)
 	switch event.EventType {
 	case "playerready":
-		if val, ok := event.Data["player_startup_time"]; ok {
-			createMetric("openqoe_player_startup_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		if val, ok := event.Data["player_startup_time"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_player_startup_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
-		if val, ok := event.Data["page_load_time"]; ok {
-			createMetric("openqoe_page_load_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		if val, ok := event.Data["page_load_time"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_page_load_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 	case "viewstart":
-		createMetric("openqoe_views_started_total", base_labels, 1, timestamp, timeserieses)
+		timeserieses = createMetric("openqoe_views_started_total", base_labels, 1, timestamp, timeserieses)
 	case "playing":
-		if val, ok := event.Data["video_startup_time"]; ok {
+		if val, ok := event.Data["video_startup_time"]; ok && val != nil {
 			createHistogram("openqoe_video_startup_seconds", base_labels, val.(float64)/1000, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 30.0}, timeserieses)
 		}
-		if val, ok := event.Data["bitrate"]; ok {
-			createMetric("openqoe_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["bitrate"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
-		if val, ok := event.Data["resolution"]; ok {
-			var res resolution
-			err := json.Unmarshal([]byte(val.(string)), &res)
-			if err != nil {
-				ms.logger.Error("Failed to unmarshal resolution", zap.Error(err))
-			}
-			resolution_label := getResolutionLabel(&res)
+		if val, ok := event.Data["resolution"]; ok && val != nil {
+			val_map := val.(map[string]any)
+			res := &resolution{width: int64(val_map["width"].(float64)), height: int64(val_map["height"].(float64))}
+			resolution_label := getResolutionLabel(res)
+
 			labels := maps.Clone(base_labels)
 			labels["resolution"] = resolution_label
 
-			createMetric("openqoe_resolution_total", labels, 1, timestamp, timeserieses)
+			timeserieses = createMetric("openqoe_resolution_total", labels, 1, timestamp, timeserieses)
 		}
 	case "stall_start":
-		createMetric("openqoe_rebuffer_events_total", base_labels, 1, timestamp, timeserieses)
-		if val, ok := event.Data["buffer_length"]; ok {
-			createMetric("openqoe_buffer_length_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		timeserieses = createMetric("openqoe_rebuffer_events_total", base_labels, 1, timestamp, timeserieses)
+		if val, ok := event.Data["buffer_length"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_buffer_length_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
 	case "stall_end":
-		if val, ok := event.Data["stall_duration"]; ok {
+		if val, ok := event.Data["stall_duration"]; ok && val != nil {
 			createHistogram("openqoe_rebuffer_duration_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0}, timeserieses)
 		}
 	case "seek":
-		createMetric("openqoe_seeks_total", base_labels, 1, timestamp, timeserieses)
-		if val, ok := event.Data["seek_latency"]; ok {
+		timeserieses = createMetric("openqoe_seeks_total", base_labels, 1, timestamp, timeserieses)
+		if val, ok := event.Data["seek_latency"]; ok && val != nil {
 			createHistogram("openqoe_seek_latency_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.1, 0.25, 0.5, 1.0, 2.0, 5.0}, timeserieses)
 		}
-
 	case "ended":
-		createMetric("openqoe_views_completed_total", base_labels, 1, timestamp, timeserieses)
-		if val, ok := event.Data["playing_time"]; ok {
-			createMetric("openqoe_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		timeserieses = createMetric("openqoe_views_completed_total", base_labels, 1, timestamp, timeserieses)
+		if val, ok := event.Data["playing_time"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
-		if val, ok := event.Data["completion_rate"]; ok {
-			createMetric("openqoe_completion_rate", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["completion_rate"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_completion_rate", base_labels, val.(float64), timestamp, timeserieses)
 		}
-		if val, ok := event.Data["rebuffer_count"]; ok {
-			createMetric("openqoe_rebuffer_count", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["rebuffer_count"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_rebuffer_count", base_labels, val.(float64), timestamp, timeserieses)
 		}
-
 	case "error":
 		labels := maps.Clone(base_labels)
 
-		if val, ok := event.Data["error_family"]; ok {
+		if val, ok := event.Data["error_family"]; ok && val != nil {
 			labels["error_family"] = val.(string)
 		} else {
 			labels["error_family"] = "unknown"
 		}
 
-		if val, ok := event.Data["error_code"]; ok {
+		if val, ok := event.Data["error_code"]; ok && val != nil {
 			labels["error_code"] = val.(string)
 		} else {
 			labels["error_code"] = "unknown"
 		}
-		createMetric("openqoe_errors_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
-
+		timeserieses = createMetric("openqoe_errors_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
 	case "heartbeat":
-		if val, ok := event.Data["playing_time"]; ok {
-			createMetric("openqoe_heartbeat_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		if val, ok := event.Data["playing_time"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_heartbeat_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
-		if val, ok := event.Data["bitrate"]; ok {
-			createMetric("openqoe_heartbeat_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["bitrate"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_heartbeat_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
-		if val, ok := event.Data["dropped_frames"]; ok {
-
-			createMetric("openqoe_dropped_frames_total", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["dropped_frames"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_dropped_frames_total", base_labels, val.(float64), timestamp, timeserieses)
 		}
-
 	case "quartile":
-		if val, ok := event.Data["quartile"]; ok {
+		if val, ok := event.Data["quartile"]; ok && val != nil {
 			labels := maps.Clone(base_labels)
-			labels["quartile"] = val.(string)
-			createMetric("openqoe_quartile_reached_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
+			labels["quartile"] = strconv.FormatFloat(val.(float64), 'f', -1, 64)
+			timeserieses = createMetric("openqoe_quartile_reached_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
 		}
-
 	case "pause":
-		createMetric("openqoe_pause_events_total", base_labels, 1, timestamp, timeserieses)
-		if val, ok := event.Data["playing_time"]; ok {
-			createMetric("openqoe_pause_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+		timeserieses = createMetric("openqoe_pause_events_total", base_labels, 1, timestamp, timeserieses)
+		if val, ok := event.Data["playing_time"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_pause_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
-
 	case "quality_change":
 		labels := maps.Clone(base_labels)
-		if val, ok := event.Data["trigger"]; ok && val != "" {
+		if val, ok := event.Data["trigger"]; ok && val != "" && val != nil {
 			labels["trigger"] = val.(string)
 		} else {
 			labels["trigger"] = "unknown"
 		}
 
-		createMetric("openqoe_quality_changes_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
+		timeserieses = createMetric("openqoe_quality_changes_total", ms.cardinality_service.ApplyGovernanceToLabels(labels), 1, timestamp, timeserieses)
 
-		if val, ok := event.Data["new_bitrate"]; ok {
+		if val, ok := event.Data["new_bitrate"]; ok && val != nil {
 
-			createMetric("openqoe_quality_change_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
+			timeserieses = createMetric("openqoe_quality_change_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 		}
-		if val, ok := event.Data["old_bitrate"]; ok {
-			createMetric("openqoe_quality_change_old_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
+		if val, ok := event.Data["old_bitrate"]; ok && val != nil {
+			timeserieses = createMetric("openqoe_quality_change_old_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
 
 		}
-		if val, ok := event.Data["resolution"]; ok {
+		if val, ok := event.Data["resolution"]; ok && val != nil {
 			// Resolution logic repeated for quality change
-			height := val.(map[string]float64)["height"]
-			width := val.(map[string]float64)["width"]
+			val_map := val.(map[string]any)
 
-			resolution_label := getResolutionLabel(&resolution{width: width, height: height})
+			resolution_label := getResolutionLabel(&resolution{width: int64(val_map["width"].(float64)), height: int64(val_map["height"].(float64))})
 			resLabels := maps.Clone(base_labels)
 			resLabels["resolution"] = resolution_label
 
-			createMetric("openqoe_resolution_total", resLabels, 1, timestamp, timeserieses)
+			timeserieses = createMetric("openqoe_resolution_total", resLabels, 1, timestamp, timeserieses)
 		}
 	}
+	return timeserieses
 }
 
 func (ms *MetricsService) extractBaseLabels(event data.BaseEvent) map[string]string {
@@ -216,7 +206,7 @@ func (ms *MetricsService) extractBaseLabels(event data.BaseEvent) map[string]str
 	return ms.cardinality_service.ApplyGovernanceToLabels(labels)
 }
 
-func createMetric(name string, labels map[string]string, value float64, timestamp time.Time, timeserieses []data.TimeSeries) {
+func createMetric(name string, labels map[string]string, value float64, timestamp time.Time, timeserieses []data.TimeSeries) []data.TimeSeries {
 	metric_labels := []data.Label{
 		{Name: "__name__", Value: name},
 	}
@@ -229,9 +219,10 @@ func createMetric(name string, labels map[string]string, value float64, timestam
 			{Value: value, Timestamp: timestamp},
 		},
 	})
+	return timeserieses
 }
 
-func createHistogram(name string, labels map[string]string, value float64, timestamp time.Time, buckets []float64, timeserieses []data.TimeSeries) {
+func createHistogram(name string, labels map[string]string, value float64, timestamp time.Time, buckets []float64, timeserieses []data.TimeSeries) []data.TimeSeries {
 	for _, bucket := range buckets {
 		bucket_labels := []data.Label{
 			{
@@ -315,6 +306,7 @@ func createHistogram(name string, labels map[string]string, value float64, times
 			},
 		},
 	})
+	return timeserieses
 }
 
 func getResolutionLabel(value *resolution) string {
