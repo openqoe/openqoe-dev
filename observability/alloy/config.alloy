@@ -8,6 +8,7 @@ otelcol.receiver.otlp "receiver" {
     output {
       metrics = [otelcol.processor.batch.processor.input]
       logs = [otelcol.processor.batch.processor.input]
+      traces = [otelcol.processor.batch.processor.input]
     }
 }
 
@@ -20,6 +21,7 @@ otelcol.processor.batch "processor" {
   output {
     metrics = [otelcol.exporter.prometheus.mimir.input]
     logs = [otelcol.exporter.loki.loki.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
@@ -36,6 +38,17 @@ otelcol.exporter.prometheus "mimir" {
 // Logs → Loki
 otelcol.exporter.loki "loki" {
   forward_to = [loki.write.loki.receiver]
+}
+
+// Traces → Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+
 }
 
 // =========================================================
