@@ -37,14 +37,13 @@ func main() {
 	config_obj := config.NewConfig(env, root_logger)
 	otel_shutdown, otel_service, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
 	logger := otel_service.Logger
-	startProcessMetrics(logger)
-	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
-	defer close(event_chan)
-
 	if err != nil {
 		logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))
 		return
 	}
+	startProcessMetrics(logger)
+	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
+	defer close(event_chan)
 
 	logger.Info("Starting worker pool")
 	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, event_chan)
@@ -57,7 +56,7 @@ func main() {
 	router.Use(middlewares.GlobalHeaders(env))
 
 	v2 := router.Group("/v2")
-	http_req_handler_service := requesthandlers.NewRequestHandlerService(env, config_obj, event_chan, logger)
+	http_req_handler_service := requesthandlers.NewRequestHandlerService(env, config_obj, event_chan, otel_service)
 	http_req_handler_service.RegisterRoutes(v2)
 
 	srv := &http.Server{

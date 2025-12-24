@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"openqoe.dev/worker_v2/config"
@@ -9,6 +10,7 @@ import (
 
 func GlobalHeaders(env *config.Env) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Set("req_start_time", time.Now().UnixNano())
 		// Cors Headers
 		allowed_origins := env.CORS_ALLOWED_ORIGINS
 		c.Header("Access-Control-Allow-Origin", allowed_origins)

@@ -110,7 +110,7 @@ type IngestionSuccessResponse struct {
 	Success          bool   `json:"success"`
 	Message          string `json:"message"`
 	EventsReceived   int    `json:"events_received"`
-	ProcessingTimeMs int64  `json:"processing_time_ms"`
+	ProcessingTimeNs int64  `json:"processing_time_ns"`
 }
 
 type HealthCheck struct {

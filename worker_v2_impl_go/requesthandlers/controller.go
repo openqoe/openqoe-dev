@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/middlewares"
@@ -12,57 +14,73 @@ import (
 )
 
 type RequestHandlerService struct {
-	config       *config.Config
-	auth_service *config.AuthService
-	event_chan   chan<- IngestRequestWithContext
+	config                    *config.Config
+	auth_service              *config.AuthService
+	otel_service              *otelservice.OpenTelemetryService
+	req_processing_time_gauge metric.Int64Gauge
+	event_chan                chan<- IngestRequestWithContext
 }
 
-func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_chan chan<- IngestRequestWithContext, parent_logger *zap.Logger) *RequestHandlerService {
+func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_chan chan<- IngestRequestWithContext, otel_service *otelservice.OpenTelemetryService) *RequestHandlerService {
+	req_processing_time_gauge, err := otel_service.Meter.Int64Gauge(
+		"request_processing_time",
+		metric.WithDescription("Time taken for the request from being received in server till just before sending response back"),
+		metric.WithUnit("ns"),
+	)
+	if err != nil {
+		otel_service.Logger.Error("request processing time gauge set up failed", zap.Error(err))
+	}
 	return &RequestHandlerService{
-		config:       config_obj,
-		auth_service: config.NewAuthService(config_obj, parent_logger),
-		event_chan:   event_chan,
+		config:                    config_obj,
+		auth_service:              config.NewAuthService(config_obj, otel_service.Logger),
+		otel_service:              otel_service,
+		req_processing_time_gauge: req_processing_time_gauge,
+		event_chan:                event_chan,
 	}
 }
 
-func (c *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
-	r.POST("/events", middlewares.Authenticate(c.auth_service), validateRequest, c.ingestEvents)
-	r.GET("/health", c.handleHealth)
-	r.GET("/stats", c.handleStats)
+func (rhs *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
+	r.POST("/events", middlewares.Authenticate(rhs.auth_service), validateRequest, rhs.ingestEvents)
+	r.GET("/health", rhs.handleHealth)
+	r.GET("/stats", rhs.handleStats)
 }
 
-func (c *RequestHandlerService) ingestEvents(ctx *gin.Context) {
-	startTime := time.Now()
-	var processing_time time.Duration
-	ingestion_events := ctx.MustGet("request").(*IngestRequest)
+func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
+	logger := rhs.otel_service.Logger
+	startTime := c.MustGet("req_start_time").(int64)
+	ingestion_events := c.MustGet("request").(*IngestRequest)
 	ingestion_events_with_ctx := &IngestRequestWithContext{
-		Ctx:    otelservice.DetachContext(ctx.Request.Context()),
+		Ctx:    otelservice.DetachContext(c.Request.Context()),
 		Events: ingestion_events.Events,
 	}
 	// channel full
-	if cap(c.event_chan)-len(c.event_chan) <= 0 {
-		processing_time = time.Since(startTime)
-		ctx.JSON(http.StatusTooManyRequests, IngestionSuccessResponse{
+	if cap(rhs.event_chan)-len(rhs.event_chan) <= 0 {
+		processing_time := time.Now().UnixNano() - startTime
+		c.JSON(http.StatusTooManyRequests, IngestionSuccessResponse{
 			Success:          false,
 			Message:          "Server overload",
 			EventsReceived:   len(ingestion_events.Events),
-			ProcessingTimeMs: processing_time.Milliseconds(),
+			ProcessingTimeNs: processing_time,
 		})
 		return
 	}
-
-	c.event_chan <- *ingestion_events_with_ctx
-	processing_time = time.Since(startTime)
-
-	ctx.JSON(http.StatusAccepted, IngestionSuccessResponse{
+	rhs.event_chan <- *ingestion_events_with_ctx
+	processing_time := time.Now().UnixNano() - startTime
+	logger.Debug("request processing time", zap.Int64("duration_ns", processing_time))
+	rhs.req_processing_time_gauge.Record(c.Request.Context(), processing_time,
+		metric.WithAttributes(
+			attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
+			attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
+		))
+	c.JSON(http.StatusAccepted, IngestionSuccessResponse{
 		Success:          true,
 		Message:          "Events accepted",
 		EventsReceived:   len(ingestion_events.Events),
-		ProcessingTimeMs: processing_time.Milliseconds(),
+		ProcessingTimeNs: processing_time,
 	})
 }
 
-func (c *RequestHandlerService) handleHealth(ctx *gin.Context) {
+func (rhs *RequestHandlerService) handleHealth(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, &HealthCheck{
 		Status:    "healthy",
 		Timestamp: time.Now(),
@@ -71,5 +89,5 @@ func (c *RequestHandlerService) handleHealth(ctx *gin.Context) {
 	})
 }
 
-func (c *RequestHandlerService) handleStats(ctx *gin.Context) {
+func (rhs *RequestHandlerService) handleStats(ctx *gin.Context) {
 }
