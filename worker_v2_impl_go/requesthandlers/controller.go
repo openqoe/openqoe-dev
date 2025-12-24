@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/middlewares"
-	"openqoe.dev/worker_v2/otel_service"
+	"openqoe.dev/worker_v2/otelservice"
 )
 
 type RequestHandlerService struct {
@@ -36,7 +36,7 @@ func (c *RequestHandlerService) ingestEvents(ctx *gin.Context) {
 	var processing_time time.Duration
 	ingestion_events := ctx.MustGet("request").(*IngestRequest)
 	ingestion_events_with_ctx := &IngestRequestWithContext{
-		Ctx:    otel_service.DetachContext(ctx.Request.Context()),
+		Ctx:    otelservice.DetachContext(ctx.Request.Context()),
 		Events: ingestion_events.Events,
 	}
 	// channel full

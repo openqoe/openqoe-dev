@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/compute"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/otel_service"
+	"openqoe.dev/worker_v2/otelservice"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
@@ -15,11 +15,10 @@ type WorkerPool struct {
 	Wg *sync.WaitGroup
 }
 
-func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger *zap.Logger, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
-	logger := parent_logger.With(zap.String("sub-component", "worker_pool"))
+func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
+	logger := otel_service.Logger.With(zap.String("sub-component", "worker_pool"))
 	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
 	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, logger)
-	tracer := otel_service.GetTracer("worker-pool")
 	wg := &sync.WaitGroup{}
 	pool := &WorkerPool{Wg: wg}
 	for i := 0; i < config_obj.GetWorkerPoolSize(); i++ {
@@ -27,7 +26,7 @@ func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger *za
 		logger.Debug("Starting worker", zap.Int("worker id", i))
 		go func(id int) {
 			defer wg.Done()
-			worker(id, logger, tracer, metrics_service, event_chan)
+			worker(id, logger, otel_service.Tracer, metrics_service, event_chan)
 		}(i)
 	}
 	return pool

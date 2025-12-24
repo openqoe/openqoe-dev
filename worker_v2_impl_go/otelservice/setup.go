@@ -1,11 +1,13 @@
-package otel_service
+package otelservice
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
@@ -18,12 +20,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"openqoe.dev/worker_v2/config"
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, config_obj *config.Config, parent_logger *zap.Logger) (func(context.Context) error, error) {
+func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder_config zapcore.EncoderConfig) (func(context.Context) error, *OpenTelemetryService, error) {
 	var shutdownFuncs []func(context.Context) error
 	var err error
 
@@ -54,33 +57,41 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, parent_logger 
 		semconv.ServiceInstanceID(uuid.New().String()),
 	)
 	// Set up trace provider.
-	tracerProvider, err := newTracerProvider(ctx, config_obj, res, parent_logger)
+	tracerProvider, err := newTracerProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, err
+		return shutdown, nil, err
 	}
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, config_obj, res, parent_logger)
+	meterProvider, err := newMeterProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, err
+		return shutdown, nil, err
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
 
 	// Set up logger provider.
-	loggerProvider, err := newLoggerProvider(ctx, config_obj, res, parent_logger)
+	loggerProvider, err := newLoggerProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, err
+		return shutdown, nil, err
 	}
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	global.SetLoggerProvider(loggerProvider)
 
-	return shutdown, err
+	// If you want to log also on stdout, you can initialize a new zap.Core
+	// that has multiple outputs using the method zap.NewTee(). With the following code,
+	// logs will be written to stdout and also exported to the OTEL endpoint through the bridge.
+	core := zapcore.NewTee(
+		zapcore.NewCore(zapcore.NewJSONEncoder(logger_encoder_config), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
+		otelzap.NewCore(package_name, otelzap.WithLoggerProvider(loggerProvider)),
+	)
+
+	return shutdown, &OpenTelemetryService{Tracer: otel.Tracer(package_name), Meter: otel.Meter(package_name), Logger: zap.New(core)}, err
 }
 
 func newPropagator() propagation.TextMapPropagator {
@@ -90,7 +101,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTracerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*trace.TracerProvider, error) {
+func newTracerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*trace.TracerProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
@@ -101,7 +112,6 @@ func newTracerProvider(ctx context.Context, config_obj *config.Config, res *reso
 
 	// 2. Add conditional options
 	if config_obj.GetConfigType() == config.SelfHosted {
-		logger.Info("Using insecure connection for tracing")
 		opts = append(opts, otlptracegrpc.WithInsecure())
 	}
 
@@ -118,7 +128,7 @@ func newTracerProvider(ctx context.Context, config_obj *config.Config, res *reso
 
 	return tracerProvider, nil
 }
-func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*metric.MeterProvider, error) {
+func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*metric.MeterProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
@@ -129,7 +139,6 @@ func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resou
 
 	// 2. Add Insecure option only for Self-Hosted
 	if config_obj.GetConfigType() == config.SelfHosted {
-		logger.Info("Using insecure connection for metrics")
 		opts = append(opts, otlpmetricgrpc.WithInsecure())
 	}
 
@@ -148,7 +157,7 @@ func newMeterProvider(ctx context.Context, config_obj *config.Config, res *resou
 	return meterProvider, nil
 }
 
-func newLoggerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource, logger *zap.Logger) (*log.LoggerProvider, error) {
+func newLoggerProvider(ctx context.Context, config_obj *config.Config, res *resource.Resource) (*log.LoggerProvider, error) {
 	otelCfg := config_obj.GetOtelConfig()
 
 	// 1. Initialize common options
@@ -159,7 +168,6 @@ func newLoggerProvider(ctx context.Context, config_obj *config.Config, res *reso
 
 	// 2. Add Insecure option only for Self-Hosted
 	if config_obj.GetConfigType() == config.SelfHosted {
-		logger.Info("Using insecure connection for logs")
 		opts = append(opts, otlploggrpc.WithInsecure())
 	}
 

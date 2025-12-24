@@ -15,20 +15,28 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/middlewares"
-	"openqoe.dev/worker_v2/otel_service"
+	"openqoe.dev/worker_v2/otelservice"
 	"openqoe.dev/worker_v2/pool"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
 func main() {
 	_ = godotenv.Load()
-	logger := otel_service.NewOtelHookeedWorkerLogger()
 	root_ctx := context.Background()
+	logger_encoder_config := zap.NewProductionEncoderConfig()
+	logger_encoder_config.EncodeTime = zapcore.RFC3339TimeEncoder
+	logger_encoder_config.EncodeLevel = zapcore.CapitalLevelEncoder
+	logger_config := zap.NewProductionConfig()
+	logger_config.EncoderConfig = logger_encoder_config
+	root_logger, _ := logger_config.Build()
+	defer root_logger.Sync()
 	env := config.NewEnv(root_ctx)
-	config_obj := config.NewConfig(env, logger)
-	otel_shutdown, err := otel_service.SetupOTelSDK(root_ctx, config_obj, logger)
+	config_obj := config.NewConfig(env, root_logger)
+	otel_shutdown, otel_service, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
+	logger := otel_service.Logger
 	startProcessMetrics(logger)
 	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
 	defer close(event_chan)
@@ -39,7 +47,7 @@ func main() {
 	}
 
 	logger.Info("Starting worker pool")
-	worker_pool := pool.NewWorkerPool(env, config_obj, logger, event_chan)
+	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, event_chan)
 
 	requesthandlers.RegisterRequestValidators(logger)
 
