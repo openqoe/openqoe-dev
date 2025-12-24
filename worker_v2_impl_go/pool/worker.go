@@ -7,15 +7,15 @@ import (
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/compute"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/otel_service"
+	"openqoe.dev/worker_v2/requesthandlers"
 )
 
 type WorkerPool struct {
 	Wg *sync.WaitGroup
 }
 
-func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger *zap.Logger, event_chan <-chan data.IngestRequestWithContext) *WorkerPool {
+func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger *zap.Logger, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
 	logger := parent_logger.With(zap.String("sub-component", "worker_pool"))
 	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
 	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, logger)
@@ -33,7 +33,7 @@ func NewWorkerPool(env *config.Env, config_obj *config.Config, parent_logger *za
 	return pool
 }
 
-func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metrics_service *compute.MetricsService, event_chan <-chan data.IngestRequestWithContext) {
+func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metrics_service *compute.MetricsService, event_chan <-chan requesthandlers.IngestRequestWithContext) {
 	logger := parent_logger.With(zap.String("sub-component", "worker"), zap.Int("worker id", worker_id))
 	// For events in the channel
 	for events_chunk := range event_chan {

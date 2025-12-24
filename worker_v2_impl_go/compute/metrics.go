@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/data"
+	"openqoe.dev/worker_v2/requesthandlers"
 )
 
 type MetricsService struct {
@@ -24,8 +24,8 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	}
 }
 
-func (ms *MetricsService) ComputeMetrics(events_chunk data.IngestRequestWithContext) []data.TimeSeries {
-	timeserieses := []data.TimeSeries{}
+func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext) []TimeSeries {
+	timeserieses := []TimeSeries{}
 	for _, event := range events_chunk.Events {
 		ms.logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 		timeserieses = ms.transformEventsToMetrics(event, timeserieses)
@@ -34,7 +34,7 @@ func (ms *MetricsService) ComputeMetrics(events_chunk data.IngestRequestWithCont
 	return timeserieses
 }
 
-func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeserieses []data.TimeSeries) []data.TimeSeries {
+func (ms *MetricsService) transformEventsToMetrics(event requesthandlers.BaseEvent, timeserieses []TimeSeries) []TimeSeries {
 	base_labels := ms.extractBaseLabels(event)
 	timestamp := time.UnixMilli(event.EventTime)
 
@@ -159,7 +159,7 @@ func (ms *MetricsService) transformEventsToMetrics(event data.BaseEvent, timeser
 	return timeserieses
 }
 
-func (ms *MetricsService) extractBaseLabels(event data.BaseEvent) map[string]string {
+func (ms *MetricsService) extractBaseLabels(event requesthandlers.BaseEvent) map[string]string {
 	labels := map[string]string{
 		"org_id":     event.OrgId,
 		"player_id":  event.PlayerId,
@@ -206,43 +206,43 @@ func (ms *MetricsService) extractBaseLabels(event data.BaseEvent) map[string]str
 	return ms.cardinality_service.ApplyGovernanceToLabels(labels)
 }
 
-func createMetric(name string, labels map[string]string, value float64, timestamp time.Time, timeserieses []data.TimeSeries) []data.TimeSeries {
-	metric_labels := []data.Label{
+func createMetric(name string, labels map[string]string, value float64, timestamp time.Time, timeserieses []TimeSeries) []TimeSeries {
+	metric_labels := []Label{
 		{Name: "__name__", Value: name},
 	}
 	for k, v := range labels {
-		metric_labels = append(metric_labels, data.Label{Name: k, Value: v})
+		metric_labels = append(metric_labels, Label{Name: k, Value: v})
 	}
-	timeserieses = append(timeserieses, data.TimeSeries{
+	timeserieses = append(timeserieses, TimeSeries{
 		Labels: metric_labels,
-		Samples: []data.Sample{
+		Samples: []Sample{
 			{Value: value, Timestamp: timestamp},
 		},
 	})
 	return timeserieses
 }
 
-func createHistogram(name string, labels map[string]string, value float64, timestamp time.Time, buckets []float64, timeserieses []data.TimeSeries) []data.TimeSeries {
+func createHistogram(name string, labels map[string]string, value float64, timestamp time.Time, buckets []float64, timeserieses []TimeSeries) []TimeSeries {
 	for _, bucket := range buckets {
-		bucket_labels := []data.Label{
+		bucket_labels := []Label{
 			{
 				Name:  "__name__",
 				Value: name + "_bucket",
 			},
 		}
 		for k, v := range labels {
-			bucket_labels = append(bucket_labels, data.Label{Name: k, Value: v})
+			bucket_labels = append(bucket_labels, Label{Name: k, Value: v})
 		}
-		bucket_labels = append(bucket_labels, data.Label{Name: "le", Value: strconv.FormatFloat(bucket, 'f', -1, 64)})
+		bucket_labels = append(bucket_labels, Label{Name: "le", Value: strconv.FormatFloat(bucket, 'f', -1, 64)})
 		val := 0.00
 		if value <= bucket {
 			val = 1
 		} else {
 			val = 0
 		}
-		timeserieses = append(timeserieses, data.TimeSeries{
+		timeserieses = append(timeserieses, TimeSeries{
 			Labels: bucket_labels,
-			Samples: []data.Sample{
+			Samples: []Sample{
 				{
 					Value:     val,
 					Timestamp: timestamp,
@@ -251,55 +251,55 @@ func createHistogram(name string, labels map[string]string, value float64, times
 		})
 	}
 
-	inf_labels := []data.Label{
+	inf_labels := []Label{
 		{
 			Name:  "__name__",
 			Value: name + "_bucket",
 		},
 	}
 	for k, v := range labels {
-		inf_labels = append(inf_labels, data.Label{Name: k, Value: v})
+		inf_labels = append(inf_labels, Label{Name: k, Value: v})
 	}
-	inf_labels = append(inf_labels, data.Label{Name: "le", Value: "+Inf"})
-	timeserieses = append(timeserieses, data.TimeSeries{
+	inf_labels = append(inf_labels, Label{Name: "le", Value: "+Inf"})
+	timeserieses = append(timeserieses, TimeSeries{
 		Labels: inf_labels,
-		Samples: []data.Sample{
+		Samples: []Sample{
 			{
 				Value:     1,
 				Timestamp: timestamp,
 			},
 		},
 	})
-	sum_labels := []data.Label{
+	sum_labels := []Label{
 		{
 			Name:  "__name__",
 			Value: name + "_sum",
 		},
 	}
 	for k, v := range labels {
-		sum_labels = append(sum_labels, data.Label{Name: k, Value: v})
+		sum_labels = append(sum_labels, Label{Name: k, Value: v})
 	}
-	timeserieses = append(timeserieses, data.TimeSeries{
+	timeserieses = append(timeserieses, TimeSeries{
 		Labels: sum_labels,
-		Samples: []data.Sample{
+		Samples: []Sample{
 			{
 				Value:     value,
 				Timestamp: timestamp,
 			},
 		},
 	})
-	count_labels := []data.Label{
+	count_labels := []Label{
 		{
 			Name:  "__name__",
 			Value: name + "_count",
 		},
 	}
 	for k, v := range labels {
-		count_labels = append(count_labels, data.Label{Name: k, Value: v})
+		count_labels = append(count_labels, Label{Name: k, Value: v})
 	}
-	timeserieses = append(timeserieses, data.TimeSeries{
+	timeserieses = append(timeserieses, TimeSeries{
 		Labels: count_labels,
-		Samples: []data.Sample{
+		Samples: []Sample{
 			{
 				Value:     1,
 				Timestamp: timestamp,

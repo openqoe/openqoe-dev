@@ -1,4 +1,4 @@
-package data
+package requesthandlers
 
 import (
 	"context"
@@ -118,18 +118,4 @@ type HealthCheck struct {
 	Timestamp time.Time `json:"timestamp"`
 	Service   string    `json:"service"`
 	Version   string    `json:"version"`
-}
-
-type Label struct {
-	Name  string
-	Value string
-}
-
-type Sample struct {
-	Value     float64
-	Timestamp time.Time
-}
-type TimeSeries struct {
-	Labels  []Label
-	Samples []Sample
 }

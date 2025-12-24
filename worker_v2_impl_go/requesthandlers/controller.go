@@ -1,4 +1,4 @@
-package controller
+package requesthandlers
 
 import (
 	"net/http"
@@ -7,43 +7,42 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
 	"openqoe.dev/worker_v2/otel_service"
 )
 
-type Controller struct {
+type RequestHandlerService struct {
 	config       *config.Config
 	auth_service *config.AuthService
-	event_chan   chan<- data.IngestRequestWithContext
+	event_chan   chan<- IngestRequestWithContext
 }
 
-func NewController(env *config.Env, config_obj *config.Config, event_chan chan<- data.IngestRequestWithContext, parent_logger *zap.Logger) *Controller {
-	return &Controller{
+func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_chan chan<- IngestRequestWithContext, parent_logger *zap.Logger) *RequestHandlerService {
+	return &RequestHandlerService{
 		config:       config_obj,
 		auth_service: config.NewAuthService(config_obj, parent_logger),
 		event_chan:   event_chan,
 	}
 }
 
-func (c *Controller) RegisterRoutes(r *gin.RouterGroup) {
-	r.POST("/events", middlewares.Authenticate(c.auth_service), middlewares.ValidateRequest, c.ingestEvents)
+func (c *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
+	r.POST("/events", middlewares.Authenticate(c.auth_service), validateRequest, c.ingestEvents)
 	r.GET("/health", c.handleHealth)
 	r.GET("/stats", c.handleStats)
 }
 
-func (c *Controller) ingestEvents(ctx *gin.Context) {
+func (c *RequestHandlerService) ingestEvents(ctx *gin.Context) {
 	startTime := time.Now()
 	var processing_time time.Duration
-	ingestion_events := ctx.MustGet("request").(*data.IngestRequest)
-	ingestion_events_with_ctx := &data.IngestRequestWithContext{
+	ingestion_events := ctx.MustGet("request").(*IngestRequest)
+	ingestion_events_with_ctx := &IngestRequestWithContext{
 		Ctx:    otel_service.DetachContext(ctx.Request.Context()),
 		Events: ingestion_events.Events,
 	}
 	// channel full
 	if cap(c.event_chan)-len(c.event_chan) <= 0 {
 		processing_time = time.Since(startTime)
-		ctx.JSON(http.StatusTooManyRequests, data.IngestionSuccessResponse{
+		ctx.JSON(http.StatusTooManyRequests, IngestionSuccessResponse{
 			Success:          false,
 			Message:          "Server overload",
 			EventsReceived:   len(ingestion_events.Events),
@@ -55,7 +54,7 @@ func (c *Controller) ingestEvents(ctx *gin.Context) {
 	c.event_chan <- *ingestion_events_with_ctx
 	processing_time = time.Since(startTime)
 
-	ctx.JSON(http.StatusAccepted, data.IngestionSuccessResponse{
+	ctx.JSON(http.StatusAccepted, IngestionSuccessResponse{
 		Success:          true,
 		Message:          "Events accepted",
 		EventsReceived:   len(ingestion_events.Events),
@@ -63,8 +62,8 @@ func (c *Controller) ingestEvents(ctx *gin.Context) {
 	})
 }
 
-func (c *Controller) handleHealth(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, &data.HealthCheck{
+func (c *RequestHandlerService) handleHealth(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, &HealthCheck{
 		Status:    "healthy",
 		Timestamp: time.Now(),
 		Service:   "openqoe-worker",
@@ -72,5 +71,5 @@ func (c *Controller) handleHealth(ctx *gin.Context) {
 	})
 }
 
-func (c *Controller) handleStats(ctx *gin.Context) {
+func (c *RequestHandlerService) handleStats(ctx *gin.Context) {
 }

@@ -16,11 +16,10 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/controller"
-	"openqoe.dev/worker_v2/data"
 	"openqoe.dev/worker_v2/middlewares"
 	"openqoe.dev/worker_v2/otel_service"
 	"openqoe.dev/worker_v2/pool"
+	"openqoe.dev/worker_v2/requesthandlers"
 )
 
 func main() {
@@ -31,7 +30,7 @@ func main() {
 	config_obj := config.NewConfig(env, logger)
 	otel_shutdown, err := otel_service.SetupOTelSDK(root_ctx, config_obj, logger)
 	startProcessMetrics(logger)
-	event_chan := make(chan data.IngestRequestWithContext, 1000)
+	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
 	defer close(event_chan)
 
 	if err != nil {
@@ -42,7 +41,7 @@ func main() {
 	logger.Info("Starting worker pool")
 	worker_pool := pool.NewWorkerPool(env, config_obj, logger, event_chan)
 
-	data.RegisterRequestValidators(logger)
+	requesthandlers.RegisterRequestValidators(logger)
 
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
@@ -50,8 +49,8 @@ func main() {
 	router.Use(middlewares.GlobalHeaders(env))
 
 	v2 := router.Group("/v2")
-	controller_obj := controller.NewController(env, config_obj, event_chan, logger)
-	controller_obj.RegisterRoutes(v2)
+	http_req_handler_service := requesthandlers.NewRequestHandlerService(env, config_obj, event_chan, logger)
+	http_req_handler_service.RegisterRoutes(v2)
 
 	srv := &http.Server{
 		Addr:    ":8788",

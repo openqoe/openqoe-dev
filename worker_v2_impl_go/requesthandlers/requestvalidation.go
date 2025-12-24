@@ -1,8 +1,10 @@
-package data
+package requesthandlers
 
 import (
+	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
@@ -43,4 +45,18 @@ func RegisterRequestValidators(logger *zap.Logger) {
 			return true
 		})
 	}
+}
+
+func validateRequest(c *gin.Context) {
+	req := new(IngestRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Validation failed",
+			"errors":  err.Error()})
+		c.Abort()
+		return
+	}
+	c.Set("request", req)
+	c.Next()
 }
