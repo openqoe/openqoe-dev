@@ -14,28 +14,29 @@ import (
 )
 
 type RequestHandlerService struct {
-	config                    *config.Config
-	auth_service              *config.AuthService
-	otel_service              *otelservice.OpenTelemetryService
-	req_processing_time_gauge metric.Int64Gauge
-	event_chan                chan<- IngestRequestWithContext
+	config                   *config.Config
+	auth_service             *config.AuthService
+	otel_service             *otelservice.OpenTelemetryService
+	req_processing_time_hist metric.Int64Histogram
+	event_chan               chan<- IngestRequestWithContext
 }
 
 func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_chan chan<- IngestRequestWithContext, otel_service *otelservice.OpenTelemetryService) *RequestHandlerService {
-	req_processing_time_gauge, err := otel_service.Meter.Int64Gauge(
+	req_processing_time_gauge, err := otel_service.Meter.Int64Histogram(
 		"request_processing_time",
 		metric.WithDescription("Time taken for the request from being received in server till just before sending response back"),
 		metric.WithUnit("ns"),
+		metric.WithExplicitBucketBoundaries(100000, 150000, 250000, 400000, 600000, 850000, 11000000),
 	)
 	if err != nil {
 		otel_service.Logger.Error("request processing time gauge set up failed", zap.Error(err))
 	}
 	return &RequestHandlerService{
-		config:                    config_obj,
-		auth_service:              config.NewAuthService(config_obj, otel_service.Logger),
-		otel_service:              otel_service,
-		req_processing_time_gauge: req_processing_time_gauge,
-		event_chan:                event_chan,
+		config:                   config_obj,
+		auth_service:             config.NewAuthService(config_obj, otel_service.Logger),
+		otel_service:             otel_service,
+		req_processing_time_hist: req_processing_time_gauge,
+		event_chan:               event_chan,
 	}
 }
 
@@ -67,7 +68,7 @@ func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
 	rhs.event_chan <- *ingestion_events_with_ctx
 	processing_time := time.Now().UnixNano() - startTime
 	logger.Debug("request processing time", zap.Int64("duration_ns", processing_time))
-	rhs.req_processing_time_gauge.Record(c.Request.Context(), processing_time,
+	rhs.req_processing_time_hist.Record(c.Request.Context(), processing_time,
 		metric.WithAttributes(
 			attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
 			attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
