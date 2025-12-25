@@ -47,8 +47,10 @@ func main() {
 
 	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
 
+	cardinality_service := config.NewCardinalityService(env, config_obj, otel_service.Logger)
+
 	logger.Info("Starting worker pool")
-	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, event_chan)
+	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, cardinality_service, event_chan)
 
 	logger.Info("Starting HTTP server", zap.Int("port", 8788))
 	requesthandlers.RegisterRequestValidators(logger)
@@ -58,7 +60,7 @@ func main() {
 	router.Use(middlewares.GlobalHeaders(env))
 
 	v2 := router.Group("/v2")
-	http_req_handler_service := requesthandlers.NewRequestHandlerService(env, config_obj, event_chan, otel_service)
+	http_req_handler_service := requesthandlers.NewRequestHandlerService(env, config_obj, otel_service, cardinality_service, event_chan)
 	http_req_handler_service.RegisterRoutes(v2)
 
 	srv := &http.Server{
