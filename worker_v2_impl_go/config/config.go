@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -82,10 +83,10 @@ func validateConfiguration(env *Env, destinationManager *DestinationManager, red
 	logger.Info("Configuration validation successful")
 	logger.Info("Successfully connected to Redis")
 }
-func NewConfig(env *Env, parentLogger *zap.Logger) *Config {
+func NewConfig(ctx context.Context, env *Env, parentLogger *zap.Logger) *Config {
 	cardinalityConfig := loadCardinalityConfig(env, parentLogger)
 	destinationManager := NewDestinationManager(env, parentLogger)
-	redisClient := NewRedisClient(env, env.CONTEXT, parentLogger)
+	redisClient := NewRedisClient(ctx, env, parentLogger)
 
 	validateConfiguration(env, destinationManager, redisClient, parentLogger)
 	return &Config{
