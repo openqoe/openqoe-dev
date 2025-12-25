@@ -3,6 +3,7 @@ package pool
 import (
 	"sync"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/compute"
@@ -38,10 +39,11 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 	for events_chunk := range event_chan {
 		// There is a ctx that is present as the first parameter which we ignore for simplicity
 		// but in future this ctx can be passed down to child functions to create child spans
-		_, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer))
-		logger.Info("Received event")
+		_, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.Int("worker.id", worker_id)))
+		logger.Debug("Received event for processing", zap.Int("worker id", worker_id))
 		// For each event chunk
 		metrics_service.ComputeMetrics(events_chunk)
+		logger.Debug("Event processing complete", zap.Int("worker id", worker_id))
 		span.End()
 	}
 }
