@@ -4,11 +4,11 @@
 
 otelcol.receiver.otlp "receiver" {
     grpc {}
-    http {}
 
     output {
       metrics = [otelcol.processor.batch.processor.input]
       logs = [otelcol.processor.batch.processor.input]
+      traces = [otelcol.processor.batch.processor.input]
     }
 }
 
@@ -21,6 +21,7 @@ otelcol.processor.batch "processor" {
   output {
     metrics = [otelcol.exporter.prometheus.mimir.input]
     logs = [otelcol.exporter.loki.loki.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
@@ -39,6 +40,17 @@ otelcol.exporter.loki "loki" {
   forward_to = [loki.write.loki.receiver]
 }
 
+// Traces → Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+
+}
+
 // =========================================================
 // EXPORTER IMPLEMENTATIONS
 // =========================================================
@@ -53,6 +65,10 @@ prometheus.remote_write "mimir" {
 // Loki Exporter
 loki.write "loki" {
   endpoint {
-    url = "loki:3100"
+    url = "http://loki:3100/loki/api/v1/push"
   }
+}
+
+livedebugging {
+  enabled = true
 }

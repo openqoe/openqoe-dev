@@ -3,7 +3,14 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>OpenQoE HTML5 Demo - SDK Event Tester</title>
+        <title>OpenQoE Shaka Player Demo - SDK Event Tester</title>
+
+        <!-- Shaka Player CSS -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css"
+        />
+
         <style>
             * {
                 margin: 0;
@@ -189,12 +196,17 @@
                 font-size: 1.5em;
             }
 
-            video {
+            #video-container {
                 width: 100%;
                 border-radius: 8px;
                 background: #000;
                 margin-bottom: 20px;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            video {
+                width: 100%;
+                border-radius: 8px;
             }
 
             .controls {
@@ -512,9 +524,9 @@
     <body>
         <div class="container">
             <header>
-                <h1>🎬 OpenQoE SDK Event Tester</h1>
+                <h1>🎬 OpenQoE Shaka Player Event Tester</h1>
                 <p class="subtitle">
-                    Test and visualize all SDK-captured events in real-time
+                    Test and visualize Shaka Player SDK events in real-time
                 </p>
                 <p style="margin-top: 10px; font-size: 14px; color: #aaa">
                     <span class="status-indicator active"></span>
@@ -531,16 +543,16 @@
             </div>
 
             <div class="url-input-section">
-                <h2>🎥 Load Your Video</h2>
+                <h2>🎥 Load Your Stream</h2>
                 <div class="input-group">
                     <input
                         type="text"
                         id="video-url-input"
-                        placeholder="Enter video URL (MP4, HLS, DASH, etc.)"
-                        value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                        placeholder="Enter stream URL (DASH, HLS, etc.)"
+                        value="https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"
                     />
                     <button class="btn btn-success" onclick="loadVideo()">
-                        Load Video
+                        Load Stream
                     </button>
                     <button class="btn" onclick="clearVideo()">Clear</button>
                 </div>
@@ -549,10 +561,10 @@
                         >Quick samples:</small
                     >
                     <button class="sample-url-btn" onclick="loadSampleVideo(0)">
-                        Big Buck Bunny
+                        Angel One DASH
                     </button>
                     <button class="sample-url-btn" onclick="loadSampleVideo(1)">
-                        Elephant's Dream
+                        Tears of Steel
                     </button>
                     <button class="sample-url-btn" onclick="loadSampleVideo(2)">
                         Sintel
@@ -563,11 +575,13 @@
             <div class="main-content">
                 <!-- Left Column: Player -->
                 <div class="player-section">
-                    <h2>Video Player</h2>
+                    <h2>Shaka Player</h2>
 
-                    <video id="video" controls>
-                        <p>Your browser doesn't support HTML5 video.</p>
-                    </video>
+                    <div id="video-container" data-shaka-player-container>
+                        <video id="video" data-shaka-player controls>
+                            <p>Your browser doesn't support HTML5 video.</p>
+                        </video>
+                    </div>
 
                     <div class="controls">
                         <button onclick="videoControls.play()">▶ Play</button>
@@ -680,7 +694,7 @@
                             </svg>
                             <div>No events captured yet</div>
                             <div style="font-size: 12px; margin-top: 5px">
-                                Load a video and start playing to see events
+                                Load a stream and start playing to see events
                             </div>
                         </div>
                     </div>
@@ -688,33 +702,34 @@
             </div>
         </div>
 
+        <!-- Shaka Player Library -->
+        <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.compiled.js"></script>
+
         <!-- OpenQoE SDK -->
         <script src="../../sdk/dist/index.umd.js"></script>
 
         <script>
-            // Sample videos
+            // Sample streams
             const sampleVideos = [
                 {
-                    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                    id: "big-buck-bunny",
-                    title: "Big Buck Bunny",
-                    duration: 596,
+                    url: "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd",
+                    id: "angel-one-dash",
+                    title: "Angel One DASH",
                 },
                 {
-                    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                    id: "elephants-dream",
-                    title: "Elephant's Dream",
-                    duration: 653,
+                    url: "https://storage.googleapis.com/shaka-demo-assets/tos-ttml/dash.mpd",
+                    id: "tears-of-steel",
+                    title: "Tears of Steel",
                 },
                 {
-                    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-                    id: "sintel",
+                    url: "https://storage.googleapis.com/shaka-demo-assets/sintel/dash.mpd",
+                    id: "sintel-shaka",
                     title: "Sintel",
-                    duration: 888,
                 },
             ];
 
             // Global variables
+            let player = null;
             let qoe = null;
             let eventCount = 0;
             let capturedEvents = [];
@@ -726,6 +741,35 @@
             const video = document.getElementById("video");
             const eventsContainer = document.getElementById("events-container");
 
+            // Initialize Shaka Player
+            function initializePlayer() {
+                // Install built-in polyfills
+                shaka.polyfill.installAll();
+
+                // Check if browser is supported
+                if (!shaka.Player.isBrowserSupported()) {
+                    console.error("Browser not supported!");
+                    alert("Your browser is not supported by Shaka Player");
+                    return null;
+                }
+
+                // Destroy existing player
+                if (player) {
+                    player.destroy();
+                    player = null;
+                }
+
+                // Create new player
+                player = new shaka.Player(video);
+
+                // Setup error handling
+                player.addEventListener("error", (error) => {
+                    console.error("Shaka Player error:", error);
+                });
+
+                return player;
+            }
+
             // Load sample video
             function loadSampleVideo(index) {
                 const sample = sampleVideos[index];
@@ -734,24 +778,27 @@
             }
 
             // Load video from URL
-            function loadVideo(sampleData = null) {
+            async function loadVideo(sampleData = null) {
                 const urlInput = document.getElementById("video-url-input");
                 const url = urlInput.value.trim();
 
                 if (!url) {
-                    alert("Please enter a video URL");
+                    alert("Please enter a stream URL");
                     return;
                 }
 
-                // Clear previous video
+                // Clear previous instances
                 if (qoe) {
                     qoe.destroy();
                     qoe = null;
                 }
 
-                // Set video source
-                video.src = url;
-                video.load();
+                // Initialize player
+                player = initializePlayer();
+
+                if (!player) {
+                    return;
+                }
 
                 // Determine video metadata
                 let videoId, videoTitle;
@@ -765,17 +812,27 @@
                     videoTitle = videoId.replace(/[-_]/g, " ");
                 }
 
+                // Load stream
+                try {
+                    await player.load(url);
+                    console.log("Shaka Player: Stream loaded successfully");
+                } catch (error) {
+                    console.error("Error loading stream:", error);
+                    alert("Error loading stream: " + error.message);
+                    return;
+                }
+
                 // Initialize OpenQoE SDK (with fake endpoint to prevent actual sending)
                 qoe = new OpenQoE.OpenQoE({
                     orgId: "demo-org",
-                    playerId: "html5-event-tester",
+                    playerId: "shaka-event-tester",
                     endpointUrl: "http://localhost:8788/v2/events", // Fake endpoint - won't send
                     debug: true,
                     logLevel: "debug",
                 });
 
-                // Attach to video player
-                qoe.attachPlayer("html5", video, {
+                // Attach to player
+                qoe.attachPlayer("shaka", player, {
                     videoId: videoId,
                     videoTitle: videoTitle,
                 });
@@ -801,6 +858,10 @@
                 if (qoe) {
                     qoe.destroy();
                     qoe = null;
+                }
+                if (player) {
+                    player.destroy();
+                    player = null;
                 }
                 video.removeAttribute("src");
                 video.load();
@@ -890,7 +951,7 @@
                         <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
                     </svg>
                     <div>No events captured yet</div>
-                    <div style="font-size: 12px; margin-top: 5px;">Load a video and start playing to see events</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Load a stream and start playing to see events</div>
                 </div>
             `;
                 eventCount = 0;
@@ -944,8 +1005,8 @@
             // Video controls
             const videoControls = {
                 play: () => {
-                    if (!video.src) {
-                        alert("Please load a video first");
+                    if (!player || !video.src) {
+                        alert("Please load a stream first");
                         return;
                     }
                     video.play();
@@ -966,8 +1027,8 @@
                     }
                 },
                 simulateError: () => {
-                    if (!video.src) {
-                        alert("Please load a video first");
+                    if (!player || !video.src) {
+                        alert("Please load a stream first");
                         return;
                     }
                     alert("Simulating error event...");
@@ -986,7 +1047,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = `openqoe-events-${Date.now()}.json`;
+                    a.download = `openqoe-shaka-events-${Date.now()}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                 },
@@ -1032,6 +1093,9 @@
             window.addEventListener("beforeunload", () => {
                 if (qoe) {
                     qoe.destroy();
+                }
+                if (player) {
+                    player.destroy();
                 }
             });
         </script>

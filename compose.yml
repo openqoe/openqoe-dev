@@ -7,42 +7,29 @@
 # View logs: docker compose logs -f
 
 services:
-  # Grafana Alloy -  Open Telemetry Collector
-  alloy:
-    image: grafana/alloy:v1.12.0
-    container_name: openqoe-alloy
+  # kv data store
+  redis:
+    image: redis:8.4-alpine3.22
+    container_name: openqoe-redis
     ports:
-      - "12345:12345"
-      - "4317:4317"
-      - "4318:4318"
+      - "6379:6379"
     volumes:
-      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - alloy_data:/var/lib/alloy/data
+      - redis_data:/data
     command:
-      - "run"
-      - "--server.http.listen-addr=0.0.0.0:12345"
-      - "--storage.path=/var/lib/alloy/data"
-      - "/etc/alloy/config.alloy"
+      - "redis-server"
+      - "--save"
+      - "60"
+      - "1"
+      - "--loglevel"
+      - "warning"
+    restart: unless-stopped
     networks:
       - openqoe
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:12345/ready",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Mimir - Scalable metrics storage (Prometheus-compatible)
   # Same backend as Grafana Cloud Metrics
   mimir:
-    image: grafana/mimir:3.0.0
+    image: grafana/mimir:3.0.1
     container_name: openqoe-mimir
     ports:
       - "9009:9009" # HTTP endpoint
@@ -59,34 +46,75 @@ services:
 
   # Loki - Log aggregation
   loki:
-    image: grafana/loki:3.5.8
+    image: grafana/loki:3.6.3
     container_name: openqoe-loki
     ports:
       - "3100:3100"
+      - "9096:9096"
     volumes:
-      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - ./observability/loki/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     networks:
       - openqoe
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3100/ready",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+
+  # Tempo runs as user 10001, and docker compose creates the volume as root.
+  # As such, we need to chown the volume in order for Tempo to start correctly.
+  tempo-init:
+    image: busybox:1.37.0
+    container_name: openqoe-tempo-init
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - tempo_data:/var/tempo
+
+  # Trace Aggregation and correlation
+  tempo:
+    image: grafana/tempo:2.9.0
+    container_name: openqoe-tempo
+    ports:
+      - "3200:3200"
+      - "4319:4317"
+    volumes:
+      - ./observability/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    restart: unless-stopped
+    depends_on:
+      - tempo-init
+    networks:
+      - openqoe
+
+  # Grafana Alloy -  Open Telemetry Collector
+  alloy:
+    image: grafana/alloy:v1.12.0
+    container_name: openqoe-alloy
+    ports:
+      - "12345:12345"
+      - "4317:4317"
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
+    restart: unless-stopped
+    depends_on:
+      - mimir
+      - loki
+      - tempo
+    networks:
+      - openqoe
 
   # Grafana - Visualization and dashboards
   grafana:
-    image: grafana/grafana:12.1
+    image: grafana/grafana:12.3.1
     container_name: openqoe-grafana
     ports:
       - "3000:3000"
@@ -102,34 +130,23 @@ services:
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
     depends_on:
-      alloy:
-        condition: service_started
-      mimir:
-        condition: service_started
-      loki:
-        condition: service_healthy
+      - mimir
+      - loki
+      - tempo
+      - alloy
     networks:
       - openqoe
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3000/api/health",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
 volumes:
+  redis_data:
+    driver: local
   alloy_data:
     driver: local
   mimir_data:
     driver: local
   loki_data:
+    driver: local
+  tempo_data:
     driver: local
   grafana_data:
     driver: local
