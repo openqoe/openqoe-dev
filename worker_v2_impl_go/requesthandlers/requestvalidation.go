@@ -16,13 +16,14 @@ const max_future = 5 * 60 * time.Millisecond
 func RegisterRequestValidators(logger *zap.Logger) {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("timecheck", func(fl validator.FieldLevel) bool {
-			// Parse as time since linux epoch
+			// Parse as time since Unix epoch
 			t := fl.Field().Int()
-			event_time := time.UnixMilli(t)
-			if event_time.IsZero() {
-				logger.Error("Failed to parse event time")
+			if t == 0 {
+				logger.Error("Event time is zero")
 				return false
 			}
+
+			event_time := time.UnixMilli(t)
 			now := time.Now()
 			future_lim := now.Add(max_future)
 			if event_time.After(future_lim) {
