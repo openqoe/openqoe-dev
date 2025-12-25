@@ -36,12 +36,12 @@ func main() {
 	env := config.NewEnv(root_ctx)
 	config_obj := config.NewConfig(root_ctx, env, root_logger)
 	otel_service, otel_shutdown, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
-	logger := otel_service.Logger
 	if err != nil {
-		logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))
+		root_logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))
 		return
 	}
 
+	logger := otel_service.Logger
 	logger.Info("Starting to observe system metrics")
 	compute.MeasureSystemMetrics(otel_service)
 
