@@ -14,9 +14,6 @@ import (
 )
 
 func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, otelservice *otelservice.OpenTelemetryService) *MetricsService {
-
-	logger := otelservice.Logger.With(zap.String("sub-component", "metrics-compute-service"))
-	otelservice.Logger = logger
 	meter := otelservice.Meter
 	events_total, _ := meter.Int64Counter("openqoe.events_total", metric.WithDescription("Total number of events received"))
 	player_startup_time, _ := meter.Float64Gauge("openqoe.player_startup_time", metric.WithDescription("Time taken by player to start"), metric.WithUnit("ms"))
@@ -91,7 +88,8 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	}
 }
 
-func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext) {
+func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext, logger *zap.Logger) {
+	logger = logger.With(zap.String("sub-component", "metrics-compute-service"))
 	for _, event := range events_chunk.Events {
 		ms.otel_service.Logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 		ms.transformEventsToMetrics(events_chunk.Ctx, event)

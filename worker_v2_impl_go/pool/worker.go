@@ -41,7 +41,7 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 		_, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.Int("worker.id", worker_id)))
 		logger.Debug("Received event for processing", zap.Int("worker id", worker_id))
 		// For each event chunk
-		metrics_service.ComputeMetrics(events_chunk)
+		metrics_service.ComputeMetrics(events_chunk, logger)
 		logger.Debug("Event processing complete", zap.Int("worker id", worker_id))
 		span.End()
 	}
