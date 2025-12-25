@@ -18,7 +18,7 @@ type WorkerPool struct {
 func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
 	logger := otel_service.Logger.With(zap.String("sub-component", "worker_pool"))
 	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
-	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, logger)
+	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, otel_service)
 	wg := &sync.WaitGroup{}
 	pool := &WorkerPool{Wg: wg}
 	for i := 0; i < config_obj.GetWorkerPoolSize(); i++ {
@@ -38,16 +38,10 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 	for events_chunk := range event_chan {
 		// There is a ctx that is present as the first parameter which we ignore for simplicity
 		// but in future this ctx can be passed down to child functions to create child spans
-		_, span := tracer.Start(events_chunk.Ctx, "worker.work")
+		_, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer))
 		logger.Info("Received event")
 		// For each event chunk
-		time_series := metrics_service.ComputeMetrics(events_chunk)
-		if len(time_series) > 0 {
-			logger.Info("Sending time series to cardinality service")
-			// more work to do here
-		} else {
-			logger.Info("No time series to send")
-		}
+		metrics_service.ComputeMetrics(events_chunk)
 		span.End()
 	}
 }

@@ -1,60 +1,100 @@
 package compute
 
 import (
+	"context"
 	"maps"
 	"strconv"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker_v2/otelservice"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
-type MetricsService struct {
-	config              *config.Config
-	cardinality_service *config.CardinalityService
-	logger              *zap.Logger
-}
+func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, otelservice *otelservice.OpenTelemetryService) *MetricsService {
 
-func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, parent_logger *zap.Logger) *MetricsService {
+	logger := otelservice.Logger.With(zap.String("sub-component", "metrics-compute-service"))
+	otelservice.Logger = logger
+	meter := otelservice.Meter
+	events_total, _ := meter.Int64Counter("openqoe.events_total", metric.WithDescription("Total number of events received"))
+	player_startup_time, _ := meter.Float64Gauge("openqoe.player_startup_time", metric.WithDescription("Time taken by player to start"), metric.WithUnit("ms"))
+	page_load_time, _ := meter.Float64Gauge("openqoe.page_load_time", metric.WithDescription("Time taken by page to load"), metric.WithUnit("ms"))
+	view_started_total, _ := meter.Int64Counter("openqoe.view_started_total", metric.WithDescription("Total number of viewers who started watching the video"))
+	video_startup_time, _ := meter.Float64Histogram("openqoe.video_startup_time",
+		metric.WithDescription("Time taken by video to start"),
+		metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(500, 1000, 2000, 3000, 5000, 10000, 15000, 30000),
+	)
+	bitrate, _ := meter.Float64Gauge("openqoe.bitrate", metric.WithDescription("Bitrate of the video"), metric.WithUnit("bps"))
+	resolution_total, _ := meter.Int64Counter("openqoe.resolution_total", metric.WithDescription("Total number of viewers who started watching the video"))
+	rebuffer_events_total, _ := meter.Int64Counter("openqoe.rebuffer_events_total", metric.WithDescription("Total number of rebuffer events"))
+	buffer_length, _ := meter.Float64Gauge("openqoe.buffer_length", metric.WithDescription("Buffer length of the video"), metric.WithUnit("ms"))
+	rebuffer_duration, _ := meter.Float64Histogram("openqoe.rebuffer_duration",
+		metric.WithDescription("Duration of rebuffer events"),
+		metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(500, 1000, 2000, 3000, 5000, 10000, 30000),
+	)
+	seek_total, _ := meter.Int64Counter("openqoe.seek_total", metric.WithDescription("Total number of seeks"))
+	seek_latency, _ := meter.Float64Histogram("openqoe.seek_latency",
+		metric.WithDescription("Latency of seeks"),
+		metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(100, 250, 500, 1000, 2000, 5000),
+	)
+	views_completed_total, _ := meter.Int64Counter("openqoe.views_completed_total", metric.WithDescription("Total number of viewers who completed watching the video"))
 	return &MetricsService{
 		config:              config,
 		cardinality_service: cardinality_service,
-		logger:              parent_logger.With(zap.String("sub-component", "metrics-service")),
+		otel_service:        otelservice,
+		metrics: &computedMetrics{
+			events_total:          events_total,
+			player_startup_time:   player_startup_time,
+			page_load_time:        page_load_time,
+			views_started_total:   view_started_total,
+			video_startup_time:    video_startup_time,
+			bitrate:               bitrate,
+			resolution_total:      resolution_total,
+			rebuffer_events_total: rebuffer_events_total,
+			buffer_length:         buffer_length,
+			rebuffer_duration:     rebuffer_duration,
+			seek_total:            seek_total,
+			seek_latency:          seek_latency,
+			views_completed_total: views_completed_total,
+		},
 	}
 }
 
-func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext) []TimeSeries {
-	timeserieses := []TimeSeries{}
+func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext) {
 	for _, event := range events_chunk.Events {
-		ms.logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
-		timeserieses = ms.transformEventsToMetrics(event, timeserieses)
-		ms.logger.Info("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		ms.otel_service.Logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		ms.transformEventsToMetrics(events_chunk.Ctx, event)
+		ms.otel_service.Logger.Info("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}
-	return timeserieses
 }
 
-func (ms *MetricsService) transformEventsToMetrics(event requesthandlers.BaseEvent, timeserieses []TimeSeries) []TimeSeries {
+func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, event requesthandlers.BaseEvent) {
 	base_labels := ms.extractBaseLabels(event)
+	base_attributes := mapToAttributeSet(base_labels)
 	timestamp := time.UnixMilli(event.EventTime)
-
-	timeserieses = createMetric("openqoe_events_total", base_labels, 1, timestamp, timeserieses)
+	ms.metrics.events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 	switch event.EventType {
 	case "playerready":
 		if val, ok := event.Data["player_startup_time"]; ok && val != nil {
-			timeserieses = createMetric("openqoe_player_startup_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+			ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 		if val, ok := event.Data["page_load_time"]; ok && val != nil {
-			timeserieses = createMetric("openqoe_page_load_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+			ms.metrics.page_load_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 	case "viewstart":
-		timeserieses = createMetric("openqoe_views_started_total", base_labels, 1, timestamp, timeserieses)
+		ms.metrics.views_started_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 	case "playing":
 		if val, ok := event.Data["video_startup_time"]; ok && val != nil {
-			createHistogram("openqoe_video_startup_seconds", base_labels, val.(float64)/1000, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 30.0}, timeserieses)
+			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 		if val, ok := event.Data["bitrate"]; ok && val != nil {
-			timeserieses = createMetric("openqoe_bitrate_bps", base_labels, val.(float64), timestamp, timeserieses)
+			ms.metrics.bitrate.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 		if val, ok := event.Data["resolution"]; ok && val != nil {
 			val_map := val.(map[string]any)
@@ -63,25 +103,24 @@ func (ms *MetricsService) transformEventsToMetrics(event requesthandlers.BaseEve
 
 			labels := maps.Clone(base_labels)
 			labels["resolution"] = resolution_label
-
-			timeserieses = createMetric("openqoe_resolution_total", labels, 1, timestamp, timeserieses)
+			ms.metrics.resolution_total.Add(evnt_ctx, 1, metric.WithAttributeSet(mapToAttributeSet(labels)))
 		}
 	case "stall_start":
-		timeserieses = createMetric("openqoe_rebuffer_events_total", base_labels, 1, timestamp, timeserieses)
+		ms.metrics.rebuffer_events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 		if val, ok := event.Data["buffer_length"]; ok && val != nil {
-			timeserieses = createMetric("openqoe_buffer_length_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
+			ms.metrics.buffer_length.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 	case "stall_end":
 		if val, ok := event.Data["stall_duration"]; ok && val != nil {
-			createHistogram("openqoe_rebuffer_duration_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0}, timeserieses)
+			ms.metrics.rebuffer_duration.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 	case "seek":
-		timeserieses = createMetric("openqoe_seeks_total", base_labels, 1, timestamp, timeserieses)
+		ms.metrics.seek_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 		if val, ok := event.Data["seek_latency"]; ok && val != nil {
-			createHistogram("openqoe_seek_latency_seconds", base_labels, val.(float64)/1000.00, timestamp, []float64{0.1, 0.25, 0.5, 1.0, 2.0, 5.0}, timeserieses)
+			ms.metrics.seek_latency.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
 	case "ended":
-		timeserieses = createMetric("openqoe_views_completed_total", base_labels, 1, timestamp, timeserieses)
+		ms.metrics.views_completed_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 		if val, ok := event.Data["playing_time"]; ok && val != nil {
 			timeserieses = createMetric("openqoe_playing_time_seconds", base_labels, val.(float64)/1000.00, timestamp, timeserieses)
 		}
@@ -156,7 +195,6 @@ func (ms *MetricsService) transformEventsToMetrics(event requesthandlers.BaseEve
 			timeserieses = createMetric("openqoe_resolution_total", resLabels, 1, timestamp, timeserieses)
 		}
 	}
-	return timeserieses
 }
 
 func (ms *MetricsService) extractBaseLabels(event requesthandlers.BaseEvent) map[string]string {
@@ -331,4 +369,12 @@ func getResolutionLabel(value *resolution) string {
 	default:
 		return "unknown"
 	}
+}
+
+func mapToAttributeSet(m map[string]string) attribute.Set {
+	attrs := make([]attribute.KeyValue, 0, len(m))
+	for k, v := range m {
+		attrs = append(attrs, attribute.String(k, v))
+	}
+	return attribute.NewSet(attrs...)
 }

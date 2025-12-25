@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/middlewares"
@@ -47,6 +48,8 @@ func (rhs *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
 }
 
 func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
+	_, span := rhs.otel_service.Tracer.Start(c.Request.Context(), "ingestEvents", trace.WithSpanKind(trace.SpanKindProducer))
+	defer span.End()
 	logger := rhs.otel_service.Logger
 	startTime := c.MustGet("req_start_time").(int64)
 	ingestion_events := c.MustGet("request").(*IngestRequest)
