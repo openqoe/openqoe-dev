@@ -70,7 +70,7 @@ services:
       - "10001:10001"
       - "/var/tempo"
     volumes:
-      - ./tempo_data:/var/tempo
+      - tempo_data:/var/tempo
 
   # Trace Aggregation and correlation
   tempo:
