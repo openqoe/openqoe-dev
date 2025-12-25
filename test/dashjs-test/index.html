@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OpenQoE Dash.js Demo - SDK Event Tester</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                color: #fff;
+                padding: 20px;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            header {
+                text-align: center;
+                padding: 30px 0;
+                margin-bottom: 30px;
+            }
+
+            h1 {
+                font-size: 3em;
+                margin-bottom: 10px;
+                background: linear-gradient(45deg, #0066cc, #51cf66);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            .subtitle {
+                color: #aaa;
+                font-size: 1.2em;
+                margin-bottom: 15px;
+            }
+
+            .warning-banner {
+                background: #ff6b6b;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                margin: 20px auto;
+                max-width: 800px;
+                text-align: center;
+                font-weight: 500;
+            }
+
+            .warning-banner strong {
+                display: block;
+                margin-bottom: 5px;
+                font-size: 1.1em;
+            }
+
+            .url-input-section {
+                background: #2a2a3e;
+                border-radius: 12px;
+                padding: 25px;
+                margin-bottom: 30px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+
+            .url-input-section h2 {
+                margin-bottom: 15px;
+                color: #51cf66;
+                font-size: 1.3em;
+            }
+
+            .input-group {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+                flex-wrap: wrap;
+            }
+
+            input[type="text"] {
+                flex: 1;
+                min-width: 300px;
+                padding: 12px 15px;
+                background: #1a1a2e;
+                border: 2px solid #0066cc;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 14px;
+                transition: border-color 0.2s;
+            }
+
+            input[type="text"]:focus {
+                outline: none;
+                border-color: #51cf66;
+            }
+
+            .btn {
+                background: #0066cc;
+                color: white;
+                border: none;
+                padding: 12px 25px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.2s;
+                box-shadow: 0 2px 4px rgba(0, 102, 204, 0.3);
+            }
+
+            .btn:hover {
+                background: #0052a3;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(0, 102, 204, 0.4);
+            }
+
+            .btn:active {
+                transform: translateY(0);
+            }
+
+            .btn-success {
+                background: #51cf66;
+            }
+
+            .btn-success:hover {
+                background: #40a956;
+            }
+
+            .btn-danger {
+                background: #ff6b6b;
+            }
+
+            .btn-danger:hover {
+                background: #ee5a5a;
+            }
+
+            .sample-urls {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-top: 10px;
+            }
+
+            .sample-url-btn {
+                background: #2a2a3e;
+                border: 1px solid #51cf66;
+                color: #51cf66;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+
+            .sample-url-btn:hover {
+                background: #51cf66;
+                color: white;
+            }
+
+            .main-content {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+
+            @media (max-width: 1024px) {
+                .main-content {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .player-section {
+                background: #2a2a3e;
+                border-radius: 12px;
+                padding: 25px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+
+            .player-section h2 {
+                margin-bottom: 20px;
+                color: #51cf66;
+                font-size: 1.5em;
+            }
+
+            video {
+                width: 100%;
+                border-radius: 8px;
+                background: #000;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            .controls {
+                display: flex;
+                justify-content: center;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-bottom: 20px;
+            }
+
+            .controls button {
+                background: #1a1a2e;
+                border: 1px solid #0066cc;
+                color: #0066cc;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s;
+            }
+
+            .controls button:hover {
+                background: #0066cc;
+                color: white;
+            }
+
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+
+            .stat-card {
+                background: #1a1a2e;
+                border-radius: 6px;
+                padding: 12px;
+                text-align: center;
+                border: 1px solid #333;
+            }
+
+            .stat-label {
+                color: #888;
+                font-size: 12px;
+                margin-bottom: 5px;
+            }
+
+            .stat-value {
+                color: #51cf66;
+                font-size: 18px;
+                font-weight: 600;
+                font-family: "Courier New", monospace;
+            }
+
+            .events-section {
+                background: #2a2a3e;
+                border-radius: 12px;
+                padding: 25px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+
+            .events-section h2 {
+                margin-bottom: 20px;
+                color: #51cf66;
+                font-size: 1.5em;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .events-controls {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+
+            .badge {
+                display: inline-block;
+                background: #0066cc;
+                color: white;
+                padding: 4px 10px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+
+            .badge.live {
+                background: #ff6b6b;
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.6;
+                }
+            }
+
+            .events-container {
+                background: #1a1a2e;
+                border-radius: 6px;
+                padding: 15px;
+                max-height: 600px;
+                overflow-y: auto;
+                font-family: "Courier New", monospace;
+            }
+
+            .events-container::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            .events-container::-webkit-scrollbar-track {
+                background: #0f0f1e;
+                border-radius: 4px;
+            }
+
+            .events-container::-webkit-scrollbar-thumb {
+                background: #0066cc;
+                border-radius: 4px;
+            }
+
+            .event-entry {
+                background: #2a2a3e;
+                border-left: 4px solid #0066cc;
+                border-radius: 4px;
+                padding: 12px;
+                margin-bottom: 10px;
+                animation: slideIn 0.3s ease-out;
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateX(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+
+            .event-entry.playerready {
+                border-left-color: #51cf66;
+            }
+            .event-entry.viewstart {
+                border-left-color: #4dabf7;
+            }
+            .event-entry.playing {
+                border-left-color: #51cf66;
+            }
+            .event-entry.pause {
+                border-left-color: #ffd43b;
+            }
+            .event-entry.seek {
+                border-left-color: #ff8787;
+            }
+            .event-entry.stall_start {
+                border-left-color: #ff6b6b;
+            }
+            .event-entry.stall_end {
+                border-left-color: #51cf66;
+            }
+            .event-entry.error {
+                border-left-color: #ff0000;
+            }
+            .event-entry.ended {
+                border-left-color: #9775fa;
+            }
+            .event-entry.heartbeat {
+                border-left-color: #0066cc;
+            }
+
+            .event-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+
+            .event-type {
+                font-weight: bold;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .event-type.playerready {
+                color: #51cf66;
+            }
+            .event-type.viewstart {
+                color: #4dabf7;
+            }
+            .event-type.playing {
+                color: #51cf66;
+            }
+            .event-type.pause {
+                color: #ffd43b;
+            }
+            .event-type.seek {
+                color: #ff8787;
+            }
+            .event-type.stall_start {
+                color: #ff6b6b;
+            }
+            .event-type.stall_end {
+                color: #51cf66;
+            }
+            .event-type.error {
+                color: #ff0000;
+            }
+            .event-type.ended {
+                color: #9775fa;
+            }
+            .event-type.heartbeat {
+                color: #0066cc;
+            }
+
+            .event-time {
+                color: #888;
+                font-size: 11px;
+            }
+
+            .event-data {
+                background: #1a1a2e;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                color: #aaa;
+                max-height: 200px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+                word-break: break-all;
+            }
+
+            .event-data-key {
+                color: #4dabf7;
+            }
+
+            .event-data-value {
+                color: #51cf66;
+            }
+
+            .no-events {
+                text-align: center;
+                color: #666;
+                padding: 40px 20px;
+                font-size: 14px;
+            }
+
+            .no-events svg {
+                width: 64px;
+                height: 64px;
+                margin-bottom: 15px;
+                opacity: 0.3;
+            }
+
+            .session-info {
+                background: #1a1a2e;
+                border-radius: 6px;
+                padding: 15px;
+                margin-top: 20px;
+                font-size: 13px;
+            }
+
+            .session-info h3 {
+                color: #0066cc;
+                margin-bottom: 10px;
+                font-size: 14px;
+            }
+
+            .session-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 0;
+                border-bottom: 1px solid #2a2a3e;
+            }
+
+            .session-row:last-child {
+                border-bottom: none;
+            }
+
+            .session-label {
+                color: #888;
+            }
+
+            .session-value {
+                color: #51cf66;
+                font-family: "Courier New", monospace;
+                font-size: 11px;
+            }
+
+            .status-indicator {
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                margin-right: 6px;
+                animation: pulse 2s infinite;
+            }
+
+            .status-indicator.active {
+                background: #51cf66;
+                box-shadow: 0 0 10px #51cf66;
+            }
+
+            .status-indicator.inactive {
+                background: #666;
+                animation: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🎬 OpenQoE Dash.js Event Tester</h1>
+                <p class="subtitle">
+                    Test and visualize Dash.js SDK events in real-time
+                </p>
+                <p style="margin-top: 10px; font-size: 14px; color: #aaa">
+                    <span class="status-indicator active"></span>
+                    <span id="status"
+                        >SDK Active - Events displayed locally only</span
+                    >
+                </p>
+            </header>
+
+            <div class="warning-banner">
+                <strong>⚠️ Testing Mode</strong>
+                Events are captured and displayed locally. No data is sent to
+                any backend.
+            </div>
+
+            <div class="url-input-section">
+                <h2>🎥 Load Your DASH Stream</h2>
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="video-url-input"
+                        placeholder="Enter DASH stream URL (.mpd)"
+                        value="https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd"
+                    />
+                    <button class="btn btn-success" onclick="loadVideo()">
+                        Load Stream
+                    </button>
+                    <button class="btn" onclick="clearVideo()">Clear</button>
+                </div>
+                <div class="sample-urls">
+                    <small style="color: #888; margin-right: 10px"
+                        >Quick samples:</small
+                    >
+                    <button class="sample-url-btn" onclick="loadSampleVideo(0)">
+                        Big Buck Bunny DASH
+                    </button>
+                    <button class="sample-url-btn" onclick="loadSampleVideo(1)">
+                        Sintel DASH
+                    </button>
+                    <button class="sample-url-btn" onclick="loadSampleVideo(2)">
+                        Qualcomm MultiRate
+                    </button>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <!-- Left Column: Player -->
+                <div class="player-section">
+                    <h2>Dash.js Player</h2>
+
+                    <video id="video" controls>
+                        <p>Your browser doesn't support HTML5 video.</p>
+                    </video>
+
+                    <div class="controls">
+                        <button onclick="videoControls.play()">▶ Play</button>
+                        <button onclick="videoControls.pause()">
+                            ⏸ Pause
+                        </button>
+                        <button onclick="videoControls.seek(0)">
+                            ⏮ Reset
+                        </button>
+                        <button onclick="videoControls.seek(-10)">
+                            ⏪ -10s
+                        </button>
+                        <button onclick="videoControls.seek(30)">
+                            ⏩ +30s
+                        </button>
+                        <button onclick="videoControls.simulateError()">
+                            ❌ Error
+                        </button>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Current Time</div>
+                            <div class="stat-value" id="stat-time">0:00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Duration</div>
+                            <div class="stat-value" id="stat-duration">
+                                --:--
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Buffer</div>
+                            <div class="stat-value" id="stat-buffered">0s</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">State</div>
+                            <div class="stat-value" id="stat-state">Idle</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Events Captured</div>
+                            <div class="stat-value" id="stat-events">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Event Rate</div>
+                            <div class="stat-value" id="stat-rate">0/s</div>
+                        </div>
+                    </div>
+
+                    <div class="session-info">
+                        <h3>Session Information</h3>
+                        <div class="session-row">
+                            <span class="session-label">Session ID:</span>
+                            <span class="session-value" id="session-id"
+                                >Not initialized</span
+                            >
+                        </div>
+                        <div class="session-row">
+                            <span class="session-label">View ID:</span>
+                            <span class="session-value" id="view-id"
+                                >Not initialized</span
+                            >
+                        </div>
+                        <div class="session-row">
+                            <span class="session-label">Viewer ID:</span>
+                            <span class="session-value" id="viewer-id"
+                                >Not initialized</span
+                            >
+                        </div>
+                        <div class="session-row">
+                            <span class="session-label">Video ID:</span>
+                            <span class="session-value" id="video-id-display"
+                                >Not loaded</span
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Events -->
+                <div class="events-section">
+                    <h2>
+                        Captured Events
+                        <span class="badge live">LIVE</span>
+                    </h2>
+
+                    <div class="events-controls">
+                        <button class="btn" onclick="videoControls.clearLogs()">
+                            Clear Events
+                        </button>
+                        <button
+                            class="btn"
+                            onclick="videoControls.downloadEvents()"
+                        >
+                            Download JSON
+                        </button>
+                        <button
+                            class="btn"
+                            onclick="videoControls.toggleAutoScroll()"
+                        >
+                            <span id="autoscroll-text">Auto-scroll: ON</span>
+                        </button>
+                    </div>
+
+                    <div class="events-container" id="events-container">
+                        <div class="no-events">
+                            <svg fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                    d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"
+                                />
+                            </svg>
+                            <div>No events captured yet</div>
+                            <div style="font-size: 12px; margin-top: 5px">
+                                Load a DASH stream and start playing to see
+                                events
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dash.js Library -->
+        <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+
+        <!-- OpenQoE SDK -->
+        <script src="../../sdk/dist/index.umd.js"></script>
+
+        <script>
+            // Sample DASH streams
+            const sampleVideos = [
+                {
+                    url: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
+                    id: "bbb-dash",
+                    title: "Big Buck Bunny DASH",
+                },
+                {
+                    url: "https://bitdash-a.akamaihd.net/content/sintel/sintel.mpd",
+                    id: "sintel-dash",
+                    title: "Sintel DASH",
+                },
+                {
+                    url: "https://dash.akamaized.net/dash264/TestCases/1c/qualcomm/2/MultiRate.mpd",
+                    id: "qualcomm-multirate",
+                    title: "Qualcomm MultiRate Test",
+                },
+            ];
+
+            // Global variables
+            let player = null;
+            let qoe = null;
+            let eventCount = 0;
+            let capturedEvents = [];
+            let autoScroll = true;
+            let lastEventTime = Date.now();
+            let eventRate = 0;
+
+            // Get elements
+            const video = document.getElementById("video");
+            const eventsContainer = document.getElementById("events-container");
+
+            // Initialize Dash.js player
+            function initializePlayer() {
+                if (player) {
+                    player.reset();
+                    player = null;
+                }
+
+                player = dashjs.MediaPlayer().create();
+                return player;
+            }
+
+            // Load sample video
+            function loadSampleVideo(index) {
+                const sample = sampleVideos[index];
+                document.getElementById("video-url-input").value = sample.url;
+                loadVideo(sample);
+            }
+
+            // Load video from URL
+            function loadVideo(sampleData = null) {
+                const urlInput = document.getElementById("video-url-input");
+                const url = urlInput.value.trim();
+
+                if (!url) {
+                    alert("Please enter a DASH stream URL");
+                    return;
+                }
+
+                // Clear previous instances
+                if (qoe) {
+                    qoe.destroy();
+                    qoe = null;
+                }
+
+                // Initialize player
+                player = initializePlayer();
+
+                // Determine video metadata
+                let videoId, videoTitle;
+                if (sampleData) {
+                    videoId = sampleData.id;
+                    videoTitle = sampleData.title;
+                } else {
+                    // Extract filename from URL
+                    const filename = url.split("/").pop().split("?")[0];
+                    videoId = filename.replace(/\.[^/.]+$/, "");
+                    videoTitle = videoId.replace(/[-_]/g, " ");
+                }
+
+                // Configure and load stream
+                player.initialize(video, url, false);
+
+                player.on(dashjs.MediaPlayer.events.PLAYBACK_ERROR, (error) => {
+                    console.error("Dash.js error:", error);
+                });
+
+                player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, () => {
+                    console.log("DASH manifest loaded");
+                });
+
+                // Initialize OpenQoE SDK (with fake endpoint to prevent actual sending)
+                qoe = new OpenQoE.OpenQoE({
+                    orgId: "demo-org",
+                    playerId: "dashjs-event-tester",
+                    endpointUrl: "http://localhost:8788/v2/events", // Fake endpoint - won't send
+                    debug: true,
+                    logLevel: "debug",
+                });
+
+                // Attach to player
+                qoe.attachPlayer("dashjs", player, {
+                    videoId: videoId,
+                    videoTitle: videoTitle,
+                });
+
+                // Update session info
+                setTimeout(() => {
+                    document.getElementById("session-id").textContent =
+                        qoe.getSessionId() || "N/A";
+                    document.getElementById("view-id").textContent =
+                        qoe.getViewId() || "N/A";
+                    document.getElementById("viewer-id").textContent =
+                        qoe.getViewerId?.() || "N/A";
+                    document.getElementById("video-id-display").textContent =
+                        videoId;
+                }, 500);
+
+                // Reset stats
+                clearLogs();
+            }
+
+            // Clear video
+            function clearVideo() {
+                if (qoe) {
+                    qoe.destroy();
+                    qoe = null;
+                }
+                if (player) {
+                    player.reset();
+                    player = null;
+                }
+                video.removeAttribute("src");
+                video.load();
+                clearLogs();
+                document.getElementById("video-url-input").value = "";
+                document.getElementById("stat-state").textContent = "Idle";
+            }
+
+            // Add event to log
+            function addEventToLog(event) {
+                // Remove "no events" message
+                const noEvents = eventsContainer.querySelector(".no-events");
+                if (noEvents) {
+                    noEvents.remove();
+                }
+
+                const entry = document.createElement("div");
+                entry.className = `event-entry ${event.event_type}`;
+
+                const now = new Date();
+                const timeStr =
+                    now.toLocaleTimeString() +
+                    "." +
+                    now.getMilliseconds().toString().padStart(3, "0");
+
+                // Format event data
+                const dataObj = {
+                    event_time: event.event_time,
+                    viewer_time: event.viewer_time,
+                    playback_time: event.playback_time,
+                    ...event.data,
+                };
+
+                // Remove undefined/null values
+                Object.keys(dataObj).forEach((key) => {
+                    if (dataObj[key] === undefined || dataObj[key] === null) {
+                        delete dataObj[key];
+                    }
+                });
+
+                const dataJson = JSON.stringify(dataObj, null, 2);
+
+                entry.innerHTML = `
+                <div class="event-header">
+                    <span class="event-type ${event.event_type}">${event.event_type}</span>
+                    <span class="event-time">${timeStr}</span>
+                </div>
+                <div class="event-data">${dataJson}</div>
+            `;
+
+                eventsContainer.insertBefore(entry, eventsContainer.firstChild);
+
+                // Update counter
+                eventCount++;
+                document.getElementById("stat-events").textContent = eventCount;
+
+                // Calculate event rate
+                const now_ms = Date.now();
+                if (now_ms - lastEventTime < 1000) {
+                    eventRate++;
+                } else {
+                    document.getElementById("stat-rate").textContent =
+                        eventRate + "/s";
+                    eventRate = 1;
+                    lastEventTime = now_ms;
+                }
+
+                // Auto-scroll to latest
+                if (autoScroll) {
+                    entry.scrollIntoView({
+                        behavior: "smooth",
+                        block: "nearest",
+                    });
+                }
+
+                // Keep only last 50 events in DOM (for performance)
+                while (eventsContainer.children.length > 50) {
+                    eventsContainer.removeChild(eventsContainer.lastChild);
+                }
+            }
+
+            // Clear logs
+            function clearLogs() {
+                eventsContainer.innerHTML = `
+                <div class="no-events">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
+                    </svg>
+                    <div>No events captured yet</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Load a DASH stream and start playing to see events</div>
+                </div>
+            `;
+                eventCount = 0;
+                capturedEvents = [];
+                eventRate = 0;
+                document.getElementById("stat-events").textContent = "0";
+                document.getElementById("stat-rate").textContent = "0/s";
+            }
+
+            // Update stats periodically
+            setInterval(() => {
+                const formatTime = (seconds) => {
+                    if (isNaN(seconds) || !isFinite(seconds)) return "--:--";
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, "0")}`;
+                };
+
+                document.getElementById("stat-time").textContent = formatTime(
+                    video.currentTime,
+                );
+                document.getElementById("stat-duration").textContent =
+                    formatTime(video.duration);
+
+                const buffered = video.buffered;
+                let bufferLength = 0;
+                if (buffered.length > 0) {
+                    for (let i = 0; i < buffered.length; i++) {
+                        if (
+                            video.currentTime >= buffered.start(i) &&
+                            video.currentTime <= buffered.end(i)
+                        ) {
+                            bufferLength = buffered.end(i) - video.currentTime;
+                            break;
+                        }
+                    }
+                }
+                document.getElementById("stat-buffered").textContent =
+                    bufferLength.toFixed(1) + "s";
+
+                let state = "Idle";
+                if (video.src) {
+                    if (video.ended) state = "Ended";
+                    else if (video.paused) state = "Paused";
+                    else if (video.seeking) state = "Seeking";
+                    else state = "Playing";
+                }
+                document.getElementById("stat-state").textContent = state;
+            }, 250);
+
+            // Video controls
+            const videoControls = {
+                play: () => {
+                    if (!player || !video.src) {
+                        alert("Please load a stream first");
+                        return;
+                    }
+                    video.play();
+                },
+                pause: () => video.pause(),
+                seek: (offset) => {
+                    if (!video.src) return;
+                    if (offset === 0) {
+                        video.currentTime = 0;
+                    } else {
+                        video.currentTime = Math.max(
+                            0,
+                            Math.min(
+                                video.duration,
+                                video.currentTime + offset,
+                            ),
+                        );
+                    }
+                },
+                simulateError: () => {
+                    if (!player || !video.src) {
+                        alert("Please load a stream first");
+                        return;
+                    }
+                    alert("Simulating error event...");
+                    video.dispatchEvent(new Event("error"));
+                },
+                clearLogs: () => clearLogs(),
+                downloadEvents: () => {
+                    if (capturedEvents.length === 0) {
+                        alert("No events to download");
+                        return;
+                    }
+                    const dataStr = JSON.stringify(capturedEvents, null, 2);
+                    const blob = new Blob([dataStr], {
+                        type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `openqoe-dashjs-events-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+                toggleAutoScroll: () => {
+                    autoScroll = !autoScroll;
+                    document.getElementById("autoscroll-text").textContent =
+                        `Auto-scroll: ${autoScroll ? "ON" : "OFF"}`;
+                },
+            };
+
+            // Keyboard shortcuts
+            document.addEventListener("keydown", (e) => {
+                if (e.target.tagName === "INPUT") return;
+
+                switch (e.key) {
+                    case " ":
+                        e.preventDefault();
+                        video.paused
+                            ? videoControls.play()
+                            : videoControls.pause();
+                        break;
+                    case "ArrowLeft":
+                        e.preventDefault();
+                        videoControls.seek(-10);
+                        break;
+                    case "ArrowRight":
+                        e.preventDefault();
+                        videoControls.seek(30);
+                        break;
+                    case "c":
+                    case "C":
+                        videoControls.clearLogs();
+                        break;
+                }
+            });
+
+            // Load first sample video on page load
+            window.addEventListener("load", () => {
+                loadSampleVideo(0);
+            });
+
+            // Clean up on page unload
+            window.addEventListener("beforeunload", () => {
+                if (qoe) {
+                    qoe.destroy();
+                }
+                if (player) {
+                    player.reset();
+                }
+            });
+        </script>
+    </body>
+</html>
