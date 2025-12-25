@@ -28,8 +28,8 @@ type CardinalityLimit struct {
 }
 
 type CardinalityStat struct {
-	count  int
-	values []string
+	Count  int
+	Values []string
 }
 
 type CardinalityConfig struct {
@@ -80,7 +80,7 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 	defer close(res_chan)
 	const key = "cardinality:" // Redis key prefix
 	// Get current cardinality set from K
-	existing_json, err := cs.config.redis_client.GetValue(key)
+	existing_json, err := cs.config.redis_client.GetValue(key + dimension)
 	if err != nil {
 		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
 	}
@@ -115,7 +115,7 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 		cs.logger.Error("Failed to marshal cardinality data", zap.Error(err))
 		return
 	}
-	err = cs.config.redis_client.SetValueWithTTL(key, string(json_data), 86400*time.Second)
+	err = cs.config.redis_client.SetValueWithTTL(key+dimension, string(json_data), 86400*time.Second)
 	if err != nil {
 		cs.logger.Error("Failed to set cardinality data with TTL", zap.Error(err))
 	}
@@ -167,28 +167,25 @@ func (cs *CardinalityService) ApplyGovernanceToLabels(labels map[string]string) 
 	return governed
 }
 
-func (cs *CardinalityService) GetCardinalityStats(dimension string, res_chan chan<- CardinalityStat) {
-	defer close(res_chan)
+func (cs *CardinalityService) GetCardinalityStats(dimension string) *CardinalityStat {
 	const key = "cardinality:"
-	existing_json, err := cs.config.redis_client.GetValue(key)
+	existing_json, err := cs.config.redis_client.GetValue(key + dimension)
 	if err != nil || existing_json == "" {
 		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
-		res_chan <- CardinalityStat{count: 0, values: []string{}}
-		return
+		return &CardinalityStat{Count: 0, Values: []string{}}
 	}
 	var values []string
 	if err := json.Unmarshal([]byte(existing_json), &values); err != nil {
 		cs.logger.Error("Error getting cardinality stats", zap.Error(err), zap.String("dimension", dimension))
-		res_chan <- CardinalityStat{count: 0, values: []string{}}
-		return
+		return &CardinalityStat{Count: 0, Values: []string{}}
 	}
-	res_chan <- CardinalityStat{count: len(values), values: values}
+	return &CardinalityStat{Count: len(values), Values: values}
 }
 
 func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<- bool) {
 	defer close(res_chan)
 	const key = "cardinality:"
-	err := cs.config.redis_client.DeleteValue(key)
+	err := cs.config.redis_client.DeleteValue(key + dimension)
 	if err != nil {
 		cs.logger.Error("Error resetting cardinality", zap.Error(err), zap.String("dimension", dimension))
 		res_chan <- false

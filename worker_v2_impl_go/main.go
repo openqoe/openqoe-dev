@@ -50,7 +50,7 @@ func main() {
 	logger.Info("Starting worker pool")
 	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, event_chan)
 
-	logger.Info("Starting HTTP server")
+	logger.Info("Starting HTTP server", zap.Int("port", 8788))
 	requesthandlers.RegisterRequestValidators(logger)
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

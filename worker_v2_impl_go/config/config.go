@@ -21,32 +21,30 @@ func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfi
 	if env.CARDINALITY_LIMITS == "default_limits" {
 		return &CardinalityConfig{
 			Limits: map[string]CardinalityLimit{
-				"org_id": {
-					Max_Cardinality: 1000,
-					Action:          "allow",
-				},
-				"player_id":  {Max_Cardinality: 10000, Action: "allow"},
-				"env":        {Max_Cardinality: 10, Action: "allow"},
-				"app_name":   {Max_Cardinality: 100, Action: "allow"},
-				"event_type": {Max_Cardinality: 20, Action: "allow"},
+				"org_id":     {Max_Cardinality: 1000, Action: Allow},
+				"player_id":  {Max_Cardinality: 10000, Action: Allow},
+				"env":        {Max_Cardinality: 10, Action: Allow},
+				"app_name":   {Max_Cardinality: 100, Action: Allow},
+				"event_type": {Max_Cardinality: 20, Action: Allow},
 
 				// Bucket medium-cardinality dimensions
-				"video_id":    {Max_Cardinality: 100000, Action: "bucket", Bucket_Size: 10000},
-				"video_title": {Max_Cardinality: 100000, Action: "bucket", Bucket_Size: 10000},
+				"video_id":    {Max_Cardinality: 100000, Action: Bucket, Bucket_Size: 10000},
+				"video_title": {Max_Cardinality: 100000, Action: Bucket, Bucket_Size: 10000},
 				// Hash high-cardinality dimensions
-				"session_id": {Max_Cardinality: math.Inf(1), Action: "hash"},
-				"view_id":    {Max_Cardinality: math.Inf(1), Action: "hash"},
-				"viewer_id":  {Max_Cardinality: math.Inf(1), Action: "hash"},
+				// max cardinality mimicks infinity
+				"session_id": {Max_Cardinality: math.MaxInt64, Action: Hash},
+				"view_id":    {Max_Cardinality: math.MaxInt64, Action: Hash},
+				"viewer_id":  {Max_Cardinality: math.MaxInt64, Action: Hash},
 				// Device/Browser - allow common values, hash others
-				"device_category": {Max_Cardinality: 10, Action: "allow"},
-				"browser_family":  {Max_Cardinality: 20, Action: "allow"},
-				"os_family":       {Max_Cardinality: 20, Action: "allow"},
+				"device_category": {Max_Cardinality: 10, Action: Allow},
+				"browser_family":  {Max_Cardinality: 20, Action: Allow},
+				"os_family":       {Max_Cardinality: 20, Action: Allow},
 				// Network - bucket by country/region
-				"network_country": {Max_Cardinality: 250, Action: "allow"},
-				"network_region":  {Max_Cardinality: 1000, Action: "bucket", Bucket_Size: 100},
+				"network_country": {Max_Cardinality: 250, Action: Allow},
+				"network_region":  {Max_Cardinality: 1000, Action: Bucket, Bucket_Size: 100},
 
 				// Drop very high cardinality
-				"video_source_url": {Max_Cardinality: 0, Action: "drop"},
+				"video_source_url": {Max_Cardinality: 0, Action: Drop},
 			},
 		}
 	}
