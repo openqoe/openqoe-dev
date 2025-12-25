@@ -16,9 +16,8 @@ type WorkerPool struct {
 	Wg *sync.WaitGroup
 }
 
-func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
+func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
 	logger := otel_service.Logger.With(zap.String("sub-component", "worker_pool"))
-	cardinality_service := config.NewCardinalityService(env, config_obj, logger)
 	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, otel_service)
 	wg := &sync.WaitGroup{}
 	pool := &WorkerPool{Wg: wg}

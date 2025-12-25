@@ -30,7 +30,7 @@ type PlayerInfo struct {
 }
 
 type NetworkInfo struct {
-	Asn         int    `json:"asn"`
+	Asn         uint64 `json:"asn"`
 	CountryCode string `json:"country_code"`
 	Region      string `json:"region"`
 	City        string `json:"city"`

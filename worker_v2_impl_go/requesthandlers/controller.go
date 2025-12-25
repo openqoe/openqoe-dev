@@ -23,7 +23,7 @@ type RequestHandlerService struct {
 	event_chan               chan<- IngestRequestWithContext
 }
 
-func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_chan chan<- IngestRequestWithContext, otel_service *otelservice.OpenTelemetryService) *RequestHandlerService {
+func NewRequestHandlerService(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan chan<- IngestRequestWithContext) *RequestHandlerService {
 	req_processing_time_gauge, err := otel_service.Meter.Int64Histogram(
 		"request_processing_time",
 		metric.WithDescription("Time taken for the request from being received in server till just before sending response back"),
@@ -37,7 +37,7 @@ func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_
 		config:                   config_obj,
 		auth_service:             config.NewAuthService(config_obj, otel_service.Logger),
 		otel_service:             otel_service,
-		cardinality_service:      config.NewCardinalityService(env, config_obj, otel_service.Logger),
+		cardinality_service:      cardinality_service,
 		req_processing_time_hist: req_processing_time_gauge,
 		event_chan:               event_chan,
 	}
