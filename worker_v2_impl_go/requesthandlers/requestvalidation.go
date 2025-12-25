@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const max_age = 24 * 60 * 60 * 1000 * time.Millisecond
-const max_future = 5 * 60 * 1000 * time.Millisecond
+const max_age = 24 * 60 * 60 * time.Millisecond
+const max_future = 5 * 60 * time.Millisecond
 
 func RegisterRequestValidators(logger *zap.Logger) {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
