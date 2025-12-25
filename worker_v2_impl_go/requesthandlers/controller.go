@@ -59,32 +59,39 @@ func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
 		Ctx:    otelservice.DetachContext(c.Request.Context()),
 		Events: ingestion_events.Events,
 	}
-	// channel full
-	if cap(rhs.event_chan)-len(rhs.event_chan) <= 0 {
+	select {
+	case rhs.event_chan <- *ingestion_events_with_ctx:
 		processing_time := time.Now().UnixNano() - startTime
+		logger.Debug("events sent to queue", zap.Int64("request processing time (ns)", processing_time))
+		rhs.req_processing_time_hist.Record(c.Request.Context(), processing_time,
+			metric.WithAttributes(
+				attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
+				attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
+				attribute.String("request.endpoint", "ingest-events"),
+			))
+		c.JSON(http.StatusAccepted, IngestionSuccessResponse{
+			Success:          true,
+			Message:          "Events accepted",
+			EventsReceived:   len(ingestion_events.Events),
+			ProcessingTimeNs: processing_time,
+		})
+	default:
+		// Channel full - reject request
+		processing_time := time.Now().UnixNano() - startTime
+		logger.Error("queue full, can not accept any more events", zap.Int64("request processing time (ns)", processing_time))
+		rhs.req_processing_time_hist.Record(c.Request.Context(), processing_time,
+			metric.WithAttributes(
+				attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
+				attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
+				attribute.String("request.endpoint", "ingest-events"),
+			))
 		c.JSON(http.StatusTooManyRequests, IngestionSuccessResponse{
 			Success:          false,
 			Message:          "Server overload",
 			EventsReceived:   len(ingestion_events.Events),
 			ProcessingTimeNs: processing_time,
 		})
-		return
 	}
-	rhs.event_chan <- *ingestion_events_with_ctx
-	processing_time := time.Now().UnixNano() - startTime
-	logger.Debug("request processing time", zap.Int64("duration_ns", processing_time))
-	rhs.req_processing_time_hist.Record(c.Request.Context(), processing_time,
-		metric.WithAttributes(
-			attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
-			attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
-			attribute.String("request.endpoint", "ingest-events"),
-		))
-	c.JSON(http.StatusAccepted, IngestionSuccessResponse{
-		Success:          true,
-		Message:          "Events accepted",
-		EventsReceived:   len(ingestion_events.Events),
-		ProcessingTimeNs: processing_time,
-	})
 }
 
 func (rhs *RequestHandlerService) handleHealth(ctx *gin.Context) {
