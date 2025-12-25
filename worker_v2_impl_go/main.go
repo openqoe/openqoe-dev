@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -22,8 +21,6 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
-	root_ctx := context.Background()
 	logger_encoder_config := zap.NewProductionEncoderConfig()
 	logger_encoder_config.EncodeTime = zapcore.RFC3339TimeEncoder
 	logger_encoder_config.EncodeLevel = zapcore.CapitalLevelEncoder
@@ -31,23 +28,30 @@ func main() {
 	logger_config.EncoderConfig = logger_encoder_config
 	root_logger, _ := logger_config.Build()
 	defer root_logger.Sync()
+
+	_ = godotenv.Load()
+	root_ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	env := config.NewEnv(root_ctx)
-	config_obj := config.NewConfig(env, root_logger)
+	config_obj := config.NewConfig(root_ctx, env, root_logger)
 	otel_shutdown, otel_service, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
 	logger := otel_service.Logger
 	if err != nil {
 		logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))
 		return
 	}
+
+	logger.Info("Starting to observe system metrics")
 	compute.MeasureSystemMetrics(otel_service)
+
 	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
-	defer close(event_chan)
 
 	logger.Info("Starting worker pool")
 	worker_pool := pool.NewWorkerPool(env, config_obj, otel_service, event_chan)
 
+	logger.Info("Starting HTTP server")
 	requesthandlers.RegisterRequestValidators(logger)
-
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
 	router.Use(otelgin.Middleware("openQoE-worker"))
@@ -68,33 +72,33 @@ func main() {
 		}
 	}()
 
-	// OS signal handling
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	<-quit
+	// Shutdown Sequence
+	<-root_ctx.Done()
 	logger.Info("shutdown signal received")
 
-	// graceful HTTP shutdown
-	httpCtx, httpCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer httpCancel()
+	shutdown_ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	if err := srv.Shutdown(httpCtx); err != nil {
-		logger.Error("server shutdown failed", zap.Error(err))
+	// 1. Stop HTTP server (no more producers)
+	if err := srv.Shutdown(shutdown_ctx); err != nil {
+		logger.Error("HTTP shutdown failed", zap.Error(err))
+	} else {
+		logger.Info("HTTP server stopped")
 	}
 
-	logger.Info("HTTP server stopped")
-
+	// 2. Close channel (signals workers to exit)
 	close(event_chan)
+
+	// 3. Wait for workers
 	worker_pool.Wg.Wait()
 	logger.Info("all workers finished processing")
-	logger.Info("flushing and shutting down OTel...")
-	otelCtx, otelCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer otelCancel()
 
-	if err := otel_shutdown(otelCtx); err != nil {
+	// 4. Shutdown OTel
+	if err := otel_shutdown(shutdown_ctx); err != nil {
 		logger.Error("OTel shutdown failed", zap.Error(err))
+	} else {
+		logger.Info("OTel shutdown complete")
 	}
-
 	logger.Info("exiting cleanly")
+
 }

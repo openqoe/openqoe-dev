@@ -24,7 +24,6 @@ type Env struct {
 	CORS_ALLOWED_ORIGINS      string
 	GIN_MODE                  GinMode
 	WORKER_POOL_SIZE          string
-	CONTEXT                   context.Context
 }
 
 func NewEnv(ctx context.Context) *Env {
@@ -43,7 +42,6 @@ func NewEnv(ctx context.Context) *Env {
 		CORS_ALLOWED_ORIGINS:      getEnv("CORS_ALLOWED_ORIGINS", "*"),
 		GIN_MODE:                  gm,
 		WORKER_POOL_SIZE:          getEnv("WORKER_POOL_SIZE", "10"),
-		CONTEXT:                   ctx,
 	}
 }
 

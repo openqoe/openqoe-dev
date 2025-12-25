@@ -13,7 +13,7 @@ type RedisConnection struct {
 	ctx    context.Context
 }
 
-func NewRedisClient(env *Env, ctx context.Context, parentLogger *zap.Logger) *RedisConnection {
+func NewRedisClient(ctx context.Context, env *Env, parentLogger *zap.Logger) *RedisConnection {
 	logger := parentLogger.With(zap.String("sub-component", "redis_client"))
 	// URL: redis://<user>:<pass>@localhost:6379/<db>
 	opt, err := redis.ParseURL(env.KV_STORE_URL)
