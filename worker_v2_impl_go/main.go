@@ -5,17 +5,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"openqoe.dev/worker_v2/compute"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/middlewares"
 	"openqoe.dev/worker_v2/otelservice"
@@ -41,7 +39,7 @@ func main() {
 		logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))
 		return
 	}
-	startProcessMetrics(logger)
+	compute.MeasureSystemMetrics(otel_service)
 	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
 	defer close(event_chan)
 
@@ -99,31 +97,4 @@ func main() {
 	}
 
 	logger.Info("exiting cleanly")
-}
-
-func startProcessMetrics(log *zap.Logger) {
-	meter := otel.GetMeterProvider().Meter("hangout.storage.metrics")
-	heapMemUsage, _ := meter.Float64ObservableGauge("go_heap_memory_usage")
-	stackMemUsage, _ := meter.Float64ObservableGauge("go_stack_memory_usage")
-	goRoutineCount, _ := meter.Int64ObservableGauge("go_goroutines_count")
-	gcCount, _ := meter.Int64ObservableGauge("go_gc_cycle_count")
-	gcPause, _ := meter.Float64ObservableGauge("go_gc_all_stop_pause_time_sum")
-
-	_, err := meter.RegisterCallback(
-		func(ctx context.Context, o metric.Observer) error {
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			o.ObserveFloat64(heapMemUsage, float64(m.Alloc))
-			o.ObserveFloat64(stackMemUsage, float64(m.StackInuse))
-			o.ObserveInt64(goRoutineCount, int64(runtime.NumGoroutine()))
-			o.ObserveFloat64(gcPause, float64(m.PauseTotalNs))
-			o.ObserveInt64(gcCount, int64(m.NumGC))
-
-			return nil
-		},
-		heapMemUsage, stackMemUsage, goRoutineCount, gcCount, gcPause,
-	)
-	if err != nil {
-		log.Error("failed to register metrics callback", zap.Error(err))
-	}
 }
