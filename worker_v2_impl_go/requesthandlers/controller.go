@@ -18,6 +18,7 @@ type RequestHandlerService struct {
 	config                   *config.Config
 	auth_service             *config.AuthService
 	otel_service             *otelservice.OpenTelemetryService
+	cardinality_service      *config.CardinalityService
 	req_processing_time_hist metric.Int64Histogram
 	event_chan               chan<- IngestRequestWithContext
 }
@@ -36,6 +37,7 @@ func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_
 		config:                   config_obj,
 		auth_service:             config.NewAuthService(config_obj, otel_service.Logger),
 		otel_service:             otel_service,
+		cardinality_service:      config.NewCardinalityService(env, config_obj, otel_service.Logger),
 		req_processing_time_hist: req_processing_time_gauge,
 		event_chan:               event_chan,
 	}
@@ -44,7 +46,7 @@ func NewRequestHandlerService(env *config.Env, config_obj *config.Config, event_
 func (rhs *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/events", middlewares.Authenticate(rhs.auth_service), validateRequest, rhs.ingestEvents)
 	r.GET("/health", rhs.handleHealth)
-	r.GET("/stats", rhs.handleStats)
+	r.GET("/stats", middlewares.Authenticate(rhs.auth_service), rhs.handleStats)
 }
 
 func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
@@ -75,6 +77,7 @@ func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
 		metric.WithAttributes(
 			attribute.String("org.id", ingestion_events_with_ctx.Events[0].OrgId),
 			attribute.String("player.id", ingestion_events_with_ctx.Events[0].PlayerId),
+			attribute.String("request.endpoint", "ingest-events"),
 		))
 	c.JSON(http.StatusAccepted, IngestionSuccessResponse{
 		Success:          true,
@@ -93,5 +96,26 @@ func (rhs *RequestHandlerService) handleHealth(ctx *gin.Context) {
 	})
 }
 
-func (rhs *RequestHandlerService) handleStats(ctx *gin.Context) {
+func (rhs *RequestHandlerService) handleStats(c *gin.Context) {
+	if dimension := c.Query("dimension"); dimension != "" {
+		rhs.otel_service.Logger.Debug("dimension present")
+		stats := rhs.cardinality_service.GetCardinalityStats(dimension)
+		first_100_values := stats.Values
+		if len(first_100_values) > 100 {
+			first_100_values = first_100_values[:100]
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"dimension": dimension,
+			"count":     stats.Count,
+			"values":    first_100_values,
+		})
+	} else {
+		rhs.otel_service.Logger.Debug("dimension not present")
+		limits := rhs.config.GetAllCardinalityLimits()
+		c.JSON(http.StatusOK, gin.H{
+			"cardinality_limits": limits,
+			"worker_version":     "2.0.0",
+		})
+
+	}
 }

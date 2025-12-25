@@ -87,7 +87,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder
 	// that has multiple outputs using the method zap.NewTee(). With the following code,
 	// logs will be written to stdout and also exported to the OTEL endpoint through the bridge.
 	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewJSONEncoder(logger_encoder_config), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(logger_encoder_config), zapcore.AddSync(os.Stdout), zapcore.DebugLevel),
 		otelzap.NewCore(package_name, otelzap.WithLoggerProvider(loggerProvider)),
 	)
 
