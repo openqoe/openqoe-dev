@@ -35,7 +35,7 @@ func main() {
 
 	env := config.NewEnv(root_ctx)
 	config_obj := config.NewConfig(root_ctx, env, root_logger)
-	otel_shutdown, otel_service, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
+	otel_service, otel_shutdown, err := otelservice.SetupOTelSDK(root_ctx, config_obj, logger_encoder_config)
 	logger := otel_service.Logger
 	if err != nil {
 		logger.Fatal("failed to setup OpenTelemetry SDK", zap.Error(err))

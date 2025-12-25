@@ -26,7 +26,7 @@ import (
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder_config zapcore.EncoderConfig) (func(context.Context) error, *OpenTelemetryService, error) {
+func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder_config zapcore.EncoderConfig) (*OpenTelemetryService, func(context.Context) error, error) {
 	var shutdownFuncs []func(context.Context) error
 	var err error
 
@@ -60,7 +60,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder
 	tracerProvider, err := newTracerProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, nil, err
+		return nil, shutdown, err
 	}
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
@@ -69,7 +69,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder
 	meterProvider, err := newMeterProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, nil, err
+		return nil, shutdown, err
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
@@ -78,7 +78,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder
 	loggerProvider, err := newLoggerProvider(ctx, config_obj, res)
 	if err != nil {
 		handleErr(err)
-		return shutdown, nil, err
+		return nil, shutdown, err
 	}
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	global.SetLoggerProvider(loggerProvider)
@@ -91,7 +91,7 @@ func SetupOTelSDK(ctx context.Context, config_obj *config.Config, logger_encoder
 		otelzap.NewCore(package_name, otelzap.WithLoggerProvider(loggerProvider)),
 	)
 
-	return shutdown, &OpenTelemetryService{Tracer: otel.Tracer(package_name), Meter: otel.Meter(package_name), Logger: zap.New(core)}, err
+	return &OpenTelemetryService{Tracer: otel.Tracer(package_name), Meter: otel.Meter(package_name), Logger: zap.New(core)}, shutdown, err
 }
 
 func newPropagator() propagation.TextMapPropagator {
