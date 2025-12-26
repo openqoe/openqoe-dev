@@ -42,7 +42,7 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 		logger.Debug("Received event for processing", zap.Int("worker id", worker_id))
 		// For each event chunk
 		metrics_service.ComputeMetrics(events_chunk, logger)
-		logger.Debug("Event processing complete", zap.Int("worker id", worker_id))
+		logger.Info("Event processing complete", zap.Int("worker id", worker_id))
 		span.End()
 	}
 }
