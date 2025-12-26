@@ -91,9 +91,9 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 func (ms *MetricsService) ComputeMetrics(events_chunk requesthandlers.IngestRequestWithContext, logger *zap.Logger) {
 	logger = logger.With(zap.String("sub-component", "metrics-compute-service"))
 	for _, event := range events_chunk.Events {
-		ms.otel_service.Logger.Info("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		ms.otel_service.Logger.Debug("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 		ms.transformEventsToMetrics(events_chunk.Ctx, event)
-		ms.otel_service.Logger.Info("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		ms.otel_service.Logger.Debug("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}
 }
 
