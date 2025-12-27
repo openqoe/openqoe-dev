@@ -188,7 +188,7 @@ func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, eve
 		if val, ok := event.Data["playing_time"]; ok && val != nil {
 			ms.metrics.pause_playing_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
-	case "quality_change":
+	case "qualitychange":
 		labels := maps.Clone(base_labels)
 		if val, ok := event.Data["trigger"]; ok && val != "" && val != nil {
 			labels["trigger"] = val.(string)
