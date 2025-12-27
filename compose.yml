@@ -139,7 +139,7 @@ services:
 
   # Worker - Executes tasks
   worker:
-    image: openqoe-worker:latest
+    image: openqoe/worker:1.0.0
     container_name: openqoe-worker
     ports:
       - "8788:8788"
