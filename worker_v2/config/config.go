@@ -28,8 +28,8 @@ func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfi
 				"event_type": {Max_Cardinality: 20, Action: Allow},
 
 				// Bucket medium-cardinality dimensions
-				"video_id":    {Max_Cardinality: 100000, Action: Allow, Bucket_Size: 10000},
-				"video_title": {Max_Cardinality: 100000, Action: Allow, Bucket_Size: 10000},
+				"video_id":    {Max_Cardinality: 100000, Action: Allow},
+				"video_title": {Max_Cardinality: 100000, Action: Allow},
 				// Hash high-cardinality dimensions
 				// max cardinality mimicks infinity
 				"session_id": {Max_Cardinality: math.MaxInt64, Action: Hash},
