@@ -1,7 +1,8 @@
 # OpenQoE Self-Hosted Stack
-# Includes: Mimir (metrics) + Loki (logs) + Grafana (visualization)
+# Included: Redis for Dimensionality Governance
+# Includes: Mimir (metrics) + Loki (logs) + Tempo (traces) + Grafana (visualization)
 # Use this for complete local/on-prem deployment
-#
+# Includes Worker's docker image for self hosting
 # Start: docker compose up -d
 # Stop: docker compose down
 # View logs: docker compose logs -f
@@ -148,7 +149,7 @@ services:
       - GIN_MODE=release
       - KV_STORE_URL=redis://redis:6379
       - OTEL_URL=http://alloy:4317
-      - WORKER_POOL_SIZE=3
+      - WORKER_POOL_SIZE=4
     restart: unless-stopped
     depends_on:
       - redis

@@ -45,7 +45,7 @@ func main() {
 	logger.Info("Starting to observe system metrics")
 	compute.MeasureSystemMetrics(otel_service)
 
-	event_chan := make(chan requesthandlers.IngestRequestWithContext, 1000)
+	event_chan := make(chan *requesthandlers.IngestRequestWithContext, 1000)
 
 	cardinality_service := config.NewCardinalityService(env, config_obj, otel_service.Logger)
 
