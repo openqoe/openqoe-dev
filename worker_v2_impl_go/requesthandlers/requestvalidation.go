@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const max_age = 24 * 60 * 60 * time.Millisecond
-const max_future = 5 * 60 * time.Millisecond
+const max_past = 24 * time.Hour
+const max_future = 5 * time.Minute
 
 func RegisterRequestValidators(logger *zap.Logger) {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
@@ -34,7 +34,7 @@ func RegisterRequestValidators(logger *zap.Logger) {
 				)
 				return false
 			}
-			past_lim := now.Add(max_age * -1)
+			past_lim := now.Add(max_past * -1)
 			if event_time.Before(past_lim) {
 				logger.Error("Event time is too old (>24 hours)",
 					zap.Time("event time", event_time),
