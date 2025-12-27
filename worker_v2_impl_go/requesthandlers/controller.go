@@ -20,10 +20,10 @@ type RequestHandlerService struct {
 	otel_service             *otelservice.OpenTelemetryService
 	cardinality_service      *config.CardinalityService
 	req_processing_time_hist metric.Int64Histogram
-	event_chan               chan<- IngestRequestWithContext
+	event_chan               chan<- *IngestRequestWithContext
 }
 
-func NewRequestHandlerService(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan chan<- IngestRequestWithContext) *RequestHandlerService {
+func NewRequestHandlerService(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan chan<- *IngestRequestWithContext) *RequestHandlerService {
 	req_processing_time_gauge, err := otel_service.Meter.Int64Histogram(
 		"request_processing_time",
 		metric.WithDescription("Time taken for the request from being received in server till just before sending response back"),
@@ -60,7 +60,7 @@ func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
 		Events: ingestion_events.Events,
 	}
 	select {
-	case rhs.event_chan <- *ingestion_events_with_ctx:
+	case rhs.event_chan <- ingestion_events_with_ctx:
 		processing_time := time.Now().UnixNano() - startTime
 		logger.Debug("events sent to queue", zap.Int64("request processing time (ns)", processing_time))
 		rhs.req_processing_time_hist.Record(c.Request.Context(), processing_time,

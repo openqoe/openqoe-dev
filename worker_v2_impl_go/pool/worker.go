@@ -16,7 +16,7 @@ type WorkerPool struct {
 	Wg *sync.WaitGroup
 }
 
-func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan <-chan requesthandlers.IngestRequestWithContext) *WorkerPool {
+func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *otelservice.OpenTelemetryService, cardinality_service *config.CardinalityService, event_chan <-chan *requesthandlers.IngestRequestWithContext) *WorkerPool {
 	logger := otel_service.Logger.With(zap.String("sub-component", "worker_pool"))
 	metrics_service := compute.NewMetricsService(config_obj, cardinality_service, otel_service)
 	wg := &sync.WaitGroup{}
@@ -32,7 +32,7 @@ func NewWorkerPool(env *config.Env, config_obj *config.Config, otel_service *ote
 	return pool
 }
 
-func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metrics_service *compute.MetricsService, event_chan <-chan requesthandlers.IngestRequestWithContext) {
+func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metrics_service *compute.MetricsService, event_chan <-chan *requesthandlers.IngestRequestWithContext) {
 	logger := parent_logger.With(zap.String("sub-component", "worker"), zap.Int("worker id", worker_id))
 	// For events in the channel
 	for events_chunk := range event_chan {
