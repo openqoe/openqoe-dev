@@ -33,25 +33,25 @@
   "author": "openqoe-core",
   "license": "MIT",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^25.0.7",
-    "@rollup/plugin-node-resolve": "^15.2.3",
-    "@rollup/plugin-typescript": "^11.1.5",
-    "@types/jest": "^29.5.8",
-    "@typescript-eslint/eslint-plugin": "^6.10.0",
-    "@typescript-eslint/parser": "^6.10.0",
-    "eslint": "^8.53.0",
-    "jest": "^29.7.0",
-    "rollup": "^4.3.0",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "eslint": "^9.39.2",
+    "jest": "^30.2.0",
+    "rollup": "^4.54.0",
     "@rollup/plugin-terser": "^0.4.4",
-    "ts-jest": "^29.1.1",
-    "tslib": "^2.6.2",
-    "typescript": "^5.2.2"
+    "ts-jest": "^29.4.6",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "hls.js": ">=1.0.0",
     "dashjs": ">=4.0.0",
     "shaka-player": ">=4.0.0",
-    "video.js": ">=7.0.0"
+    "video.js": ">=8.0.0"
   },
   "peerDependenciesMeta": {
     "hls.js": {

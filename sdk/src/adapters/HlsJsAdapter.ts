@@ -147,10 +147,14 @@ export class HlsJsAdapter implements PlayerAdapter {
    * Manifest Parsed event (Player Ready)
    */
   async onManifestParsed(): Promise<void> {
+    // Get page load time using Navigation Timing Level 2
+    let pageLoadTime: number | undefined;
+    const navigationTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+    if (navigationTiming) {
+      pageLoadTime = navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+    }
     const event = await this.eventCollector.createEvent('playerready', {
-      player_startup_time: performance.now(),
-      page_load_time: performance.timing?.loadEventEnd ?
-        performance.timing.loadEventEnd - performance.timing.navigationStart : undefined
+      page_load_time: pageLoadTime
     });
 
     this.batchManager.addEvent(event);
