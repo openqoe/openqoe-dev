@@ -2,27 +2,29 @@
  * OpenQoE - Main SDK class
  */
 
-import { OpenQoEConfig, VideoMetadata, PlayerType } from './types';
-import { Logger } from './utils/logger';
-import { PrivacyModule } from './utils/privacy';
-import { DeviceDetector } from './utils/device';
-import { SessionManager } from './core/SessionManager';
-import { BatchManager } from './core/BatchManager';
-import { QueueManager } from './core/QueueManager';
-import { RetryManager } from './core/RetryManager';
-import { Transport } from './core/Transport';
-import { EventCollector } from './core/EventCollector';
-import { PlayerAdapter } from './types';
+import { OpenQoEConfig, VideoMetadata, PlayerType } from "./types";
+import { Logger } from "./utils/logger";
+import { PrivacyModule } from "./utils/privacy";
+import { DeviceDetector } from "./utils/device";
+import { SessionManager } from "./core/SessionManager";
+import { BatchManager } from "./core/BatchManager";
+import { QueueManager } from "./core/QueueManager";
+import { RetryManager } from "./core/RetryManager";
+import { Transport } from "./core/Transport";
+import { EventCollector } from "./core/EventCollector";
+import { PlayerAdapter } from "./types";
 
 // Import adapters
-import { HTML5Adapter } from './adapters/HTML5Adapter';
-import { VideoJsAdapter } from './adapters/VideoJsAdapter';
-import { HlsJsAdapter } from './adapters/HlsJsAdapter';
-import { DashJsAdapter } from './adapters/DashJsAdapter';
-import { ShakaAdapter } from './adapters/ShakaAdapter';
+import { HTML5Adapter } from "./adapters/HTML5Adapter";
+import { VideoJsAdapter } from "./adapters/VideoJsAdapter";
+import { HlsJsAdapter } from "./adapters/HlsJsAdapter";
+import { DashJsAdapter } from "./adapters/DashJsAdapter";
+import { ShakaAdapter } from "./adapters/ShakaAdapter";
 
 // Internal config type with defaults applied
-type InternalConfig = Required<Omit<OpenQoEConfig, 'appName' | 'appVersion'>> & {
+type InternalConfig = Required<
+  Omit<OpenQoEConfig, "appName" | "appVersion">
+> & {
   appName?: string;
   appVersion?: string;
 };
@@ -44,7 +46,7 @@ export class OpenQoE {
   constructor(config: OpenQoEConfig) {
     // Validate required config
     if (!config.orgId || !config.playerId || !config.endpointUrl) {
-      throw new Error('OpenQoE: orgId, playerId, and endpointUrl are required');
+      throw new Error("OpenQoE: orgId, playerId, and endpointUrl are required");
     }
 
     // Set defaults
@@ -52,7 +54,7 @@ export class OpenQoE {
       orgId: config.orgId,
       playerId: config.playerId,
       endpointUrl: config.endpointUrl,
-      env: config.env || 'prod',
+      env: config.env || "prod",
       appName: config.appName,
       appVersion: config.appVersion,
       samplingRate: config.samplingRate ?? 1.0,
@@ -62,18 +64,18 @@ export class OpenQoE {
       batchInterval: config.batchInterval || 5000,
       maxQueueSize: config.maxQueueSize || 100,
       debug: config.debug || false,
-      logLevel: config.logLevel || 'warn'
+      logLevel: config.logLevel || "warn",
     };
 
     this.samplingRate = this.config.samplingRate;
 
     // Initialize logger
     this.logger = new Logger(this.config.debug, this.config.logLevel);
-    this.logger.info('OpenQoE SDK initialized', {
-      version: '1.0.0',
+    this.logger.info("OpenQoE SDK initialized", {
+      version: "1.0.0",
       orgId: this.config.orgId,
       playerId: this.config.playerId,
-      env: this.config.env
+      env: this.config.env,
     });
 
     // Initialize utilities
@@ -85,14 +87,14 @@ export class OpenQoE {
     this.queueManager = new QueueManager(
       this.config.maxQueueSize,
       true,
-      this.logger
+      this.logger,
     );
     this.retryManager = new RetryManager(this.logger);
     this.transport = new Transport(
       this.config.endpointUrl,
       this.retryManager,
       this.queueManager,
-      this.logger
+      this.logger,
     );
 
     // Initialize batch manager with flush callback
@@ -100,7 +102,8 @@ export class OpenQoE {
       this.config.batchSize,
       this.config.batchInterval,
       async (events) => await this.transport.send(events),
-      this.logger
+      (events) => this.transport.sendSync(events),
+      this.logger,
     );
 
     // Initialize event collector
@@ -113,11 +116,12 @@ export class OpenQoE {
       this.logger,
       this.config.env,
       this.config.appName,
-      this.config.appVersion
+      this.config.appVersion,
     );
 
     // Start session
-    this.sessionManager.startSession();
+    const sessionId = this.sessionManager.startSession();
+    this.logger.info("New session started:", sessionId);
   }
 
   /**
@@ -126,13 +130,15 @@ export class OpenQoE {
   attachPlayer(
     playerType: PlayerType,
     playerInstance: any,
-    metadata?: VideoMetadata
+    metadata?: VideoMetadata,
   ): void {
     this.logger.info(`Attaching ${playerType} player`);
 
     // Apply sampling
     if (!this.shouldSample()) {
-      this.logger.info(`Skipping tracking due to sampling rate (${this.samplingRate})`);
+      this.logger.info(
+        `Skipping tracking due to sampling rate (${this.samplingRate})`,
+      );
       return;
     }
 
@@ -148,20 +154,40 @@ export class OpenQoE {
 
     // Create appropriate adapter
     switch (playerType) {
-      case 'html5':
-        this.currentAdapter = new HTML5Adapter(this.eventCollector, this.batchManager, this.logger);
+      case "html5":
+        this.currentAdapter = new HTML5Adapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
         break;
-      case 'videojs':
-        this.currentAdapter = new VideoJsAdapter(this.eventCollector, this.batchManager, this.logger);
+      case "videojs":
+        this.currentAdapter = new VideoJsAdapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
         break;
-      case 'hlsjs':
-        this.currentAdapter = new HlsJsAdapter(this.eventCollector, this.batchManager, this.logger);
+      case "hlsjs":
+        this.currentAdapter = new HlsJsAdapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
         break;
-      case 'dashjs':
-        this.currentAdapter = new DashJsAdapter(this.eventCollector, this.batchManager, this.logger);
+      case "dashjs":
+        this.currentAdapter = new DashJsAdapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
         break;
-      case 'shaka':
-        this.currentAdapter = new ShakaAdapter(this.eventCollector, this.batchManager, this.logger);
+      case "shaka":
+        this.currentAdapter = new ShakaAdapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
         break;
       default:
         throw new Error(`Unsupported player type: ${playerType}`);
@@ -175,7 +201,10 @@ export class OpenQoE {
   /**
    * Track custom event manually
    */
-  async trackEvent(eventType: string, data?: Record<string, any>): Promise<void> {
+  async trackEvent(
+    eventType: string,
+    data?: Record<string, any>,
+  ): Promise<void> {
     if (!this.shouldSample()) {
       return;
     }
@@ -189,7 +218,7 @@ export class OpenQoE {
    */
   startSession(): string {
     const sessionId = this.sessionManager.startSession();
-    this.logger.info('New session started:', sessionId);
+    this.logger.info("New session started:", sessionId);
     return sessionId;
   }
 
@@ -199,7 +228,7 @@ export class OpenQoE {
   endSession(): void {
     this.sessionManager.endSession();
     this.batchManager.flush();
-    this.logger.info('Session ended');
+    this.logger.info("Session ended");
   }
 
   /**
@@ -227,7 +256,7 @@ export class OpenQoE {
    * Destroy SDK instance
    */
   destroy(): void {
-    this.logger.info('Destroying OpenQoE SDK instance');
+    this.logger.info("Destroying OpenQoE SDK instance");
 
     // Detach adapter
     if (this.currentAdapter) {

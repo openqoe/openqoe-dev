@@ -2,10 +2,17 @@
  * Shaka Player Adapter
  */
 
-import { PlayerAdapter, VideoMetadata, PlayerState, Resolution, CMCDData, PlayerError } from '../types';
-import { EventCollector } from '../core/EventCollector';
-import { BatchManager } from '../core/BatchManager';
-import { Logger } from '../utils/logger';
+import {
+  PlayerAdapter,
+  VideoMetadata,
+  PlayerState,
+  Resolution,
+  CMCDData,
+  PlayerError,
+} from "../types";
+import { EventCollector } from "../core/EventCollector";
+import { BatchManager } from "../core/BatchManager";
+import { Logger } from "../utils/logger";
 
 export class ShakaAdapter implements PlayerAdapter {
   private player: any = null;
@@ -14,7 +21,8 @@ export class ShakaAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventListeners: Map<string, EventListenerOrEventListenerObject> = new Map();
+  private eventListeners: Map<string, EventListenerOrEventListenerObject> =
+    new Map();
   private shakaEventHandlers: Map<string, Function> = new Map();
 
   // State tracking
@@ -33,7 +41,7 @@ export class ShakaAdapter implements PlayerAdapter {
   constructor(
     eventCollector: EventCollector,
     batchManager: BatchManager,
-    logger: Logger
+    logger: Logger,
   ) {
     this.eventCollector = eventCollector;
     this.batchManager = batchManager;
@@ -44,8 +52,8 @@ export class ShakaAdapter implements PlayerAdapter {
    * Attach to Shaka Player
    */
   attach(player: any, metadata: VideoMetadata): void {
-    if (!player || typeof player.addEventListener !== 'function') {
-      throw new Error('ShakaAdapter: player must be a Shaka Player instance');
+    if (!player || typeof player.addEventListener !== "function") {
+      throw new Error("ShakaAdapter: player must be a Shaka Player instance");
     }
 
     this.player = player;
@@ -54,22 +62,24 @@ export class ShakaAdapter implements PlayerAdapter {
     // Get video element (Shaka attaches to a video element)
     this.video = this.player.getMediaElement();
     if (!this.video) {
-      throw new Error('ShakaAdapter: Shaka Player must be attached to a video element');
+      throw new Error(
+        "ShakaAdapter: Shaka Player must be attached to a video element",
+      );
     }
 
     // Set player info
     const version = this.player.constructor?.version || undefined;
     this.eventCollector.setPlayerInfo({
-      name: 'shaka',
+      name: "shaka",
       version: version,
       autoplay: this.video.autoplay,
-      preload: (this.video.preload as any) || 'auto'
+      preload: (this.video.preload as any) || "auto",
     });
 
     // Attach event listeners
     this.attachEventListeners();
 
-    this.logger.info('ShakaAdapter attached');
+    this.logger.info("ShakaAdapter attached");
   }
 
   /**
@@ -94,7 +104,7 @@ export class ShakaAdapter implements PlayerAdapter {
 
     this.video = null;
     this.player = null;
-    this.logger.info('ShakaAdapter detached');
+    this.logger.info("ShakaAdapter detached");
   }
 
   /**
@@ -107,19 +117,19 @@ export class ShakaAdapter implements PlayerAdapter {
     // Access event types from the player's constructor
     const EventType = this.player.constructor.EventType || {};
 
-    this.onShaka('loaded', () => this.onManifestLoaded());
-    this.onShaka('adaptation', () => this.onAdaptation());
-    this.onShaka('error', (event: any) => this.onShakaError(event));
-    this.onShaka('buffering', (event: any) => this.onBuffering(event));
+    this.onShaka("loaded", () => this.onManifestLoaded());
+    this.onShaka("adaptation", () => this.onAdaptation());
+    this.onShaka("error", (event: any) => this.onShakaError(event));
+    this.onShaka("buffering", (event: any) => this.onBuffering(event));
 
     // Standard video element events
-    this.addEventListener('loadstart', () => this.onViewStart());
-    this.addEventListener('play', () => this.onPlaying());
-    this.addEventListener('pause', () => this.onPause());
-    this.addEventListener('seeking', () => this.onSeeking());
-    this.addEventListener('seeked', () => this.onSeeked());
-    this.addEventListener('ended', () => this.onEnded());
-    this.addEventListener('timeupdate', () => this.onTimeUpdate());
+    this.addEventListener("loadstart", () => this.onViewStart());
+    this.addEventListener("play", () => this.onPlaying());
+    this.addEventListener("pause", () => this.onPause());
+    this.addEventListener("seeking", () => this.onSeeking());
+    this.addEventListener("seeked", () => this.onSeeked());
+    this.addEventListener("ended", () => this.onEnded());
+    this.addEventListener("timeupdate", () => this.onTimeUpdate());
   }
 
   /**
@@ -148,16 +158,19 @@ export class ShakaAdapter implements PlayerAdapter {
   async onManifestLoaded(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
-    const navigationTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+    const navigationTiming = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
     if (navigationTiming) {
-      pageLoadTime = navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+      pageLoadTime =
+        navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent('playerready', {
-      page_load_time: pageLoadTime
+    const event = await this.eventCollector.createEvent("playerready", {
+      page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('playerready event fired');
+    this.logger.debug("playerready event fired");
   }
 
   /**
@@ -166,12 +179,12 @@ export class ShakaAdapter implements PlayerAdapter {
   async onViewStart(): Promise<void> {
     this.viewStartTime = performance.now();
 
-    const event = await this.eventCollector.createEvent('viewstart', {
-      preroll_requested: false
+    const event = await this.eventCollector.createEvent("viewstart", {
+      preroll_requested: false,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('viewstart event fired');
+    this.logger.debug("viewstart event fired");
   }
 
   /**
@@ -181,17 +194,19 @@ export class ShakaAdapter implements PlayerAdapter {
     if (!this.video) return;
 
     // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime ? performance.now() - this.viewStartTime : undefined;
+    const startupTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : undefined;
 
     const event = await this.eventCollector.createEvent(
-      'playing',
+      "playing",
       {
         video_startup_time: startupTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
@@ -199,7 +214,7 @@ export class ShakaAdapter implements PlayerAdapter {
     // Start heartbeat
     this.startHeartbeat();
 
-    this.logger.debug('playing event fired');
+    this.logger.debug("playing event fired");
   }
 
   /**
@@ -212,15 +227,15 @@ export class ShakaAdapter implements PlayerAdapter {
     this.stopHeartbeat();
 
     const event = await this.eventCollector.createEvent(
-      'pause',
+      "pause",
       {
-        playing_time: this.playingTime
+        playing_time: this.playingTime,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('pause event fired');
+    this.logger.debug("pause event fired");
   }
 
   /**
@@ -242,17 +257,17 @@ export class ShakaAdapter implements PlayerAdapter {
     const seekLatency = performance.now() - (this.seekStartTime || 0);
 
     const event = await this.eventCollector.createEvent(
-      'seek',
+      "seek",
       {
         from: this.seekFrom,
         to: seekTo,
-        seek_latency: seekLatency
+        seek_latency: seekLatency,
       },
-      seekTo
+      seekTo,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('seek event fired');
+    this.logger.debug("seek event fired");
   }
 
   /**
@@ -268,17 +283,16 @@ export class ShakaAdapter implements PlayerAdapter {
       this.stallStartTime = performance.now();
 
       const stallEvent = await this.eventCollector.createEvent(
-        'stall_start',
+        "stall_start",
         {
           buffer_length: this.getBufferLength(),
-          bitrate: this.getBitrate()
+          bitrate: this.getBitrate(),
         },
-        this.video.currentTime * 1000
+        this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(stallEvent);
-      this.logger.debug('stall_start event fired');
-
+      this.logger.debug("stall_start event fired");
     } else if (!buffering && this.stallStartTime !== null) {
       // Stall ended
       const stallDuration = performance.now() - this.stallStartTime;
@@ -286,17 +300,17 @@ export class ShakaAdapter implements PlayerAdapter {
       this.rebufferCount++;
 
       const stallEvent = await this.eventCollector.createEvent(
-        'stall_end',
+        "stall_end",
         {
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength()
+          buffer_length: this.getBufferLength(),
         },
-        this.video.currentTime * 1000
+        this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(stallEvent);
       this.stallStartTime = null;
-      this.logger.debug('stall_end event fired');
+      this.logger.debug("stall_end event fired");
     }
   }
 
@@ -308,23 +322,28 @@ export class ShakaAdapter implements PlayerAdapter {
 
     this.stopHeartbeat();
 
-    const totalWatchTime = this.viewStartTime ? performance.now() - this.viewStartTime : 0;
-    const completionRate = this.video.duration > 0 ? this.video.currentTime / this.video.duration : 1;
+    const totalWatchTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : 0;
+    const completionRate =
+      this.video.duration > 0
+        ? this.video.currentTime / this.video.duration
+        : 1;
 
     const event = await this.eventCollector.createEvent(
-      'ended',
+      "ended",
       {
         playing_time: this.playingTime,
         total_watch_time: totalWatchTime,
         completion_rate: completionRate,
         rebuffer_count: this.rebufferCount,
-        rebuffer_duration: this.rebufferDuration
+        rebuffer_duration: this.rebufferDuration,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('ended event fired');
+    this.logger.debug("ended event fired");
   }
 
   /**
@@ -334,17 +353,17 @@ export class ShakaAdapter implements PlayerAdapter {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
-      'qualitychange',
+      "qualitychange",
       {
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('qualitychange event fired');
+    this.logger.debug("qualitychange event fired");
   }
 
   /**
@@ -364,35 +383,35 @@ export class ShakaAdapter implements PlayerAdapter {
     // Categorize based on Shaka error category
     switch (category) {
       case 1: // NETWORK
-        errorFamily = 'network';
+        errorFamily = "network";
         errorMessage = `Network error (${code})`;
         break;
       case 2: // TEXT
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `Text track error (${code})`;
         break;
       case 3: // MEDIA
-        errorFamily = 'decoder';
+        errorFamily = "decoder";
         errorMessage = `Media error (${code})`;
         break;
       case 4: // MANIFEST
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `Manifest error (${code})`;
         break;
       case 5: // STREAMING
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `Streaming error (${code})`;
         break;
       case 6: // DRM
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `DRM error (${code})`;
         break;
       case 7: // PLAYER
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `Player error (${code})`;
         break;
       default:
-        errorFamily = 'source';
+        errorFamily = "source";
         errorMessage = `Error (${code})`;
     }
 
@@ -407,8 +426,8 @@ export class ShakaAdapter implements PlayerAdapter {
         error_family: errorFamily,
         severity,
         category,
-        data
-      }
+        data,
+      },
     });
   }
 
@@ -419,18 +438,18 @@ export class ShakaAdapter implements PlayerAdapter {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
-      'error',
+      "error",
       {
-        error_family: error.context?.error_family || 'source',
+        error_family: error.context?.error_family || "source",
         error_code: String(error.code),
         error_message: error.message,
-        error_context: error.context
+        error_context: error.context,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('error event fired', error);
+    this.logger.debug("error event fired", error);
   }
 
   /**
@@ -442,19 +461,19 @@ export class ShakaAdapter implements PlayerAdapter {
     const progress = this.video.currentTime / this.video.duration;
 
     // Track quartiles
-    const quartiles = [0.25, 0.50, 0.75, 1.0];
+    const quartiles = [0.25, 0.5, 0.75, 1.0];
     for (const q of quartiles) {
       if (progress >= q && !this.quartileFired.has(q)) {
         this.quartileFired.add(q);
 
         const event = await this.eventCollector.createEvent(
-          'quartile',
+          "quartile",
           {
             quartile: q * 100,
             playing_time: this.playingTime,
-            watch_time: this.watchTime
+            watch_time: this.watchTime,
           },
-          this.video.currentTime * 1000
+          this.video.currentTime * 1000,
         );
 
         this.batchManager.addEvent(event);
@@ -465,7 +484,8 @@ export class ShakaAdapter implements PlayerAdapter {
     // Update playing time
     if (!this.video.paused) {
       const timeDelta = this.video.currentTime - this.lastPlaybackTime;
-      if (timeDelta > 0 && timeDelta < 1) { // Sanity check
+      if (timeDelta > 0 && timeDelta < 1) {
+        // Sanity check
         this.playingTime += timeDelta * 1000; // Convert to ms
       }
     }
@@ -484,18 +504,18 @@ export class ShakaAdapter implements PlayerAdapter {
       if (!this.video) return;
 
       const event = await this.eventCollector.createEvent(
-        'heartbeat',
+        "heartbeat",
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
           buffer_length: this.getBufferLength(),
-          dropped_frames: this.getDroppedFrames()
+          dropped_frames: this.getDroppedFrames(),
         },
-        this.video.currentTime * 1000
+        this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(event);
-      this.logger.debug('heartbeat event fired');
+      this.logger.debug("heartbeat event fired");
     }, 10000); // Every 10 seconds
   }
 
@@ -512,7 +532,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getCurrentTime(): number {
+  getVideoPlaybackPosition(): number {
     return this.video?.currentTime || 0;
   }
 
@@ -545,7 +565,7 @@ export class ShakaAdapter implements PlayerAdapter {
         }
       }
     } catch (e) {
-      this.logger.debug('Error getting bitrate:', e);
+      this.logger.debug("Error getting bitrate:", e);
     }
 
     return null;
@@ -565,19 +585,19 @@ export class ShakaAdapter implements PlayerAdapter {
         if (activeTrack) {
           return {
             width: activeTrack.width || this.video?.videoWidth || 0,
-            height: activeTrack.height || this.video?.videoHeight || 0
+            height: activeTrack.height || this.video?.videoHeight || 0,
           };
         }
       }
     } catch (e) {
-      this.logger.debug('Error getting resolution:', e);
+      this.logger.debug("Error getting resolution:", e);
     }
 
     // Fallback to video element
     if (this.video) {
       return {
         width: this.video.videoWidth,
-        height: this.video.videoHeight
+        height: this.video.videoHeight,
       };
     }
 
@@ -600,7 +620,7 @@ export class ShakaAdapter implements PlayerAdapter {
         }
       }
     } catch (e) {
-      this.logger.debug('Error getting framerate:', e);
+      this.logger.debug("Error getting framerate:", e);
     }
 
     return null;
@@ -618,7 +638,7 @@ export class ShakaAdapter implements PlayerAdapter {
         return stats.droppedFrames;
       }
     } catch (e) {
-      this.logger.debug('Error getting dropped frames:', e);
+      this.logger.debug("Error getting dropped frames:", e);
     }
 
     // Fallback to video element
@@ -641,7 +661,7 @@ export class ShakaAdapter implements PlayerAdapter {
         paused: true,
         ended: false,
         buffered: null,
-        readyState: 0
+        readyState: 0,
       };
     }
 
@@ -651,7 +671,7 @@ export class ShakaAdapter implements PlayerAdapter {
       paused: this.video.paused,
       ended: this.video.ended,
       buffered: this.video.buffered,
-      readyState: this.video.readyState
+      readyState: this.video.readyState,
     };
   }
 
@@ -673,7 +693,7 @@ export class ShakaAdapter implements PlayerAdapter {
         };
       }
     } catch (e) {
-      this.logger.debug('Error getting CMCD data:', e);
+      this.logger.debug("Error getting CMCD data:", e);
     }
 
     return null;
@@ -693,14 +713,17 @@ export class ShakaAdapter implements PlayerAdapter {
         if (buffered && buffered.length > 0) {
           const currentTime = this.video.currentTime;
           for (let i = 0; i < buffered.length; i++) {
-            if (currentTime >= buffered.start(i) && currentTime <= buffered.end(i)) {
+            if (
+              currentTime >= buffered.start(i) &&
+              currentTime <= buffered.end(i)
+            ) {
               return (buffered.end(i) - currentTime) * 1000; // Convert to ms
             }
           }
         }
       }
     } catch (e) {
-      this.logger.debug('Error getting buffer length:', e);
+      this.logger.debug("Error getting buffer length:", e);
     }
 
     return undefined;
