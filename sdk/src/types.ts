@@ -2,13 +2,13 @@
  * openqoe-core Types & Interfaces
  */
 
-export type Environment = 'dev' | 'staging' | 'prod';
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
-export type PlayerType = 'html5' | 'videojs' | 'hlsjs' | 'dashjs' | 'shaka';
-export type DeviceCategory = 'desktop' | 'mobile' | 'tablet' | 'tv';
-export type StreamType = 'vod' | 'live';
-export type PlayerPreload = 'none' | 'metadata' | 'auto';
-export type ErrorFamily = 'network' | 'decoder' | 'source' | 'drm' | 'business';
+export type Environment = "dev" | "staging" | "prod";
+export type LogLevel = "error" | "warn" | "info" | "debug";
+export type PlayerType = "html5" | "videojs" | "hlsjs" | "dashjs" | "shaka";
+export type DeviceCategory = "desktop" | "mobile" | "tablet" | "tv";
+export type StreamType = "vod" | "live";
+export type PlayerPreload = "none" | "metadata" | "auto";
+export type ErrorFamily = "network" | "decoder" | "source" | "drm" | "business";
 
 export interface OpenQoEConfig {
   // Required
@@ -98,24 +98,24 @@ export interface Resolution {
 }
 
 export interface CMCDData {
-  br?: number;      // Encoded bitrate (kbps)
-  bl?: number;      // Buffer length (ms)
-  bs?: boolean;     // Buffer starvation
-  cid?: string;     // Content ID
-  d?: number;       // Object duration (ms)
-  dl?: number;      // Deadline (ms)
-  mtp?: number;     // Measured throughput (kbps)
-  nor?: string;     // Next object request
-  nrr?: string;     // Next range request
-  ot?: string;      // Object type
-  pr?: number;      // Playback rate
-  rtp?: number;     // Requested max throughput (kbps)
-  sf?: string;      // Streaming format
-  sid?: string;     // Session ID
-  st?: string;      // Stream type
-  su?: boolean;     // Startup
-  tb?: number;      // Top bitrate (kbps)
-  v?: number;       // Version
+  br?: number; // Encoded bitrate (kbps)
+  bl?: number; // Buffer length (ms)
+  bs?: boolean; // Buffer starvation
+  cid?: string; // Content ID
+  d?: number; // Object duration (ms)
+  dl?: number; // Deadline (ms)
+  mtp?: number; // Measured throughput (kbps)
+  nor?: string; // Next object request
+  nrr?: string; // Next range request
+  ot?: string; // Object type
+  pr?: number; // Playback rate
+  rtp?: number; // Requested max throughput (kbps)
+  sf?: string; // Streaming format
+  sid?: string; // Session ID
+  st?: string; // Stream type
+  su?: boolean; // Startup
+  tb?: number; // Top bitrate (kbps)
+  v?: number; // Version
 }
 
 export interface BaseEvent {
@@ -194,7 +194,7 @@ export interface QualityChangeData {
   new_bitrate: number; // bps
   previous_resolution?: Resolution;
   new_resolution?: Resolution;
-  trigger?: 'abr' | 'manual';
+  trigger?: "abr" | "manual";
 }
 
 export interface EndedData {
@@ -254,7 +254,7 @@ export interface PlayerError {
 export interface PlayerAdapter {
   attach(player: any, metadata: VideoMetadata): void;
   detach(): void;
-  getCurrentTime(): number;
+  getVideoPlaybackPosition(): number;
   getDuration(): number;
   getBitrate(): number | null;
   getVideoResolution(): Resolution | null;

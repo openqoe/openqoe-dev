@@ -2,10 +2,17 @@
  * HLS.js Player Adapter
  */
 
-import { PlayerAdapter, VideoMetadata, PlayerState, Resolution, CMCDData, PlayerError } from '../types';
-import { EventCollector } from '../core/EventCollector';
-import { BatchManager } from '../core/BatchManager';
-import { Logger } from '../utils/logger';
+import {
+  PlayerAdapter,
+  VideoMetadata,
+  PlayerState,
+  Resolution,
+  CMCDData,
+  PlayerError,
+} from "../types";
+import { EventCollector } from "../core/EventCollector";
+import { BatchManager } from "../core/BatchManager";
+import { Logger } from "../utils/logger";
 
 export class HlsJsAdapter implements PlayerAdapter {
   private hls: any = null;
@@ -14,7 +21,8 @@ export class HlsJsAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventListeners: Map<string, EventListenerOrEventListenerObject> = new Map();
+  private eventListeners: Map<string, EventListenerOrEventListenerObject> =
+    new Map();
   private hlsEventHandlers: Map<string, Function> = new Map();
 
   // State tracking
@@ -34,7 +42,7 @@ export class HlsJsAdapter implements PlayerAdapter {
   constructor(
     eventCollector: EventCollector,
     batchManager: BatchManager,
-    logger: Logger
+    logger: Logger,
   ) {
     this.eventCollector = eventCollector;
     this.batchManager = batchManager;
@@ -45,8 +53,8 @@ export class HlsJsAdapter implements PlayerAdapter {
    * Attach to HLS.js instance
    */
   attach(player: any, metadata: VideoMetadata): void {
-    if (!player || typeof player.on !== 'function') {
-      throw new Error('HlsJsAdapter: player must be an HLS.js instance');
+    if (!player || typeof player.on !== "function") {
+      throw new Error("HlsJsAdapter: player must be an HLS.js instance");
     }
 
     this.hls = player;
@@ -55,22 +63,24 @@ export class HlsJsAdapter implements PlayerAdapter {
     // Get video element
     this.video = this.hls.media;
     if (!this.video) {
-      throw new Error('HlsJsAdapter: HLS instance must be attached to a video element');
+      throw new Error(
+        "HlsJsAdapter: HLS instance must be attached to a video element",
+      );
     }
 
     // Set player info
     const version = (player.constructor as any)?.version || undefined;
     this.eventCollector.setPlayerInfo({
-      name: 'hlsjs',
+      name: "hlsjs",
       version: version,
       autoplay: this.video.autoplay,
-      preload: (this.video.preload as any) || 'auto'
+      preload: (this.video.preload as any) || "auto",
     });
 
     // Attach event listeners
     this.attachEventListeners();
 
-    this.logger.info('HlsJsAdapter attached');
+    this.logger.info("HlsJsAdapter attached");
   }
 
   /**
@@ -95,7 +105,7 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     this.video = null;
     this.hls = null;
-    this.logger.info('HlsJsAdapter detached');
+    this.logger.info("HlsJsAdapter detached");
   }
 
   /**
@@ -107,20 +117,26 @@ export class HlsJsAdapter implements PlayerAdapter {
     // HLS-specific events
     const Hls = this.hls.constructor;
     this.onHls(Hls.Events.MANIFEST_PARSED, () => this.onManifestParsed());
-    this.onHls(Hls.Events.LEVEL_SWITCHED, (_event: any, data: any) => this.onLevelSwitched(data));
-    this.onHls(Hls.Events.FRAG_LOADED, (_event: any, data: any) => this.onFragLoaded(data));
-    this.onHls(Hls.Events.ERROR, (_event: any, data: any) => this.onHlsError(data));
+    this.onHls(Hls.Events.LEVEL_SWITCHED, (_event: any, data: any) =>
+      this.onLevelSwitched(data),
+    );
+    this.onHls(Hls.Events.FRAG_LOADED, (_event: any, data: any) =>
+      this.onFragLoaded(data),
+    );
+    this.onHls(Hls.Events.ERROR, (_event: any, data: any) =>
+      this.onHlsError(data),
+    );
 
     // Standard video element events
-    this.addEventListener('loadstart', () => this.onViewStart());
-    this.addEventListener('play', () => this.onPlaying());
-    this.addEventListener('pause', () => this.onPause());
-    this.addEventListener('seeking', () => this.onSeeking());
-    this.addEventListener('seeked', () => this.onSeeked());
-    this.addEventListener('waiting', () => this.onStallStart());
-    this.addEventListener('playing', () => this.onPlayingAfterWait());
-    this.addEventListener('ended', () => this.onEnded());
-    this.addEventListener('timeupdate', () => this.onTimeUpdate());
+    this.addEventListener("loadstart", () => this.onViewStart());
+    this.addEventListener("play", () => this.onPlaying());
+    this.addEventListener("pause", () => this.onPause());
+    this.addEventListener("seeking", () => this.onSeeking());
+    this.addEventListener("seeked", () => this.onSeeked());
+    this.addEventListener("waiting", () => this.onStallStart());
+    this.addEventListener("playing", () => this.onPlayingAfterWait());
+    this.addEventListener("ended", () => this.onEnded());
+    this.addEventListener("timeupdate", () => this.onTimeUpdate());
   }
 
   /**
@@ -149,16 +165,19 @@ export class HlsJsAdapter implements PlayerAdapter {
   async onManifestParsed(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
-    const navigationTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+    const navigationTiming = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
     if (navigationTiming) {
-      pageLoadTime = navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+      pageLoadTime =
+        navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent('playerready', {
-      page_load_time: pageLoadTime
+    const event = await this.eventCollector.createEvent("playerready", {
+      page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('playerready event fired');
+    this.logger.debug("playerready event fired");
   }
 
   /**
@@ -167,12 +186,12 @@ export class HlsJsAdapter implements PlayerAdapter {
   async onViewStart(): Promise<void> {
     this.viewStartTime = performance.now();
 
-    const event = await this.eventCollector.createEvent('viewstart', {
-      preroll_requested: false
+    const event = await this.eventCollector.createEvent("viewstart", {
+      preroll_requested: false,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('viewstart event fired');
+    this.logger.debug("viewstart event fired");
   }
 
   /**
@@ -182,17 +201,19 @@ export class HlsJsAdapter implements PlayerAdapter {
     if (!this.video) return;
 
     // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime ? performance.now() - this.viewStartTime : undefined;
+    const startupTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : undefined;
 
     const event = await this.eventCollector.createEvent(
-      'playing',
+      "playing",
       {
         video_startup_time: startupTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
@@ -200,7 +221,7 @@ export class HlsJsAdapter implements PlayerAdapter {
     // Start heartbeat
     this.startHeartbeat();
 
-    this.logger.debug('playing event fired');
+    this.logger.debug("playing event fired");
   }
 
   /**
@@ -213,15 +234,15 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.stopHeartbeat();
 
     const event = await this.eventCollector.createEvent(
-      'pause',
+      "pause",
       {
-        playing_time: this.playingTime
+        playing_time: this.playingTime,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('pause event fired');
+    this.logger.debug("pause event fired");
   }
 
   /**
@@ -243,17 +264,17 @@ export class HlsJsAdapter implements PlayerAdapter {
     const seekLatency = performance.now() - (this.seekStartTime || 0);
 
     const event = await this.eventCollector.createEvent(
-      'seek',
+      "seek",
       {
         from: this.seekFrom,
         to: seekTo,
-        seek_latency: seekLatency
+        seek_latency: seekLatency,
       },
-      seekTo
+      seekTo,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('seek event fired');
+    this.logger.debug("seek event fired");
   }
 
   /**
@@ -265,16 +286,16 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.stallStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent(
-      'stall_start',
+      "stall_start",
       {
         buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate()
+        bitrate: this.getBitrate(),
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('stall_start event fired');
+    this.logger.debug("stall_start event fired");
   }
 
   /**
@@ -290,17 +311,17 @@ export class HlsJsAdapter implements PlayerAdapter {
       this.rebufferCount++;
 
       const event = await this.eventCollector.createEvent(
-        'stall_end',
+        "stall_end",
         {
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength()
+          buffer_length: this.getBufferLength(),
         },
-        this.video.currentTime * 1000
+        this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(event);
       this.stallStartTime = null;
-      this.logger.debug('stall_end event fired');
+      this.logger.debug("stall_end event fired");
     }
   }
 
@@ -312,23 +333,28 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     this.stopHeartbeat();
 
-    const totalWatchTime = this.viewStartTime ? performance.now() - this.viewStartTime : 0;
-    const completionRate = this.video.duration > 0 ? this.video.currentTime / this.video.duration : 1;
+    const totalWatchTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : 0;
+    const completionRate =
+      this.video.duration > 0
+        ? this.video.currentTime / this.video.duration
+        : 1;
 
     const event = await this.eventCollector.createEvent(
-      'ended',
+      "ended",
       {
         playing_time: this.playingTime,
         total_watch_time: totalWatchTime,
         completion_rate: completionRate,
         rebuffer_count: this.rebufferCount,
-        rebuffer_duration: this.rebufferDuration
+        rebuffer_duration: this.rebufferDuration,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('ended event fired');
+    this.logger.debug("ended event fired");
   }
 
   /**
@@ -340,17 +366,17 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.currentLevel = data.level;
 
     const event = await this.eventCollector.createEvent(
-      'qualitychange',
+      "qualitychange",
       {
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('qualitychange event fired');
+    this.logger.debug("qualitychange event fired");
   }
 
   /**
@@ -359,9 +385,9 @@ export class HlsJsAdapter implements PlayerAdapter {
   async onFragLoaded(data: any): Promise<void> {
     // This can be used for throughput calculation
     // For now, we just log it
-    this.logger.debug('Fragment loaded', {
+    this.logger.debug("Fragment loaded", {
       duration: data.frag?.duration,
-      level: data.frag?.level
+      level: data.frag?.level,
     });
   }
 
@@ -378,16 +404,16 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     // Determine error family based on type
     if (type === this.hls.constructor.ErrorTypes.NETWORK_ERROR) {
-      errorFamily = 'network';
+      errorFamily = "network";
       errorMessage = `Network error: ${details}`;
     } else if (type === this.hls.constructor.ErrorTypes.MEDIA_ERROR) {
-      errorFamily = 'decoder';
+      errorFamily = "decoder";
       errorMessage = `Media error: ${details}`;
     } else if (type === this.hls.constructor.ErrorTypes.MUX_ERROR) {
-      errorFamily = 'source';
+      errorFamily = "source";
       errorMessage = `Remux/multiplexer error: ${details}`;
     } else {
-      errorFamily = 'source';
+      errorFamily = "source";
       errorMessage = `Error: ${details}`;
     }
 
@@ -398,13 +424,13 @@ export class HlsJsAdapter implements PlayerAdapter {
       context: {
         error_family: errorFamily,
         error_type: type,
-        error_details: details
-      }
+        error_details: details,
+      },
     });
 
     // If fatal and network error, HLS.js will try to recover automatically
     if (fatal && type === this.hls.constructor.ErrorTypes.NETWORK_ERROR) {
-      this.logger.warn('Fatal network error, HLS.js will attempt recovery');
+      this.logger.warn("Fatal network error, HLS.js will attempt recovery");
     }
   }
 
@@ -415,18 +441,18 @@ export class HlsJsAdapter implements PlayerAdapter {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
-      'error',
+      "error",
       {
-        error_family: error.context?.error_family || 'source',
+        error_family: error.context?.error_family || "source",
         error_code: String(error.code),
         error_message: error.message,
-        error_context: error.context
+        error_context: error.context,
       },
-      this.video.currentTime * 1000
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('error event fired', error);
+    this.logger.debug("error event fired", error);
   }
 
   /**
@@ -438,19 +464,19 @@ export class HlsJsAdapter implements PlayerAdapter {
     const progress = this.video.currentTime / this.video.duration;
 
     // Track quartiles
-    const quartiles = [0.25, 0.50, 0.75, 1.0];
+    const quartiles = [0.25, 0.5, 0.75, 1.0];
     for (const q of quartiles) {
       if (progress >= q && !this.quartileFired.has(q)) {
         this.quartileFired.add(q);
 
         const event = await this.eventCollector.createEvent(
-          'quartile',
+          "quartile",
           {
             quartile: q * 100,
             playing_time: this.playingTime,
-            watch_time: this.watchTime
+            watch_time: this.watchTime,
           },
-          this.video.currentTime * 1000
+          this.video.currentTime * 1000,
         );
 
         this.batchManager.addEvent(event);
@@ -461,7 +487,8 @@ export class HlsJsAdapter implements PlayerAdapter {
     // Update playing time
     if (!this.video.paused) {
       const timeDelta = this.video.currentTime - this.lastPlaybackTime;
-      if (timeDelta > 0 && timeDelta < 1) { // Sanity check
+      if (timeDelta > 0 && timeDelta < 1) {
+        // Sanity check
         this.playingTime += timeDelta * 1000; // Convert to ms
       }
     }
@@ -480,18 +507,18 @@ export class HlsJsAdapter implements PlayerAdapter {
       if (!this.video) return;
 
       const event = await this.eventCollector.createEvent(
-        'heartbeat',
+        "heartbeat",
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
           buffer_length: this.getBufferLength(),
-          dropped_frames: this.getDroppedFrames()
+          dropped_frames: this.getDroppedFrames(),
         },
-        this.video.currentTime * 1000
+        this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(event);
-      this.logger.debug('heartbeat event fired');
+      this.logger.debug("heartbeat event fired");
     }, 10000); // Every 10 seconds
   }
 
@@ -508,7 +535,7 @@ export class HlsJsAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getCurrentTime(): number {
+  getVideoPlaybackPosition(): number {
     return this.video?.currentTime || 0;
   }
 
@@ -544,7 +571,7 @@ export class HlsJsAdapter implements PlayerAdapter {
       const level = levels[this.currentLevel];
       return {
         width: level.width,
-        height: level.height
+        height: level.height,
       };
     }
 
@@ -552,7 +579,7 @@ export class HlsJsAdapter implements PlayerAdapter {
     if (this.video) {
       return {
         width: this.video.videoWidth,
-        height: this.video.videoHeight
+        height: this.video.videoHeight,
       };
     }
 
@@ -598,7 +625,7 @@ export class HlsJsAdapter implements PlayerAdapter {
         paused: true,
         ended: false,
         buffered: null,
-        readyState: 0
+        readyState: 0,
       };
     }
 
@@ -608,7 +635,7 @@ export class HlsJsAdapter implements PlayerAdapter {
       paused: this.video.paused,
       ended: this.video.ended,
       buffered: this.video.buffered,
-      readyState: this.video.readyState
+      readyState: this.video.readyState,
     };
   }
 
@@ -644,7 +671,10 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     const currentTime = this.video.currentTime;
     for (let i = 0; i < bufferInfo.length; i++) {
-      if (currentTime >= bufferInfo.start(i) && currentTime <= bufferInfo.end(i)) {
+      if (
+        currentTime >= bufferInfo.start(i) &&
+        currentTime <= bufferInfo.end(i)
+      ) {
         return (bufferInfo.end(i) - currentTime) * 1000; // Convert to ms
       }
     }

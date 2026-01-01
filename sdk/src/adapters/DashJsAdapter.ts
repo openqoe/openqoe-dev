@@ -169,9 +169,12 @@ export class DashJsAdapter implements PlayerAdapter {
   async onManifestLoaded(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
-    const navigationTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+    const navigationTiming = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
     if (navigationTiming) {
-      pageLoadTime = navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+      pageLoadTime =
+        navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
 
     const event = await this.eventCollector.createEvent("playerready", {
@@ -534,7 +537,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getCurrentTime(): number {
+  getVideoPlaybackPosition(): number {
     return this.video?.currentTime || 0;
   }
 
