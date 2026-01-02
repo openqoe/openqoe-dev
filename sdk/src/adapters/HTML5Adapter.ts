@@ -242,9 +242,17 @@ export class HTML5Adapter implements PlayerAdapter {
    */
   async onPageLoad(): Promise<void> {
     const currentTime = this.getCurrentTime();
+    // Get page load time using Navigation Timing Level 2
+    let pageLoadStartTime: number | undefined;
+    const navigationTiming = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
+    if (navigationTiming) {
+      pageLoadStartTime = navigationTiming.loadEventStart;
+    }
     const event = await this.eventCollector.createEvent("pageload", {
       event_ts: currentTime,
-      page_load_ts: currentTime,
+      page_load_start_ts: pageLoadStartTime,
     });
     this.batchManager.addEvent(event);
     this.logger.debug("pageload event fired");
@@ -370,16 +378,16 @@ export class HTML5Adapter implements PlayerAdapter {
   async onPlayerReady(): Promise<void> {
     if (!this.video) return;
     // Get page load time using Navigation Timing Level 2
-    let pageLoadTime: number | undefined;
+    let pageLoadEndTs: number | undefined;
     const navigationTiming = performance.getEntriesByType(
       "navigation",
     )[0] as PerformanceNavigationTiming;
     if (navigationTiming) {
-      pageLoadTime =
-        navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+      pageLoadEndTs = navigationTiming.loadEventEnd;
     }
     const event = await this.eventCollector.createEvent("playerready", {
-      page_load_time: pageLoadTime,
+      event_ts: this.getCurrentTime(),
+      page_load_end_ts: pageLoadEndTs,
     });
 
     this.batchManager.addEvent(event);
@@ -392,6 +400,7 @@ export class HTML5Adapter implements PlayerAdapter {
   async onEncrypted(): Promise<void> {
     const event = await this.eventCollector.createEvent("encrypted", {
       event_ts: this.getCurrentTime(),
+      encrypted_streams: true,
     });
     this.batchManager.addEvent(event);
     this.logger.debug("encrypted event fired");
@@ -403,6 +412,7 @@ export class HTML5Adapter implements PlayerAdapter {
   async onWaitingForKey(): Promise<void> {
     const event = await this.eventCollector.createEvent("waitingforkey", {
       event_ts: this.getCurrentTime(),
+      waiting_for_key: true,
     });
     this.batchManager.addEvent(event);
     this.logger.debug("waitingforkey event fired");
@@ -415,6 +425,7 @@ export class HTML5Adapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent("loadeddata", {
       event_ts: this.getCurrentTime(),
       video_duration: this.getDuration(),
+      current_playing_time: this.getVideoPlaybackPosition(),
     });
     this.batchManager.addEvent(event);
     this.logger.debug("loadeddata event fired");
@@ -692,10 +703,12 @@ export class HTML5Adapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "error",
       {
+        event_ts: this.getCurrentTime(),
         error_family: error.context?.error_family || "source",
         error_code: String(error.code),
         error_message: error.message,
         error_context: error.context,
+        current_playing_time: this.getVideoPlaybackPosition(),
       },
       this.video.currentTime * 1000,
     );
