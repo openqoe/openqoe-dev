@@ -1,7 +1,7 @@
 /**
  * OpenQoE - Main SDK class
  */
-
+import { v7 as uuidv7 } from "uuid";
 import { OpenQoEConfig, VideoMetadata, PlayerType } from "./types";
 import { Logger } from "./utils/logger";
 import { PrivacyModule } from "./utils/privacy";
@@ -118,6 +118,17 @@ export class OpenQoE {
       this.config.appName,
       this.config.appVersion,
     );
+
+    // check for existing cookie
+    if (document.cookie.indexOf("marker=") === -1) {
+      const marker = uuidv7();
+      const url = new URL(this.config.endpointUrl);
+      document.cookie = `marker=${marker}; domain=.${url.hostname}; path=/v2/events; SameSite=None, Secure`;
+    } else {
+      this.logger.info(
+        "No existing OpenQoE cookie found, setting new cookie for tracking",
+      );
+    }
 
     // Start session
     const sessionId = this.sessionManager.startSession();
