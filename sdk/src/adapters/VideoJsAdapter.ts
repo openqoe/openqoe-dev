@@ -2,16 +2,15 @@
  * Video.js Player Adapter
  */
 
+import { BatchManager } from "../core/BatchManager";
+import { EventCollector } from "../core/EventCollector";
 import {
+  CMCDData,
   PlayerAdapter,
-  VideoMetadata,
+  PlayerError,
   PlayerState,
   Resolution,
-  CMCDData,
-  PlayerError,
 } from "../types";
-import { EventCollector } from "../core/EventCollector";
-import { BatchManager } from "../core/BatchManager";
 import { Logger } from "../utils/logger";
 
 export class VideoJsAdapter implements PlayerAdapter {
@@ -19,7 +18,6 @@ export class VideoJsAdapter implements PlayerAdapter {
   private eventCollector: EventCollector;
   private batchManager: BatchManager;
   private logger: Logger;
-  private metadata: VideoMetadata = {};
   private eventHandlers: Map<string, Function> = new Map();
 
   // State tracking
@@ -48,7 +46,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   /**
    * Attach to Video.js player
    */
-  attach(player: any, metadata: VideoMetadata): void {
+  attach(player: any): void {
     if (!player || typeof player.on !== "function") {
       throw new Error(
         "VideoJsAdapter: player must be a Video.js player instance",
@@ -56,7 +54,6 @@ export class VideoJsAdapter implements PlayerAdapter {
     }
 
     this.player = player;
-    this.metadata = metadata;
 
     // Set player info
     const version = player.constructor?.VERSION || player.VERSION || undefined;

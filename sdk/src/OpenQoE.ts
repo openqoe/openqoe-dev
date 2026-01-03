@@ -160,13 +160,6 @@ export class OpenQoE {
           this.logger,
         );
         break;
-      case "videojs":
-        this.currentAdapter = new VideoJsAdapter(
-          this.eventCollector,
-          this.batchManager,
-          this.logger,
-        );
-        break;
       case "hlsjs":
         this.currentAdapter = new HlsJsAdapter(
           this.eventCollector,
@@ -188,12 +181,19 @@ export class OpenQoE {
           this.logger,
         );
         break;
+      case "videojs":
+        this.currentAdapter = new VideoJsAdapter(
+          this.eventCollector,
+          this.batchManager,
+          this.logger,
+        );
+        break;
       default:
         throw new Error(`Unsupported player type: ${playerType}`);
     }
 
     // Attach adapter to player
-    this.currentAdapter.attach(playerInstance, metadata || {});
+    this.currentAdapter.attach(playerInstance, metadata);
     this.logger.info(`${playerType} player attached successfully`);
   }
 

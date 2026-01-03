@@ -252,7 +252,7 @@ export interface PlayerError {
 }
 
 export interface PlayerAdapter {
-  attach(player: any, metadata: VideoMetadata): void;
+  attach(player: any, metadata?: VideoMetadata): void;
   detach(): void;
   getVideoPlaybackPosition(): number;
   getDuration(): number;

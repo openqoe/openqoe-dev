@@ -1,12 +1,6 @@
-import {
-  PlayerAdapter,
-  VideoMetadata,
-  PlayerState,
-  Resolution,
-  CMCDData,
-} from "../types";
-import { EventCollector } from "../core/EventCollector";
 import { BatchManager } from "../core/BatchManager";
+import { EventCollector } from "../core/EventCollector";
+import { CMCDData, PlayerAdapter, PlayerState, Resolution } from "../types";
 import { Logger } from "../utils/logger";
 
 export class HTML5Adapter implements PlayerAdapter {
@@ -14,7 +8,6 @@ export class HTML5Adapter implements PlayerAdapter {
   private eventCollector: EventCollector;
   private batchManager: BatchManager;
   private logger: Logger;
-  private metadata: VideoMetadata = {};
   private eventListeners: Map<string, { target: EventTarget; handler: any }> =
     new Map();
 
@@ -33,14 +26,14 @@ export class HTML5Adapter implements PlayerAdapter {
 
   // --- Interface Implementation ---
 
-  attach(player: HTMLVideoElement, metadata: VideoMetadata): void {
+  attach(player: HTMLVideoElement): void {
     this.video = player;
-    this.metadata = metadata;
     this.attachEventListeners();
     this.startHeartbeat();
 
     // Initial State Capture
     this.emit("adapter_attached");
+    this.logger.info("HTML5Adapter attached to video element.");
   }
 
   detach(): void {
@@ -106,6 +99,7 @@ export class HTML5Adapter implements PlayerAdapter {
       dropped: this.getDroppedFrames(),
     });
     this.batchManager.addEvent(event);
+    this.logger.debug(`Event emitted: ${eventName}`, event);
   }
 
   private attachEventListeners(): void {
