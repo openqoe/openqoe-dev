@@ -41,7 +41,7 @@ export class Transport {
    */
   async send(events: BaseEvent[]): Promise<void> {
     // Enqueue first
-    const batchId = this.queueManager.enqueue(events);
+    this.queueManager.enqueue(events);
 
     // Try to send immediately if online
     if (this.isOnline()) {

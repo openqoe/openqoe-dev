@@ -104,7 +104,10 @@ export class BatchManager {
     );
 
     // Use sendBeacon if available
-    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.sendBeacon !== undefined
+    ) {
       // The actual sending will be handled by the transport layer
       // For now, just call the callback synchronously
       this.flushSyncCallback(eventsToSend);
