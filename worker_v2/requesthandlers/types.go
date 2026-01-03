@@ -105,6 +105,7 @@ type IngestRequest struct {
 type IngestRequestWithContext struct {
 	Ctx    context.Context
 	Events []BaseEvent
+	Marker string
 }
 type IngestionSuccessResponse struct {
 	Success          bool   `json:"success"`

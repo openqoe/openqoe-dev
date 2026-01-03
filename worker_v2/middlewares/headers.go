@@ -15,7 +15,8 @@ func GlobalHeaders(env *config.Env) gin.HandlerFunc {
 		allowed_origins := env.CORS_ALLOWED_ORIGINS
 		c.Header("Access-Control-Allow-Origin", allowed_origins)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Authorization, X-API-Key, X-SDK-Version")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Authorization, Cookie, X-API-Key, X-SDK-Version")
+		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

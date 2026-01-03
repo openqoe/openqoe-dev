@@ -22,6 +22,7 @@ type Env struct {
 	API_KEY                   string
 	CARDINALITY_LIMITS        string
 	CORS_ALLOWED_ORIGINS      string
+	OWN_DOMAIN                string
 	GIN_MODE                  GinMode
 	WORKER_POOL_SIZE          string
 }
@@ -40,6 +41,7 @@ func NewEnv(ctx context.Context) *Env {
 		API_KEY:                   getEnv("API_KEY", "default_api_key"),
 		CARDINALITY_LIMITS:        getEnv("CARDINALITY_LIMITS", "default_limits"),
 		CORS_ALLOWED_ORIGINS:      getEnv("CORS_ALLOWED_ORIGINS", "*"),
+		OWN_DOMAIN:                getEnv("OWN_DOMAIN", "localhost"),
 		GIN_MODE:                  gm,
 		WORKER_POOL_SIZE:          getEnv("WORKER_POOL_SIZE", "10"),
 	}

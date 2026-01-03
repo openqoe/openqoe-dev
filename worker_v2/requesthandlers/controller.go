@@ -15,6 +15,7 @@ import (
 )
 
 type RequestHandlerService struct {
+	env                      *config.Env
 	config                   *config.Config
 	auth_service             *config.AuthService
 	otel_service             *otelservice.OpenTelemetryService
@@ -34,6 +35,7 @@ func NewRequestHandlerService(env *config.Env, config_obj *config.Config, otel_s
 		otel_service.Logger.Error("request processing time gauge set up failed", zap.Error(err))
 	}
 	return &RequestHandlerService{
+		env:                      env,
 		config:                   config_obj,
 		auth_service:             config.NewAuthService(config_obj, otel_service.Logger),
 		otel_service:             otel_service,
@@ -44,7 +46,7 @@ func NewRequestHandlerService(env *config.Env, config_obj *config.Config, otel_s
 }
 
 func (rhs *RequestHandlerService) RegisterRoutes(r *gin.RouterGroup) {
-	r.POST("/events", middlewares.Authenticate(rhs.auth_service), validateRequest, rhs.ingestEvents)
+	r.POST("/events", middlewares.Authenticate(rhs.auth_service), validateRequest, markDevice(rhs.env), rhs.ingestEvents)
 	r.GET("/health", rhs.handleHealth)
 	r.GET("/stats", middlewares.Authenticate(rhs.auth_service), rhs.handleStats)
 }
@@ -58,6 +60,7 @@ func (rhs *RequestHandlerService) ingestEvents(c *gin.Context) {
 	ingestion_events_with_ctx := &IngestRequestWithContext{
 		Ctx:    otelservice.DetachContext(c.Request.Context()),
 		Events: ingestion_events.Events,
+		Marker: c.MustGet("marker").(string),
 	}
 	select {
 	case rhs.event_chan <- ingestion_events_with_ctx:
