@@ -122,7 +122,18 @@ export class DashJsAdapter implements PlayerAdapter {
     const events = this.player.constructor.events || {};
 
     // dash.js specific events
+    this.onDash(events.MANIFEST_LOADING_STARTED, () =>
+      this.onManifestLoadingStart(),
+    );
     this.onDash(events.MANIFEST_LOADED, () => this.onManifestLoaded());
+    this.onDash(events.PLAYBACK_INITIALIZED, () => this.onPlaybackInit());
+    this.onDash(events.PLAYBACK_PLAYING, () => this.onPlaying());
+    this.onDash(events.PLAYBACK_PAUSED, () => this.onPause());
+    this.onDash(events.PLAYBACK_STARTED, () => this.onPlayingAfterWait());
+    this.onDash(events.PLAYBACK_ENDED, () => this.onEnded());
+    this.onDash(events.QUALITY_CHANGE_REQUESTED, (e: any) =>
+      this.onQualityChangeRequested(e),
+    );
     this.onDash(events.QUALITY_CHANGE_RENDERED, (e: any) =>
       this.onQualityChangeRendered(e),
     );
@@ -130,17 +141,21 @@ export class DashJsAdapter implements PlayerAdapter {
     this.onDash(events.FRAGMENT_LOADING_COMPLETED, (e: any) =>
       this.onFragmentLoaded(e),
     );
-
-    // Standard video element events
-    this.addEventListener("loadstart", () => this.onViewStart());
-    this.addEventListener("play", () => this.onPlaying());
-    this.addEventListener("pause", () => this.onPause());
-    this.addEventListener("seeking", () => this.onSeeking());
-    this.addEventListener("seeked", () => this.onSeeked());
-    this.addEventListener("waiting", () => this.onStallStart());
-    this.addEventListener("playing", () => this.onPlayingAfterWait());
-    this.addEventListener("ended", () => this.onEnded());
-    this.addEventListener("timeupdate", () => this.onTimeUpdate());
+    this.onDash(events.PLAYBACK_SEEKING, () => this.onSeeking());
+    this.onDash(events.PLAYBACK_SEEKED, () => this.onSeeked());
+    this.onDash(events.PLAYBACK_WAITING, () => this.onStallStart());
+    this.onDash(events.PLAYBACK_STALLED, () => this.onStallStart());
+    this.onDash(events.BUFFER_LEVEL_UPDATED, () => this.onBufferLevelChange());
+    this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
+      this.onBitrateChange(e),
+    );
+    this.onDash(events.PLAYBACK_RATE_CHANGED, (e: any) =>
+      this.onPlaybackRateChanged(e),
+    );
+    this.onDash(events.PLAYBACK_VOLUME_CHANGED, (e: any) =>
+      this.onPlaybackVolumeChanged(e),
+    );
+    this.onDash(events.PLAYBACK_TIME_UPDATED, () => this.onTimeUpdate());
   }
 
   /**
@@ -154,19 +169,9 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Helper to add video event listener
+   * Manifest Loading Start event
    */
-  private addEventListener(event: string, handler: EventListener): void {
-    if (!this.video) return;
-
-    this.video.addEventListener(event, handler);
-    this.eventListeners.set(event, handler);
-  }
-
-  /**
-   * Manifest Loaded event (Player Ready)
-   */
-  async onManifestLoaded(): Promise<void> {
+  private async onManifestLoadingStart(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -176,11 +181,24 @@ export class DashJsAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
+    const event = await this.eventCollector.createEvent(
+      "manifestloadingstart",
+      {
+        page_load_time: pageLoadTime,
+      },
+    );
 
+    this.batchManager.addEvent(event);
+    this.logger.debug("manifestloadingstart event fired");
+  }
+
+  /**
+   * Manifest Loaded event (Player Ready)
+   */
+  private async onManifestLoaded(): Promise<void> {
     const event = await this.eventCollector.createEvent("playerready", {
-      page_load_time: pageLoadTime,
+      player_startup_time: performance.now(),
     });
-
     this.batchManager.addEvent(event);
     this.logger.debug("playerready event fired");
   }
@@ -188,7 +206,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * View Start event
    */
-  async onViewStart(): Promise<void> {
+  private async onPlaybackInit(): Promise<void> {
     this.viewStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent("viewstart", {
@@ -202,7 +220,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Playing event
    */
-  async onPlaying(): Promise<void> {
+  private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
     // Calculate video startup time if this is first play
@@ -213,7 +231,7 @@ export class DashJsAdapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        player_startup_time: startupTime,
+        video_startup_time: startupTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: this.getFramerate(),
@@ -232,7 +250,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Pause event
    */
-  async onPause(): Promise<void> {
+  private async onPause(): Promise<void> {
     if (!this.video) return;
 
     // Stop heartbeat
@@ -251,62 +269,9 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Seeking event
-   */
-  onSeeking(): void {
-    if (!this.video) return;
-    this.seekFrom = this.video.currentTime * 1000;
-    this.seekStartTime = performance.now();
-  }
-
-  /**
-   * Seeked event
-   */
-  async onSeeked(): Promise<void> {
-    if (!this.video) return;
-
-    const seekTo = this.video.currentTime * 1000;
-    const seekLatency = performance.now() - (this.seekStartTime || 0);
-
-    const event = await this.eventCollector.createEvent(
-      "seek",
-      {
-        from: this.seekFrom,
-        to: seekTo,
-        seek_latency: seekLatency,
-      },
-      seekTo,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("seek event fired");
-  }
-
-  /**
-   * Stall Start (waiting) event
-   */
-  async onStallStart(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent(
-      "stall_start",
-      {
-        buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
-  }
-
-  /**
    * Playing after waiting - Stall End
    */
-  async onPlayingAfterWait(): Promise<void> {
+  private async onPlayingAfterWait(): Promise<void> {
     if (!this.video) return;
 
     // If we were stalled, fire stall_end
@@ -333,7 +298,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Ended event
    */
-  async onEnded(): Promise<void> {
+  private async onEnded(): Promise<void> {
     if (!this.video) return;
 
     this.stopHeartbeat();
@@ -363,15 +328,36 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Quality Change Requested event
+   */
+  private async onQualityChangeRequested(data: any): Promise<void> {
+    if (!this.video || !data) return;
+
+    const event = await this.eventCollector.createEvent(
+      "qualitychangerequested",
+      {
+        requested_quality: data.newQuality,
+        bitrate: this.getBitrate(),
+        resolution: this.getVideoResolution(),
+        framerate: this.getFramerate(),
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("qualitychange_requested event fired");
+  }
+
+  /**
    * Quality Change Rendered event
    */
-  async onQualityChangeRendered(data: any): Promise<void> {
+  private async onQualityChangeRendered(data: any): Promise<void> {
     if (!this.video || !data) return;
 
     this.currentQuality = data.newQuality;
 
     const event = await this.eventCollector.createEvent(
-      "qualitychange",
+      "qualitychangecompleted",
       {
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
@@ -385,20 +371,9 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Fragment Loaded event
-   */
-  async onFragmentLoaded(data: any): Promise<void> {
-    // This can be used for throughput calculation
-    this.logger.debug("Fragment loaded", {
-      duration: data.request?.duration,
-      type: data.request?.type,
-    });
-  }
-
-  /**
    * Playback Error event
    */
-  async onPlaybackError(data: any): Promise<void> {
+  private async onPlaybackError(data: any): Promise<void> {
     if (!this.player) return;
 
     const { error } = data;
@@ -437,9 +412,149 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Fragment Loaded event
+   */
+  private async onFragmentLoaded(data: any): Promise<void> {
+    // This can be used for throughput calculation
+    this.logger.debug("Fragment loaded", {
+      duration: data.request?.duration,
+      type: data.request?.type,
+    });
+  }
+
+  /**
+   * Seeking event
+   */
+  private async onSeeking(): Promise<void> {
+    if (!this.video) return;
+    this.seekFrom = this.video.currentTime * 1000;
+    this.seekStartTime = performance.now();
+  }
+
+  /**
+   * Seeked event
+   */
+  private async onSeeked(): Promise<void> {
+    if (!this.video) return;
+
+    const seekTo = this.video.currentTime * 1000;
+    const seekLatency = performance.now() - (this.seekStartTime || 0);
+
+    const event = await this.eventCollector.createEvent(
+      "seek",
+      {
+        from: this.seekFrom,
+        to: seekTo,
+        seek_latency: seekLatency,
+      },
+      seekTo,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("seek event fired");
+  }
+
+  /**
+   * Stall Start (waiting) event
+   */
+  private async onStallStart(): Promise<void> {
+    if (!this.video || this.stallStartTime !== null) return;
+
+    this.stallStartTime = performance.now();
+
+    const event = await this.eventCollector.createEvent(
+      "stall_start",
+      {
+        buffer_length: this.getBufferLength(),
+        bitrate: this.getBitrate(),
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("stall_start event fired");
+  }
+
+  /**
+   * Buffer Level Change event
+   */
+  private async onBufferLevelChange(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "buffer_level_change",
+      {
+        buffer_length: this.getBufferLength(),
+        bitrate: this.getBitrate(),
+      },
+      this.video.currentTime,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("buffer_level_change event fired");
+  }
+
+  /**
+   * Bitrate Change event
+   */
+  private async onBitrateChange(data: any): Promise<void> {
+    if (!this.video || !data) return;
+
+    const event = await this.eventCollector.createEvent(
+      "bitratechange",
+      {
+        bitrate: this.getBitrate(),
+        resolution: this.getVideoResolution(),
+        framerate: this.getFramerate(),
+        previous_quality: data.oldQuality,
+        new_quality: data.newQuality,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("bitratechange event fired");
+  }
+
+  /**
+   * Playback Rate Change event
+   */
+  private async onPlaybackRateChanged(data: any): Promise<void> {
+    if (!this.video) return;
+    const event = await this.eventCollector.createEvent(
+      "playbackratechange",
+      {
+        playback_rate: data.playbackRate,
+      },
+      this.video.currentTime,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("playbackratechange event fired");
+  }
+
+  /**
+   * Playback Volume Change event
+   */
+  private async onPlaybackVolumeChanged(data: any): Promise<void> {
+    if (!this.video) return;
+    const event = await this.eventCollector.createEvent(
+      "playbackvolumechange",
+      {
+        volume: data.volume,
+        muted: data.muted,
+      },
+      this.video.currentTime,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("playbackvolumechange event fired");
+  }
+
+  /**
    * Error handler
    */
-  async onError(error: PlayerError): Promise<void> {
+  private async onError(error: PlayerError): Promise<void> {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
@@ -460,7 +575,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Time Update - Track quartiles
    */
-  async onTimeUpdate(): Promise<void> {
+  private async onTimeUpdate(): Promise<void> {
     if (!this.video) return;
 
     const progress = this.video.currentTime / this.video.duration;
@@ -537,7 +652,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getVideoPlaybackPosition(): number {
+  getCurrentTime(): number {
     return this.video?.currentTime || 0;
   }
 
@@ -644,22 +759,28 @@ export class DashJsAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.video) {
       return {
-        currentTime: 0,
-        duration: 0,
-        paused: true,
-        ended: false,
-        buffered: null,
-        readyState: 0,
+        pos: 0,
+        dur: 0,
+        psd: true,
+        endd: false,
+        bufd: null,
+        rdy: 0,
+        vol: 0,
+        mut: false,
+        spd: 0,
       };
     }
 
     return {
-      currentTime: this.video.currentTime,
-      duration: this.video.duration,
-      paused: this.video.paused,
-      ended: this.video.ended,
-      buffered: this.video.buffered,
-      readyState: this.video.readyState,
+      pos: this.video.currentTime,
+      dur: this.video.duration,
+      psd: this.video.paused,
+      endd: this.video.ended,
+      bufd: this.video.buffered,
+      rdy: this.video.readyState,
+      vol: this.video.volume,
+      mut: this.video.muted,
+      spd: this.video.playbackRate,
     };
   }
 

@@ -115,7 +115,7 @@ export class ShakaAdapter implements PlayerAdapter {
 
     // Shaka Player events
     // Access event types from the player's constructor
-    const EventType = this.player.constructor.EventType || {};
+    // const EventType = this.player.constructor.EventType || {};
 
     this.onShaka("loaded", () => this.onManifestLoaded());
     this.onShaka("adaptation", () => this.onAdaptation());
@@ -532,7 +532,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getVideoPlaybackPosition(): number {
+  getCurrentTime(): number {
     return this.video?.currentTime || 0;
   }
 
@@ -657,21 +657,21 @@ export class ShakaAdapter implements PlayerAdapter {
     if (!this.video) {
       return {
         currentTime: 0,
-        duration: 0,
-        paused: true,
-        ended: false,
-        buffered: null,
-        readyState: 0,
+        dur: 0,
+        psd: true,
+        endd: false,
+        buf: null,
+        rdy: 0,
       };
     }
 
     return {
       currentTime: this.video.currentTime,
-      duration: this.video.duration,
-      paused: this.video.paused,
-      ended: this.video.ended,
-      buffered: this.video.buffered,
-      readyState: this.video.readyState,
+      dur: this.video.duration,
+      psd: this.video.paused,
+      endd: this.video.ended,
+      buf: this.video.buffered,
+      rdy: this.video.readyState,
     };
   }
 

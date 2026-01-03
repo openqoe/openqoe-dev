@@ -45,11 +45,11 @@ export class HTML5Adapter implements PlayerAdapter {
     this.video = null;
   }
 
-  getVideoPlaybackPosition(): number {
-    return (this.video?.currentTime || 0) * 1000;
+  getCurrentTime(): number {
+    return this.video?.currentTime || 0;
   }
   getDuration(): number {
-    return (this.video?.duration || 0) * 1000;
+    return this.video?.duration || 0;
   }
   getBitrate(): number | null {
     return null;
@@ -61,41 +61,61 @@ export class HTML5Adapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.video)
       return {
-        currentTime: 0,
-        duration: 0,
-        paused: true,
-        ended: false,
-        buffered: null,
-        readyState: 0,
+        pos: 0,
+        dur: 0,
+        psd: true,
+        endd: false,
+        bufd: null,
+        rdy: 0,
+        vol: 0, // QoE: Is the user actually listening?
+        mut: false,
+        spd: 0,
       };
     return {
-      currentTime: this.video.currentTime,
-      duration: this.video.duration,
-      paused: this.video.paused,
-      ended: this.video.ended,
-      buffered: this.video.buffered,
-      readyState: this.video.readyState,
+      pos: this.getCurrentTime(),
+      dur: this.getDuration(),
+      psd: this.video.paused,
+      endd: this.video.ended,
+      bufd: this.video.buffered,
+      rdy: this.video.readyState,
+      vol: this.video?.volume,
+      mut: this.video?.muted,
+      spd: this.video?.playbackRate,
     };
   }
   getCMCDData(): CMCDData | null {
     return null;
   }
+  // --- QoS Helpers ---
+  private getBufferLength(): number {
+    if (!this.video) return 0;
+    const b = this.video.buffered;
+    const t = this.video.currentTime;
+    for (let i = 0; i < b.length; i++) {
+      if (t >= b.start(i) && t <= b.end(i)) return (b.end(i) - t) * 1000;
+    }
+    return 0;
+  }
+
+  private getDroppedFrames(): number {
+    return (
+      (this.video as any)?.getVideoPlaybackQuality?.().droppedVideoFrames || 0
+    );
+  }
 
   // --- Critical Event Collection ---
-
   private async emit(eventName: string, data: object = {}): Promise<void> {
     const event = await this.eventCollector.createEvent(eventName, {
       ...data,
+      ...this.getPlayerState(),
+      ...this.getCMCDData(),
       p_ts: performance.now(), // High-res time for duration math
-      pos: this.getVideoPlaybackPosition(),
-      buf: this.getBufferLength(),
+      br: this.getBitrate(),
+      buf_len: this.getBufferLength(),
       res: this.getVideoResolution(),
       seeking: this.isSeeking,
       v_state: document.visibilityState,
       net: navigator.onLine, // QoS: Is the device actually connected?
-      vol: this.video?.volume, // QoE: Is the user actually listening?
-      mute: this.video?.muted,
-      speed: this.video?.playbackRate,
       dropped: this.getDroppedFrames(),
     });
     this.batchManager.addEvent(event);
@@ -128,8 +148,8 @@ export class HTML5Adapter implements PlayerAdapter {
     this.bind(this.video, "error");
 
     // 4. Seeking (User behavior)
-    this.bind(this.video, "seeking", () => (this.isSeeking = true));
-    this.bind(this.video, "seeked", () => (this.isSeeking = false));
+    this.bind(this.video, "seekstart", () => (this.isSeeking = true));
+    this.bind(this.video, "seekend", () => (this.isSeeking = false));
 
     // 5. Environmental / Engagement
     this.bind(document, "visibilitychange", () => {
@@ -152,24 +172,6 @@ export class HTML5Adapter implements PlayerAdapter {
     };
     target.addEventListener(event, handler);
     this.eventListeners.set(event, { target, handler });
-  }
-
-  // --- QoS Helpers ---
-
-  private getBufferLength(): number {
-    if (!this.video) return 0;
-    const b = this.video.buffered;
-    const t = this.video.currentTime;
-    for (let i = 0; i < b.length; i++) {
-      if (t >= b.start(i) && t <= b.end(i)) return (b.end(i) - t) * 1000;
-    }
-    return 0;
-  }
-
-  private getDroppedFrames(): number {
-    return (
-      (this.video as any)?.getVideoPlaybackQuality?.().droppedVideoFrames || 0
-    );
   }
 
   private startHeartbeat(): void {

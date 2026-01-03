@@ -491,7 +491,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   /**
    * Get current time in seconds
    */
-  getVideoPlaybackPosition(): number {
+  getCurrentTime(): number {
     return this.player?.currentTime() || 0;
   }
 
@@ -597,21 +597,21 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) {
       return {
         currentTime: 0,
-        duration: 0,
-        paused: true,
-        ended: false,
-        buffered: null,
-        readyState: 0,
+        dur: 0,
+        psd: true,
+        endd: false,
+        buf: null,
+        rdy: 0,
       };
     }
 
     return {
       currentTime: this.player.currentTime(),
-      duration: this.player.duration(),
-      paused: this.player.paused(),
-      ended: this.player.ended(),
-      buffered: this.player.buffered(),
-      readyState: this.player.readyState(),
+      dur: this.player.duration(),
+      psd: this.player.paused(),
+      endd: this.player.ended(),
+      buf: this.player.buffered(),
+      rdy: this.player.readyState(),
     };
   }
 

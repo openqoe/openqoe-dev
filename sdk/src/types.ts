@@ -236,12 +236,15 @@ export interface SessionData {
 }
 
 export interface PlayerState {
-  currentTime: number; // seconds
-  duration: number; // seconds
-  paused: boolean;
-  ended: boolean;
-  buffered: TimeRanges | null;
-  readyState: number;
+  pos: number; // current position in seconds
+  dur: number; // duration in seconds
+  psd: boolean; // is paused
+  endd: boolean; // is ended
+  bufd: TimeRanges | null; // buffered time in seconds
+  rdy: number; // player ready state
+  vol: number; // 0.0 - 1.0
+  mut: boolean; // is muted
+  spd: number; // playback speed
 }
 
 export interface PlayerError {
@@ -254,7 +257,7 @@ export interface PlayerError {
 export interface PlayerAdapter {
   attach(player: any, metadata?: VideoMetadata): void;
   detach(): void;
-  getVideoPlaybackPosition(): number;
+  getCurrentTime(): number;
   getDuration(): number;
   getBitrate(): number | null;
   getVideoResolution(): Resolution | null;
