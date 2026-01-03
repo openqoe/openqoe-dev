@@ -24,6 +24,7 @@ export class DashJsAdapter implements PlayerAdapter {
   private eventListeners: Map<string, EventListenerOrEventListenerObject> =
     new Map();
   private dashEventHandlers: Map<string, Function> = new Map();
+  private dashMetrics: any = null;
 
   // State tracking
   private lastPlaybackTime: number = 0;
@@ -37,7 +38,9 @@ export class DashJsAdapter implements PlayerAdapter {
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
-  private currentQuality: number = -1;
+  private currentBitrate: number | null = null;
+  private currentResolution: Resolution | null = null;
+  private currentFPS: number | null = null;
 
   constructor(
     eventCollector: EventCollector,
@@ -61,6 +64,7 @@ export class DashJsAdapter implements PlayerAdapter {
 
     this.player = player;
     this.metadata = metadata;
+    this.dashMetrics = this.player.getDashMetrics();
 
     // Get video element
     this.video = this.player.getVideoElement();
@@ -112,14 +116,38 @@ export class DashJsAdapter implements PlayerAdapter {
     this.logger.info("DashJsAdapter detached");
   }
 
+  async resolveDashJS(): Promise<void> {
+    // 1. Try global (browser UMD)
+    if ((globalThis as any).dashjs) {
+      return (globalThis as any).dashjs;
+    }
+
+    // 2. Try module (bundler / Node)
+    try {
+      const mod = await import("dashjs");
+      return mod.default ?? mod;
+    } catch {
+      throw new Error(
+        "dashjs not found. Either load dash.all.min.js globally or install dashjs as a dependency.",
+      );
+    }
+  }
+
   /**
    * Attach all event listeners
    */
-  private attachEventListeners(): void {
+  private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
-
+    let dashjs;
+    try {
+      dashjs = await this.resolveDashJS();
+    } catch (e) {
+      throw new Error(
+        "dashjs library is not available. Please ensure dashjs is installed.",
+      );
+    }
     // Get MediaPlayer events enum
-    const events = this.player.constructor.events || {};
+    const events = dashjs.MediaPlayer.events;
 
     // dash.js specific events
     this.onDash(events.MANIFEST_LOADING_STARTED, () =>
@@ -145,7 +173,9 @@ export class DashJsAdapter implements PlayerAdapter {
     this.onDash(events.PLAYBACK_SEEKED, () => this.onSeeked());
     this.onDash(events.PLAYBACK_WAITING, () => this.onStallStart());
     this.onDash(events.PLAYBACK_STALLED, () => this.onStallStart());
-    this.onDash(events.BUFFER_LEVEL_UPDATED, () => this.onBufferLevelChange());
+    this.onDash(events.BUFFER_LEVEL_STATE_CHANGED, (e: any) =>
+      this.onBufferLevelChange(e),
+    );
     this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
       this.onBitrateChange(e),
     );
@@ -332,7 +362,7 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onQualityChangeRequested(data: any): Promise<void> {
     if (!this.video || !data) return;
-
+    console.log("Quality change requested data:", data);
     const event = await this.eventCollector.createEvent(
       "qualitychangerequested",
       {
@@ -353,7 +383,7 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onQualityChangeRendered(data: any): Promise<void> {
     if (!this.video || !data) return;
-
+    console.log("Quality change rendered data:", data);
     this.currentQuality = data.newQuality;
 
     const event = await this.eventCollector.createEvent(
@@ -478,13 +508,14 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Buffer Level Change event
    */
-  private async onBufferLevelChange(): Promise<void> {
+  private async onBufferLevelChange(data: any): Promise<void> {
     if (!this.video) return;
-
     const event = await this.eventCollector.createEvent(
-      "buffer_level_change",
+      "bufferlevelchange",
       {
-        buffer_length: this.getBufferLength(),
+        state: data.state,
+        media_type: data.mediaType,
+        buffer_len_ms: this.getBufferLength(data.mediaType),
         bitrate: this.getBitrate(),
       },
       this.video.currentTime,
@@ -499,13 +530,20 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onBitrateChange(data: any): Promise<void> {
     if (!this.video || !data) return;
-
+    console.log("Bitrate change data:", data);
+    this.currentBitrate = data.currentRepresentation?.bitrateInKbit || null;
+    this.currentResolution = {
+      width: data.currentRepresentation?.width || null,
+      height: data.currentRepresentation?.height || null,
+    };
+    this.currentFPS = data.currentRepresentation?.frameRate || null;
     const event = await this.eventCollector.createEvent(
       "bitratechange",
       {
-        bitrate: this.getBitrate(),
-        resolution: this.getVideoResolution(),
-        framerate: this.getFramerate(),
+        bitrate_kb: this.currentBitrate,
+        bandwidth: data.currentRepresentation?.bandwidth || null,
+        resolution: this.currentResolution,
+        framerate: this.currentFPS,
         previous_quality: data.oldQuality,
         new_quality: data.newQuality,
       },
@@ -667,67 +705,14 @@ export class DashJsAdapter implements PlayerAdapter {
    * Get bitrate
    */
   getBitrate(): number | null {
-    if (!this.player) return null;
-
-    try {
-      const bitrateList = this.player.getBitrateInfoListFor("video");
-      if (
-        bitrateList &&
-        this.currentQuality >= 0 &&
-        this.currentQuality < bitrateList.length
-      ) {
-        return bitrateList[this.currentQuality].bitrate || null;
-      }
-
-      // Fallback to current quality
-      const currentQuality = this.player.getQualityFor("video");
-      if (
-        currentQuality >= 0 &&
-        bitrateList &&
-        currentQuality < bitrateList.length
-      ) {
-        this.currentQuality = currentQuality;
-        return bitrateList[currentQuality].bitrate || null;
-      }
-    } catch (e) {
-      this.logger.debug("Error getting bitrate:", e);
-    }
-
-    return null;
+    return this.currentBitrate;
   }
 
   /**
    * Get video resolution
    */
   getVideoResolution(): Resolution | null {
-    if (!this.player) return null;
-
-    try {
-      const bitrateList = this.player.getBitrateInfoListFor("video");
-      if (
-        bitrateList &&
-        this.currentQuality >= 0 &&
-        this.currentQuality < bitrateList.length
-      ) {
-        const quality = bitrateList[this.currentQuality];
-        return {
-          width: quality.width,
-          height: quality.height,
-        };
-      }
-    } catch (e) {
-      this.logger.debug("Error getting resolution:", e);
-    }
-
-    // Fallback to video element
-    if (this.video) {
-      return {
-        width: this.video.videoWidth,
-        height: this.video.videoHeight,
-      };
-    }
-
-    return null;
+    return this.currentResolution;
   }
 
   /**
@@ -736,20 +721,24 @@ export class DashJsAdapter implements PlayerAdapter {
   getFramerate(): number | null {
     // dash.js doesn't directly expose framerate in bitrateList
     // Would need to parse from manifest
-    return null;
+    return this.currentFPS;
   }
 
   /**
    * Get dropped frames
    */
   getDroppedFrames(): number | undefined {
-    if (!this.video) return undefined;
-
-    if ((this.video as any).getVideoPlaybackQuality) {
-      const quality = (this.video as any).getVideoPlaybackQuality();
-      return quality.droppedVideoFrames;
+    if (!this.player || !this.video) return undefined;
+    try {
+      if (this.dashMetrics) {
+        const droppedFrames = this.dashMetrics.getCurrentDroppedFrames();
+        if (droppedFrames !== undefined && droppedFrames !== null) {
+          return droppedFrames;
+        }
+      }
+    } catch (e) {
+      this.logger.debug("Error getting dropped frames from metrics:", e);
     }
-
     return undefined;
   }
 
@@ -803,16 +792,18 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Get buffer length in ms
    */
-  private getBufferLength(): number | undefined {
+  private getBufferLength(
+    mediaType: "audio" | "video" = "video",
+  ): number | undefined {
     if (!this.player || !this.video) return undefined;
 
     try {
-      // dash.js provides getDashMetrics
-      const dashMetrics = this.player.getDashMetrics();
-      if (dashMetrics) {
-        const bufferLevel = dashMetrics.getCurrentBufferLevel("video");
+      if (this.dashMetrics) {
+        const bufferLevel = this.dashMetrics.getCurrentBufferLevel(mediaType);
         if (bufferLevel !== undefined && bufferLevel !== null) {
           return bufferLevel * 1000; // Convert to ms
+        } else {
+          return 0;
         }
       }
     } catch (e) {
