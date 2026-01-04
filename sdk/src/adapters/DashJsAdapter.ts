@@ -182,8 +182,8 @@ export class DashJsAdapter implements PlayerAdapter {
     this.onDash(events.PLAYBACK_RATE_CHANGED, (e: any) =>
       this.onPlaybackRateChanged(e),
     );
-    this.onDash(events.PLAYBACK_VOLUME_CHANGED, (e: any) =>
-      this.onPlaybackVolumeChanged(e),
+    this.onDash(events.PLAYBACK_VOLUME_CHANGED, () =>
+      this.onPlaybackVolumeChanged(),
     );
     this.onDash(events.PLAYBACK_TIME_UPDATED, () => this.onTimeUpdate());
   }
@@ -362,14 +362,29 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onQualityChangeRequested(data: any): Promise<void> {
     if (!this.video || !data) return;
-    console.log("Quality change requested data:", data);
     const event = await this.eventCollector.createEvent(
       "qualitychangerequested",
       {
-        requested_quality: data.newQuality,
-        bitrate: this.getBitrate(),
-        resolution: this.getVideoResolution(),
-        framerate: this.getFramerate(),
+        old: {
+          bitrate_kb: data.oldRepresentation?.bitrateInKbit || null,
+          bandWidth: data.oldRepresentation?.bandwidth || null,
+          resolution: {
+            width: data.oldRepresentation?.width || null,
+            height: data.oldRepresentation?.height || null,
+          },
+          framerate: data.oldRepresentation?.frameRate || null,
+          codec: data.oldRepresentation?.codecFamily || null,
+        },
+        new: {
+          bitrate_kb: data.newRepresentation?.bitrateInKbit || null,
+          bandWidth: data.newRepresentation?.bandwidth || null,
+          resolution: {
+            width: data.newRepresentation?.width || null,
+            height: data.newRepresentation?.height || null,
+          },
+          framerate: data.newRepresentation?.frameRate || null,
+          codec: data.newRepresentation?.codecFamily || null,
+        },
       },
       this.video.currentTime * 1000,
     );
@@ -383,15 +398,21 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onQualityChangeRendered(data: any): Promise<void> {
     if (!this.video || !data) return;
-    console.log("Quality change rendered data:", data);
-    this.currentQuality = data.newQuality;
+    this.currentBitrate = data.newRepresentation?.bitrateInKbit || null;
+    this.currentResolution = {
+      width: data.newRepresentation?.width || null,
+      height: data.newRepresentation?.height || null,
+    };
+    this.currentFPS = data.newRepresentation?.frameRate || null;
 
     const event = await this.eventCollector.createEvent(
       "qualitychangecompleted",
       {
-        bitrate: this.getBitrate(),
-        resolution: this.getVideoResolution(),
-        framerate: this.getFramerate(),
+        bitrate_kb: this.currentBitrate,
+        bandwidth: data.newRepresentation?.bandwidth || null,
+        resolution: this.currentResolution,
+        framerate: this.currentFPS,
+        codec: data.newRepresentation?.codecFamily || null,
       },
       this.video.currentTime * 1000,
     );
@@ -445,7 +466,24 @@ export class DashJsAdapter implements PlayerAdapter {
    * Fragment Loaded event
    */
   private async onFragmentLoaded(data: any): Promise<void> {
-    // This can be used for throughput calculation
+    if (!this.video || !data) return;
+    const event = await this.eventCollector.createEvent(
+      "fragmentloaded",
+      {
+        media_type: data.request?.mediaType,
+        type: data.request?.type,
+        duration: data.request?.duration,
+        size_bytes: data.request?.bytesLoaded,
+        total_bytes: data.request?.bytesTotal,
+        loading_delay: data.request?.delayLoadingTime,
+        bandWidth: data.request?.bandwidth,
+        service_location: data.request?.serviceLocation,
+        url: data.request?.url,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
     this.logger.debug("Fragment loaded", {
       duration: data.request?.duration,
       type: data.request?.type,
@@ -518,7 +556,7 @@ export class DashJsAdapter implements PlayerAdapter {
         buffer_len_ms: this.getBufferLength(data.mediaType),
         bitrate: this.getBitrate(),
       },
-      this.video.currentTime,
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
@@ -530,7 +568,6 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onBitrateChange(data: any): Promise<void> {
     if (!this.video || !data) return;
-    console.log("Bitrate change data:", data);
     this.currentBitrate = data.currentRepresentation?.bitrateInKbit || null;
     this.currentResolution = {
       width: data.currentRepresentation?.width || null,
@@ -544,8 +581,7 @@ export class DashJsAdapter implements PlayerAdapter {
         bandwidth: data.currentRepresentation?.bandwidth || null,
         resolution: this.currentResolution,
         framerate: this.currentFPS,
-        previous_quality: data.oldQuality,
-        new_quality: data.newQuality,
+        codec: data.currentRepresentation?.codecFamily || null,
       },
       this.video.currentTime * 1000,
     );
@@ -564,7 +600,7 @@ export class DashJsAdapter implements PlayerAdapter {
       {
         playback_rate: data.playbackRate,
       },
-      this.video.currentTime,
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
@@ -574,15 +610,15 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Playback Volume Change event
    */
-  private async onPlaybackVolumeChanged(data: any): Promise<void> {
+  private async onPlaybackVolumeChanged(): Promise<void> {
     if (!this.video) return;
     const event = await this.eventCollector.createEvent(
       "playbackvolumechange",
       {
-        volume: data.volume,
-        muted: data.muted,
+        volume: this.video.volume * 100,
+        muted: this.video.muted,
       },
-      this.video.currentTime,
+      this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
