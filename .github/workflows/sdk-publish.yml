@@ -1,0 +1,38 @@
+name: Publish to npm
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write # Essential for OIDC (Trusted Publishing)
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Sync Version and Publish
+        working-directory: ./sdk # Ensures we are in the subfolder
+        run: |
+          # 1. Get version from GitHub Release Tag (e.g., v1.0.5 -> 1.0.5)
+          CLEAN_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+
+          # 2. Force update the SDK's package.json (The Fail-safe)
+          npm version $CLEAN_VERSION --no-git-tag-version
+
+          # 3. Detect if this is a pre-release (beta/alpha)
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            echo "Publishing with beta tag..."
+            npm publish --tag beta --access public
+          else
+            echo "Publishing as latest..."
+            npm publish --access public
+          fi
