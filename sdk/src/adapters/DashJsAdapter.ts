@@ -116,7 +116,7 @@ export class DashJsAdapter implements PlayerAdapter {
     this.logger.info("DashJsAdapter detached");
   }
 
-  async resolveDashJS(): Promise<void> {
+  private async resolveDashJS(): Promise<void> {
     // 1. Try global (browser UMD)
     if ((globalThis as any).dashjs) {
       return (globalThis as any).dashjs;
@@ -367,7 +367,7 @@ export class DashJsAdapter implements PlayerAdapter {
       {
         old: {
           bitrate_kb: data.oldRepresentation?.bitrateInKbit || null,
-          bandWidth: data.oldRepresentation?.bandwidth || null,
+          bandwidth: data.oldRepresentation?.bandwidth || null,
           resolution: {
             width: data.oldRepresentation?.width || null,
             height: data.oldRepresentation?.height || null,
@@ -377,7 +377,7 @@ export class DashJsAdapter implements PlayerAdapter {
         },
         new: {
           bitrate_kb: data.newRepresentation?.bitrateInKbit || null,
-          bandWidth: data.newRepresentation?.bandwidth || null,
+          bandwidth: data.newRepresentation?.bandwidth || null,
           resolution: {
             width: data.newRepresentation?.width || null,
             height: data.newRepresentation?.height || null,
@@ -476,7 +476,7 @@ export class DashJsAdapter implements PlayerAdapter {
         size_bytes: data.request?.bytesLoaded,
         total_bytes: data.request?.bytesTotal,
         loading_delay: data.request?.delayLoadingTime,
-        bandWidth: data.request?.bandwidth,
+        bandwidth: data.request?.bandwidth,
         service_location: data.request?.serviceLocation,
         url: data.request?.url,
       },
