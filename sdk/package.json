@@ -1,6 +1,6 @@
 {
   "name": "@openqoe/sdk",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Production-grade video QoE/QoS observability SDK for web players",
   "publishConfig": {
     "access": "restricted",
@@ -8,9 +8,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/openqoe/openqoe-dev",
+    "url": "git+https://github.com/openqoe/openqoe-dev.git",
     "directory": "sdk"
   },
+  "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -39,8 +40,7 @@
     "dashjs",
     "shaka"
   ],
-  "author": "openqoe-core",
-  "license": "MIT",
+  "author": "openqoe-dev",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
