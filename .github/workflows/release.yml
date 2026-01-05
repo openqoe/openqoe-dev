@@ -1,0 +1,76 @@
+name: Production Release (SDK & Worker)
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  packages: write
+  contents: read
+
+jobs:
+  publish-sdk:
+    name: Publish SDK to npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22" # Matches your dev environment
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install and Build SDK
+        working-directory: ./sdk
+        run: |
+          npm ci            # Install exact versions from package-lock
+          npm run build     # CRITICAL: Generates the /dist folder for your package
+
+      - name: Sync Version and Publish
+        working-directory: ./sdk
+        run: |
+          # 1. Sync version from GitHub Tag
+          CLEAN_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          npm version $CLEAN_VERSION --no-git-tag-version
+
+          # 2. Publish with Provenance (OIDC)
+          # We force '--access public' to override the 'restricted' in package.json
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            npm publish --tag beta --access public --provenance
+          else
+            npm publish --access public --provenance
+          fi
+
+  publish-worker:
+    name: Push Worker to GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/openqoe/worker
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+
+      - name: Build and Push Worker
+        uses: docker/build-push-action@v6
+        with:
+          context: ./worker_v2
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

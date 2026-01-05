@@ -1,9 +1,15 @@
 {
   "name": "@openqoe/sdk",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Production-grade video QoE/QoS observability SDK for web players",
   "publishConfig": {
-    "access": "restricted"
+    "access": "restricted",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openqoe/openqoe-dev",
+    "directory": "sdk"
   },
   "type": "module",
   "main": "dist/index.js",
