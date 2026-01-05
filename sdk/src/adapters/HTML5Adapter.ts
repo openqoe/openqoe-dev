@@ -303,6 +303,24 @@ export class HTML5Adapter implements PlayerAdapter {
     this.logger.debug("stall_start event fired");
   }
 
+  private async onStallStart(): Promise<void> {
+    if (!this.video || this.stallStartTime !== null) return;
+
+    this.stallStartTime = performance.now();
+
+    const event = await this.eventCollector.createEvent(
+      "stall_start",
+      {
+        buffer_length: this.getBufferLength(),
+        bitrate: this.getBitrate(),
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("stall_start event fired");
+  }
+
   /**
    * Playing after waiting - Stall End
    */
@@ -328,6 +346,40 @@ export class HTML5Adapter implements PlayerAdapter {
       this.stallStartTime = null;
       this.logger.debug("stall_end event fired");
     }
+  }
+
+  /**
+   * Playback rate change
+   */
+  private async onRateChange(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "playbackratechange",
+      {
+        playback_rate: this.video.playbackRate,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("rate_change event fired");
+  }
+
+  private async onVolumeChange(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "playbackvolumechange",
+      {
+        playback_volume: this.video.volume * 100,
+        muted: this.video.muted,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("playbackvolumechange event fired");
   }
 
   /**

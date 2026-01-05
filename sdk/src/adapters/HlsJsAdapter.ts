@@ -679,7 +679,7 @@ export class HlsJsAdapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "playbackvolumechange",
       {
-        volume: this.video.volume,
+        volume: this.video.volume * 100,
         muted: this.video.muted,
       },
       this.video.currentTime * 1000,
