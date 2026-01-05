@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Production-grade video QoE/QoS observability SDK for web players",
   "publishConfig": {
-    "access": "restricted",
+    "access": "public",
     "provenance": true
   },
   "repository": {
