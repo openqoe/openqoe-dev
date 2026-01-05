@@ -39,9 +39,9 @@ jobs:
           # 2. Publish with Provenance (OIDC)
           # We force '--access public' to override the 'restricted' in package.json
           if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
-            npm publish --tag beta --access public --provenance
+            npm publish --tag beta
           else
-            npm publish --access public --provenance
+            npm publish
           fi
 
   publish-worker:
