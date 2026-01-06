@@ -293,7 +293,7 @@ export class HTML5Adapter implements PlayerAdapter {
     this.stallStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent(
-      "stall_start",
+      "waitstart",
       {
         buffer_length: this.getBufferLength(),
         bitrate: this.getBitrate(),
@@ -302,7 +302,7 @@ export class HTML5Adapter implements PlayerAdapter {
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
+    this.logger.debug("waitstart event fired");
   }
 
   private async onStallStart(): Promise<void> {
@@ -311,7 +311,7 @@ export class HTML5Adapter implements PlayerAdapter {
     this.stallStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent(
-      "stall_start",
+      "stallstart",
       {
         buffer_length: this.getBufferLength(),
         bitrate: this.getBitrate(),
@@ -320,7 +320,7 @@ export class HTML5Adapter implements PlayerAdapter {
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
+    this.logger.debug("stallstart event fired");
   }
 
   /**
@@ -329,14 +329,14 @@ export class HTML5Adapter implements PlayerAdapter {
   private async onPlayingAfterWait(): Promise<void> {
     if (!this.video) return;
 
-    // If we were stalled, fire stall_end
+    // If we were stalled, fire stallend
     if (this.stallStartTime !== null) {
       const stallDuration = performance.now() - this.stallStartTime;
       this.rebufferDuration += stallDuration;
       this.rebufferCount++;
 
       const event = await this.eventCollector.createEvent(
-        "stall_end",
+        "stallend",
         {
           stall_duration: stallDuration,
           buffer_length: this.getBufferLength(),
@@ -346,7 +346,7 @@ export class HTML5Adapter implements PlayerAdapter {
 
       this.batchManager.addEvent(event);
       this.stallStartTime = null;
-      this.logger.debug("stall_end event fired");
+      this.logger.debug("stallend event fired");
     }
   }
 
