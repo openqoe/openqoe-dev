@@ -31,8 +31,6 @@ jobs:
 
       - name: Sync Version and Publish
         working-directory: ./sdk
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           # 1. Sync version from GitHub Tag
           CLEAN_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
