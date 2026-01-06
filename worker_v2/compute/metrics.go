@@ -103,36 +103,14 @@ func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, eve
 	ms.metrics.events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 	switch event.EventType {
 	case "playerready":
-		if val, ok := event.Data["player_startup_time"]; ok && val != nil {
-			ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
-		}
-		if val, ok := event.Data["page_load_time"]; ok && val != nil {
-			ms.metrics.page_load_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
-		}
+		ms.onPlayerReady(&event, evnt_ctx, &base_attributes)
 	case "viewstart":
-		ms.metrics.views_started_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
+		ms.onViewStart(evnt_ctx, &base_attributes)
 	case "playing":
-		if val, ok := event.Data["video_startup_time"]; ok && val != nil {
-			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
-		}
-		if val, ok := event.Data["bitrate"]; ok && val != nil {
-			ms.metrics.bitrate.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
-		}
-		if val, ok := event.Data["resolution"]; ok && val != nil {
-			val_map := val.(map[string]any)
-			res := &resolution{width: int64(val_map["width"].(float64)), height: int64(val_map["height"].(float64))}
-			resolution_label := getResolutionLabel(res)
-
-			labels := maps.Clone(base_labels)
-			labels["resolution"] = resolution_label
-			ms.metrics.resolution_total.Add(evnt_ctx, 1, metric.WithAttributeSet(mapToAttributeSet(labels)))
-		}
-	case "stall_start":
-		ms.metrics.rebuffer_events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
-		if val, ok := event.Data["buffer_length"]; ok && val != nil {
-			ms.metrics.buffer_length.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
-		}
-	case "stall_end":
+		ms.onPlaying(&event, evnt_ctx, &base_attributes, base_labels)
+	case "stallstart":
+		ms.onStallStart(&event, evnt_ctx, &base_attributes)
+	case "stallend":
 		if val, ok := event.Data["stall_duration"]; ok && val != nil {
 			ms.metrics.rebuffer_duration.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(base_attributes))
 		}
