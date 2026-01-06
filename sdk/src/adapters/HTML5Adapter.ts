@@ -20,8 +20,10 @@ export class HTML5Adapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventListeners: Map<string, EventListenerOrEventListenerObject> =
-    new Map();
+  private readonly eventListeners: Map<
+    string,
+    EventListenerOrEventListenerObject
+  > = new Map();
 
   // State tracking
   private lastPlaybackTime: number = 0;
@@ -595,22 +597,28 @@ export class HTML5Adapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.video) {
       return {
-        currentTime: 0,
-        duration: 0,
-        paused: true,
-        ended: false,
-        buffered: null,
-        readyState: 0,
+        pos: 0,
+        dur: 0,
+        psd: true,
+        endd: false,
+        bufd: null,
+        rdy: 0,
+        vol: 0,
+        mut: false,
+        spd: 0,
       };
     }
 
     return {
-      currentTime: this.video.currentTime,
-      duration: this.video.duration,
-      paused: this.video.paused,
-      ended: this.video.ended,
-      buffered: this.video.buffered,
-      readyState: this.video.readyState,
+      pos: this.video.currentTime,
+      dur: this.video.duration,
+      psd: this.video.paused,
+      endd: this.video.ended,
+      bufd: this.video.buffered,
+      rdy: this.video.readyState,
+      vol: this.video.volume,
+      mut: this.video.muted,
+      spd: this.video.playbackRate,
     };
   }
 

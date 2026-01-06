@@ -21,8 +21,10 @@ export class ShakaAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventListeners: Map<string, EventListenerOrEventListenerObject> =
-    new Map();
+  private readonly eventListeners: Map<
+    string,
+    EventListenerOrEventListenerObject
+  > = new Map();
   private shakaEventHandlers: Map<string, Function> = new Map();
 
   // State tracking
@@ -656,22 +658,28 @@ export class ShakaAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.video) {
       return {
-        currentTime: 0,
+        pos: 0,
         dur: 0,
         psd: true,
         endd: false,
-        buf: null,
+        bufd: null,
         rdy: 0,
+        vol: 0,
+        mut: false,
+        spd: 0,
       };
     }
 
     return {
-      currentTime: this.video.currentTime,
+      pos: this.video.currentTime,
       dur: this.video.duration,
       psd: this.video.paused,
       endd: this.video.ended,
-      buf: this.video.buffered,
+      bufd: this.video.buffered,
       rdy: this.video.readyState,
+      vol: this.video.volume,
+      mut: this.video.muted,
+      spd: this.video.playbackRate,
     };
   }
 

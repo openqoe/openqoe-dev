@@ -18,7 +18,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   private eventCollector: EventCollector;
   private batchManager: BatchManager;
   private logger: Logger;
-  private eventHandlers: Map<string, Function> = new Map();
+  private readonly eventHandlers: Map<string, Function> = new Map();
 
   // State tracking
   private lastPlaybackTime: number = 0;
@@ -596,22 +596,28 @@ export class VideoJsAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.player) {
       return {
-        currentTime: 0,
+        pos: 0,
         dur: 0,
         psd: true,
         endd: false,
-        buf: null,
+        bufd: null,
         rdy: 0,
+        vol: 0,
+        mut: false,
+        spd: 0,
       };
     }
 
     return {
-      currentTime: this.player.currentTime(),
-      dur: this.player.duration(),
-      psd: this.player.paused(),
-      endd: this.player.ended(),
-      buf: this.player.buffered(),
-      rdy: this.player.readyState(),
+      pos: this.player.currentTime,
+      dur: this.player.duration,
+      psd: this.player.paused,
+      endd: this.player.ended,
+      bufd: this.player.buffered,
+      rdy: this.player.readyState,
+      vol: this.player.volume,
+      mut: this.player.muted,
+      spd: this.player.playbackRate,
     };
   }
 

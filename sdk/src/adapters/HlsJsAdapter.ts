@@ -21,8 +21,10 @@ export class HlsJsAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventListeners: Map<string, EventListenerOrEventListenerObject> =
-    new Map();
+  private readonly eventListeners: Map<
+    string,
+    EventListenerOrEventListenerObject
+  > = new Map();
   private hlsEventHandlers: Map<string, Function> = new Map();
 
   // State tracking
