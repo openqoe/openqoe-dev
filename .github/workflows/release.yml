@@ -34,9 +34,20 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # 1. Sync version from GitHub Tag
+          # 1. Validate version matches GitHub Release tag
           CLEAN_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-          npm version $CLEAN_VERSION --no-git-tag-version
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Release version: $CLEAN_VERSION"
+          echo "package.json version: $PKG_VERSION"
+
+          if [ "$PKG_VERSION" != "$CLEAN_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match release version ($CLEAN_VERSION)"
+            exit 1
+          fi
+
+          echo "Version check passed"
+
 
           # 2. Publish in npm
           if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
