@@ -4,7 +4,7 @@
   "description": "Production-grade video QoE/QoS observability SDK for web players",
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "provenance": false
   },
   "repository": {
     "type": "git",
