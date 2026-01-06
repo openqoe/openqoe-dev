@@ -596,28 +596,28 @@ export class VideoJsAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.player) {
       return {
-        pos: 0,
-        dur: 0,
-        psd: true,
-        endd: false,
-        bufd: null,
-        rdy: 0,
-        vol: 0,
-        mut: false,
-        spd: 0,
+        position: 0,
+        duration: 0,
+        paused: true,
+        ended: false,
+        buffered: null,
+        ready: 0,
+        volume: 0,
+        muted: false,
+        playback_rate: 0,
       };
     }
 
     return {
-      pos: this.player.currentTime,
-      dur: this.player.duration,
-      psd: this.player.paused,
-      endd: this.player.ended,
-      bufd: this.player.buffered,
-      rdy: this.player.readyState,
-      vol: this.player.volume,
-      mut: this.player.muted,
-      spd: this.player.playbackRate,
+      position: this.player.currentTime,
+      duration: this.player.duration,
+      paused: this.player.paused,
+      ended: this.player.ended,
+      buffered: this.player.buffered,
+      ready: this.player.readyState,
+      volume: this.player.volume,
+      muted: this.player.muted,
+      playback_rate: this.player.playbackRate,
     };
   }
 

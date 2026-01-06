@@ -658,28 +658,28 @@ export class ShakaAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.video) {
       return {
-        pos: 0,
-        dur: 0,
-        psd: true,
-        endd: false,
-        bufd: null,
-        rdy: 0,
-        vol: 0,
-        mut: false,
-        spd: 0,
+        position: 0,
+        duration: 0,
+        paused: true,
+        ended: false,
+        buffered: null,
+        ready: 0,
+        volume: 0,
+        muted: false,
+        playback_rate: 0,
       };
     }
 
     return {
-      pos: this.video.currentTime,
-      dur: this.video.duration,
-      psd: this.video.paused,
-      endd: this.video.ended,
-      bufd: this.video.buffered,
-      rdy: this.video.readyState,
-      vol: this.video.volume,
-      mut: this.video.muted,
-      spd: this.video.playbackRate,
+      position: this.video.currentTime,
+      duration: this.video.duration,
+      paused: this.video.paused,
+      ended: this.video.ended,
+      buffered: this.video.buffered,
+      ready: this.video.readyState,
+      volume: this.video.volume,
+      muted: this.video.muted,
+      playback_rate: this.video.playbackRate,
     };
   }
 
