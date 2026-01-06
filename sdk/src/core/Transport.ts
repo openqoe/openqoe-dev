@@ -2,10 +2,10 @@
  * Transport - HTTP client for sending events
  */
 
-import { BaseEvent } from '../types';
-import { Logger } from '../utils/logger';
-import { RetryManager } from './RetryManager';
-import { QueueManager } from './QueueManager';
+import { BaseEvent } from "../types";
+import { Logger } from "../utils/logger";
+import { RetryManager } from "./RetryManager";
+import { QueueManager } from "./QueueManager";
 
 export class Transport {
   private endpointUrl: string;
@@ -17,7 +17,7 @@ export class Transport {
     endpointUrl: string,
     retryManager: RetryManager,
     queueManager: QueueManager,
-    logger: Logger
+    logger: Logger,
   ) {
     this.endpointUrl = endpointUrl;
     this.retryManager = retryManager;
@@ -28,9 +28,9 @@ export class Transport {
     this.processQueue();
 
     // Set up online/offline handlers
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => {
-        this.logger.info('Network online, processing queue');
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => {
+        this.logger.info("Network online, processing queue");
         this.processQueue();
       });
     }
@@ -41,13 +41,13 @@ export class Transport {
    */
   async send(events: BaseEvent[]): Promise<void> {
     // Enqueue first
-    const batchId = this.queueManager.enqueue(events);
+    this.queueManager.enqueue(events);
 
     // Try to send immediately if online
     if (this.isOnline()) {
       await this.processQueue();
     } else {
-      this.logger.info('Offline, events queued for later');
+      this.logger.info("Offline, events queued for later");
     }
   }
 
@@ -67,7 +67,6 @@ export class Transport {
         // Success - remove from queue
         this.queueManager.dequeue();
         this.logger.info(`Batch ${batch.id} sent successfully`);
-
       } catch (error) {
         this.logger.error(`Failed to send batch ${batch.id}:`, error);
 
@@ -95,23 +94,26 @@ export class Transport {
    */
   private async sendBatch(events: BaseEvent[]): Promise<void> {
     const payload = {
-      events
+      events,
     };
 
     this.logger.debug(`Sending ${events.length} events to ${this.endpointUrl}`);
 
     const response = await fetch(this.endpointUrl, {
-      method: 'POST',
+      method: "POST",
+      credentials: "include",
       headers: {
-        'Content-Type': 'application/json',
-        'X-SDK-Version': '1.0.0'
+        "Content-Type": "application/json",
+        "X-SDK-Version": "1.0.0",
       },
       body: JSON.stringify(payload),
-      keepalive: true // Important for sendBeacon-like behavior
+      keepalive: true, // Important for sendBeacon-like behavior
     });
 
     if (!response.ok) {
-      const error: any = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const error: any = new Error(
+        `HTTP ${response.status}: ${response.statusText}`,
+      );
       error.status = response.status;
       error.response = response;
 
@@ -127,7 +129,7 @@ export class Transport {
     }
 
     const result = await response.json();
-    this.logger.debug('Batch sent successfully:', result);
+    this.logger.debug("Batch sent successfully:", result);
   }
 
   /**
@@ -135,34 +137,35 @@ export class Transport {
    */
   sendSync(events: BaseEvent[]): void {
     if (!this.isOnline()) {
-      this.logger.info('Offline, cannot send synchronously');
+      this.logger.info("Offline, cannot send synchronously");
       return;
     }
 
     const payload = {
-      events
+      events,
     };
 
     // Use sendBeacon if available
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify(payload)], {
+        type: "application/json",
+      });
       const sent = navigator.sendBeacon(this.endpointUrl, blob);
-
       if (sent) {
         this.logger.info(`Sent ${events.length} events via sendBeacon`);
       } else {
-        this.logger.warn('sendBeacon failed');
+        this.logger.warn("sendBeacon failed");
       }
     } else {
       // Fallback to synchronous XHR (not recommended but works)
       try {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', this.endpointUrl, false); // synchronous
-        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.open("POST", this.endpointUrl, false); // synchronous
+        xhr.setRequestHeader("Content-Type", "application/json");
         xhr.send(JSON.stringify(payload));
         this.logger.info(`Sent ${events.length} events via sync XHR`);
       } catch (error) {
-        this.logger.error('Sync XHR failed:', error);
+        this.logger.error("Sync XHR failed:", error);
       }
     }
   }
@@ -171,6 +174,6 @@ export class Transport {
    * Check if online
    */
   private isOnline(): boolean {
-    return typeof navigator === 'undefined' || navigator.onLine !== false;
+    return typeof navigator === "undefined" || navigator.onLine !== false;
   }
 }

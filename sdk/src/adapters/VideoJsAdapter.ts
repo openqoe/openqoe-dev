@@ -2,10 +2,17 @@
  * Video.js Player Adapter
  */
 
-import { PlayerAdapter, VideoMetadata, PlayerState, Resolution, CMCDData, PlayerError } from '../types';
-import { EventCollector } from '../core/EventCollector';
-import { BatchManager } from '../core/BatchManager';
-import { Logger } from '../utils/logger';
+import { BatchManager } from "../core/BatchManager";
+import { EventCollector } from "../core/EventCollector";
+import {
+  CMCDData,
+  PlayerAdapter,
+  VideoMetadata,
+  PlayerError,
+  PlayerState,
+  Resolution,
+} from "../types";
+import { Logger } from "../utils/logger";
 
 export class VideoJsAdapter implements PlayerAdapter {
   private player: any = null;
@@ -13,7 +20,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private eventHandlers: Map<string, Function> = new Map();
+  private readonly eventHandlers: Map<string, Function> = new Map();
 
   // State tracking
   private lastPlaybackTime: number = 0;
@@ -31,7 +38,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   constructor(
     eventCollector: EventCollector,
     batchManager: BatchManager,
-    logger: Logger
+    logger: Logger,
   ) {
     this.eventCollector = eventCollector;
     this.batchManager = batchManager;
@@ -42,26 +49,27 @@ export class VideoJsAdapter implements PlayerAdapter {
    * Attach to Video.js player
    */
   attach(player: any, metadata: VideoMetadata): void {
-    if (!player || typeof player.on !== 'function') {
-      throw new Error('VideoJsAdapter: player must be a Video.js player instance');
+    if (!player || typeof player.on !== "function") {
+      throw new Error(
+        "VideoJsAdapter: player must be a Video.js player instance",
+      );
     }
 
     this.player = player;
     this.metadata = metadata;
-
     // Set player info
     const version = player.constructor?.VERSION || player.VERSION || undefined;
     this.eventCollector.setPlayerInfo({
-      name: 'videojs',
+      name: "videojs",
       version: version,
       autoplay: player.autoplay(),
-      preload: player.preload()
+      preload: player.preload(),
     });
 
     // Attach event listeners
     this.attachEventListeners();
 
-    this.logger.info('VideoJsAdapter attached');
+    this.logger.info("VideoJsAdapter attached");
   }
 
   /**
@@ -79,7 +87,7 @@ export class VideoJsAdapter implements PlayerAdapter {
     this.eventHandlers.clear();
 
     this.player = null;
-    this.logger.info('VideoJsAdapter detached');
+    this.logger.info("VideoJsAdapter detached");
   }
 
   /**
@@ -88,22 +96,25 @@ export class VideoJsAdapter implements PlayerAdapter {
   private attachEventListeners(): void {
     if (!this.player) return;
 
-    this.on('ready', () => this.onPlayerReady());
-    this.on('loadstart', () => this.onViewStart());
-    this.on('play', () => this.onPlaying());
-    this.on('pause', () => this.onPause());
-    this.on('seeking', () => this.onSeeking());
-    this.on('seeked', () => this.onSeeked());
-    this.on('waiting', () => this.onStallStart());
-    this.on('playing', () => this.onPlayingAfterWait());
-    this.on('ended', () => this.onEnded());
-    this.on('error', () => this.onErrorEvent());
-    this.on('timeupdate', () => this.onTimeUpdate());
+    this.on("ready", () => this.onPlayerReady());
+    this.on("loadstart", () => this.onViewStart());
+    this.on("play", () => this.onPlaying());
+    this.on("pause", () => this.onPause());
+    this.on("seeking", () => this.onSeeking());
+    this.on("seeked", () => this.onSeeked());
+    this.on("waiting", () => this.onStallStart());
+    this.on("playing", () => this.onPlayingAfterWait());
+    this.on("ended", () => this.onEnded());
+    this.on("error", () => this.onErrorEvent());
+    this.on("timeupdate", () => this.onTimeUpdate());
 
     // Quality change event (if quality selector is available)
-    if (this.player.qualityLevels && typeof this.player.qualityLevels === 'function') {
+    if (
+      this.player.qualityLevels &&
+      typeof this.player.qualityLevels === "function"
+    ) {
       const qualityLevels = this.player.qualityLevels();
-      qualityLevels.on('change', () => this.onQualityChange());
+      qualityLevels.on("change", () => this.onQualityChange());
     }
   }
 
@@ -122,15 +133,21 @@ export class VideoJsAdapter implements PlayerAdapter {
    */
   async onPlayerReady(): Promise<void> {
     if (!this.player) return;
-
-    const event = await this.eventCollector.createEvent('playerready', {
-      player_startup_time: performance.now(),
-      page_load_time: performance.timing?.loadEventEnd ?
-        performance.timing.loadEventEnd - performance.timing.navigationStart : undefined
+    // Get page load time using Navigation Timing Level 2
+    let pageLoadTime: number | undefined;
+    const navigationTiming = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
+    if (navigationTiming) {
+      pageLoadTime =
+        navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
+    }
+    const event = await this.eventCollector.createEvent("playerready", {
+      page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('playerready event fired');
+    this.logger.debug("playerready event fired");
   }
 
   /**
@@ -139,12 +156,12 @@ export class VideoJsAdapter implements PlayerAdapter {
   async onViewStart(): Promise<void> {
     this.viewStartTime = performance.now();
 
-    const event = await this.eventCollector.createEvent('viewstart', {
-      preroll_requested: false
+    const event = await this.eventCollector.createEvent("viewstart", {
+      preroll_requested: false,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug('viewstart event fired');
+    this.logger.debug("viewstart event fired");
   }
 
   /**
@@ -154,17 +171,19 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) return;
 
     // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime ? performance.now() - this.viewStartTime : undefined;
+    const startupTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : undefined;
 
     const event = await this.eventCollector.createEvent(
-      'playing',
+      "playing",
       {
         video_startup_time: startupTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
@@ -172,7 +191,7 @@ export class VideoJsAdapter implements PlayerAdapter {
     // Start heartbeat
     this.startHeartbeat();
 
-    this.logger.debug('playing event fired');
+    this.logger.debug("playing event fired");
   }
 
   /**
@@ -185,15 +204,15 @@ export class VideoJsAdapter implements PlayerAdapter {
     this.stopHeartbeat();
 
     const event = await this.eventCollector.createEvent(
-      'pause',
+      "pause",
       {
-        playing_time: this.playingTime
+        playing_time: this.playingTime,
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('pause event fired');
+    this.logger.debug("pause event fired");
   }
 
   /**
@@ -215,17 +234,17 @@ export class VideoJsAdapter implements PlayerAdapter {
     const seekLatency = performance.now() - (this.seekStartTime || 0);
 
     const event = await this.eventCollector.createEvent(
-      'seek',
+      "seek",
       {
         from: this.seekFrom,
         to: seekTo,
-        seek_latency: seekLatency
+        seek_latency: seekLatency,
       },
-      seekTo
+      seekTo,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('seek event fired');
+    this.logger.debug("seek event fired");
   }
 
   /**
@@ -237,16 +256,16 @@ export class VideoJsAdapter implements PlayerAdapter {
     this.stallStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent(
-      'stall_start',
+      "stall_start",
       {
         buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate()
+        bitrate: this.getBitrate(),
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('stall_start event fired');
+    this.logger.debug("stall_start event fired");
   }
 
   /**
@@ -262,17 +281,17 @@ export class VideoJsAdapter implements PlayerAdapter {
       this.rebufferCount++;
 
       const event = await this.eventCollector.createEvent(
-        'stall_end',
+        "stall_end",
         {
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength()
+          buffer_length: this.getBufferLength(),
         },
-        this.player.currentTime() * 1000
+        this.player.currentTime() * 1000,
       );
 
       this.batchManager.addEvent(event);
       this.stallStartTime = null;
-      this.logger.debug('stall_end event fired');
+      this.logger.debug("stall_end event fired");
     }
   }
 
@@ -284,23 +303,28 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     this.stopHeartbeat();
 
-    const totalWatchTime = this.viewStartTime ? performance.now() - this.viewStartTime : 0;
-    const completionRate = this.player.duration() > 0 ? this.player.currentTime() / this.player.duration() : 1;
+    const totalWatchTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : 0;
+    const completionRate =
+      this.player.duration() > 0
+        ? this.player.currentTime() / this.player.duration()
+        : 1;
 
     const event = await this.eventCollector.createEvent(
-      'ended',
+      "ended",
       {
         playing_time: this.playingTime,
         total_watch_time: totalWatchTime,
         completion_rate: completionRate,
         rebuffer_count: this.rebufferCount,
-        rebuffer_duration: this.rebufferDuration
+        rebuffer_duration: this.rebufferDuration,
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('ended event fired');
+    this.logger.debug("ended event fired");
   }
 
   /**
@@ -318,24 +342,24 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     switch (errorCode) {
       case 1: // MEDIA_ERR_ABORTED
-        errorFamily = 'source';
-        errorMessage = error.message || 'Media loading aborted';
+        errorFamily = "source";
+        errorMessage = error.message || "Media loading aborted";
         break;
       case 2: // MEDIA_ERR_NETWORK
-        errorFamily = 'network';
-        errorMessage = error.message || 'Network error while loading media';
+        errorFamily = "network";
+        errorMessage = error.message || "Network error while loading media";
         break;
       case 3: // MEDIA_ERR_DECODE
-        errorFamily = 'decoder';
-        errorMessage = error.message || 'Media decoding error';
+        errorFamily = "decoder";
+        errorMessage = error.message || "Media decoding error";
         break;
       case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorFamily = 'source';
-        errorMessage = error.message || 'Media format not supported';
+        errorFamily = "source";
+        errorMessage = error.message || "Media format not supported";
         break;
       default:
-        errorFamily = 'source';
-        errorMessage = error.message || 'Unknown error';
+        errorFamily = "source";
+        errorMessage = error.message || "Unknown error";
     }
 
     this.onError({
@@ -343,8 +367,8 @@ export class VideoJsAdapter implements PlayerAdapter {
       message: errorMessage,
       fatal: true,
       context: {
-        error_family: errorFamily
-      }
+        error_family: errorFamily,
+      },
     });
   }
 
@@ -355,18 +379,18 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) return;
 
     const event = await this.eventCollector.createEvent(
-      'error',
+      "error",
       {
-        error_family: error.context?.error_family || 'source',
+        error_family: error.context?.error_family || "source",
         error_code: String(error.code),
         error_message: error.message,
-        error_context: error.context
+        error_context: error.context,
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('error event fired', error);
+    this.logger.debug("error event fired", error);
   }
 
   /**
@@ -376,17 +400,17 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) return;
 
     const event = await this.eventCollector.createEvent(
-      'qualitychange',
+      "qualitychange",
       {
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
-        framerate: this.getFramerate()
+        framerate: this.getFramerate(),
       },
-      this.player.currentTime() * 1000
+      this.player.currentTime() * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug('qualitychange event fired');
+    this.logger.debug("qualitychange event fired");
   }
 
   /**
@@ -398,19 +422,19 @@ export class VideoJsAdapter implements PlayerAdapter {
     const progress = this.player.currentTime() / this.player.duration();
 
     // Track quartiles
-    const quartiles = [0.25, 0.50, 0.75, 1.0];
+    const quartiles = [0.25, 0.5, 0.75, 1.0];
     for (const q of quartiles) {
       if (progress >= q && !this.quartileFired.has(q)) {
         this.quartileFired.add(q);
 
         const event = await this.eventCollector.createEvent(
-          'quartile',
+          "quartile",
           {
             quartile: q * 100,
             playing_time: this.playingTime,
-            watch_time: this.watchTime
+            watch_time: this.watchTime,
           },
-          this.player.currentTime() * 1000
+          this.player.currentTime() * 1000,
         );
 
         this.batchManager.addEvent(event);
@@ -421,7 +445,8 @@ export class VideoJsAdapter implements PlayerAdapter {
     // Update playing time
     if (!this.player.paused()) {
       const timeDelta = this.player.currentTime() - this.lastPlaybackTime;
-      if (timeDelta > 0 && timeDelta < 1) { // Sanity check
+      if (timeDelta > 0 && timeDelta < 1) {
+        // Sanity check
         this.playingTime += timeDelta * 1000; // Convert to ms
       }
     }
@@ -440,18 +465,18 @@ export class VideoJsAdapter implements PlayerAdapter {
       if (!this.player) return;
 
       const event = await this.eventCollector.createEvent(
-        'heartbeat',
+        "heartbeat",
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
           buffer_length: this.getBufferLength(),
-          dropped_frames: this.getDroppedFrames()
+          dropped_frames: this.getDroppedFrames(),
         },
-        this.player.currentTime() * 1000
+        this.player.currentTime() * 1000,
       );
 
       this.batchManager.addEvent(event);
-      this.logger.debug('heartbeat event fired');
+      this.logger.debug("heartbeat event fired");
     }, 10000); // Every 10 seconds
   }
 
@@ -486,7 +511,10 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) return null;
 
     // Try to get from quality levels
-    if (this.player.qualityLevels && typeof this.player.qualityLevels === 'function') {
+    if (
+      this.player.qualityLevels &&
+      typeof this.player.qualityLevels === "function"
+    ) {
       const qualityLevels = this.player.qualityLevels();
       for (let i = 0; i < qualityLevels.length; i++) {
         const level = qualityLevels[i];
@@ -519,7 +547,7 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     return {
       width: tech.el_.videoWidth,
-      height: tech.el_.videoHeight
+      height: tech.el_.videoHeight,
     };
   }
 
@@ -530,7 +558,10 @@ export class VideoJsAdapter implements PlayerAdapter {
     if (!this.player) return null;
 
     // Try to get from quality levels
-    if (this.player.qualityLevels && typeof this.player.qualityLevels === 'function') {
+    if (
+      this.player.qualityLevels &&
+      typeof this.player.qualityLevels === "function"
+    ) {
       const qualityLevels = this.player.qualityLevels();
       for (let i = 0; i < qualityLevels.length; i++) {
         const level = qualityLevels[i];
@@ -567,22 +598,28 @@ export class VideoJsAdapter implements PlayerAdapter {
   getPlayerState(): PlayerState {
     if (!this.player) {
       return {
-        currentTime: 0,
+        position: 0,
         duration: 0,
         paused: true,
         ended: false,
         buffered: null,
-        readyState: 0
+        ready: 0,
+        volume: 0,
+        muted: false,
+        playback_rate: 0,
       };
     }
 
     return {
-      currentTime: this.player.currentTime(),
+      position: this.player.currentTime(),
       duration: this.player.duration(),
       paused: this.player.paused(),
       ended: this.player.ended(),
       buffered: this.player.buffered(),
-      readyState: this.player.readyState()
+      ready: this.player.readyState(),
+      volume: this.player.volume() * 100,
+      muted: this.player.muted(),
+      playback_rate: this.player.playbackRate(),
     };
   }
 
@@ -590,7 +627,11 @@ export class VideoJsAdapter implements PlayerAdapter {
    * Get CMCD data (not available for basic Video.js)
    */
   getCMCDData(): CMCDData | null {
-    return null;
+    return {
+      br: this.getBitrate() || undefined,
+      bl: this.getBufferLength() || undefined,
+      cid: this.metadata.videoId,
+    };
   }
 
   /**
