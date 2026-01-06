@@ -5,7 +5,7 @@ on:
     types: [published]
 
 permissions:
-  # id-token: write
+  id-token: write
   packages: write
   contents: read
 
@@ -31,8 +31,6 @@ jobs:
 
       - name: Sync Version and Publish
         working-directory: ./sdk
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           # 1. Validate version matches GitHub Release tag
           CLEAN_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
