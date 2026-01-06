@@ -677,7 +677,7 @@ export class ShakaAdapter implements PlayerAdapter {
       ended: this.video.ended,
       buffered: this.video.buffered,
       ready: this.video.readyState,
-      volume: this.video.volume,
+      volume: this.video.volume * 100,
       muted: this.video.muted,
       playback_rate: this.video.playbackRate,
     };

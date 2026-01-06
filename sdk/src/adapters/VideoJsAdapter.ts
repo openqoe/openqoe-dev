@@ -611,15 +611,15 @@ export class VideoJsAdapter implements PlayerAdapter {
     }
 
     return {
-      position: this.player.currentTime,
-      duration: this.player.duration,
-      paused: this.player.paused,
-      ended: this.player.ended,
-      buffered: this.player.buffered,
-      ready: this.player.readyState,
-      volume: this.player.volume,
-      muted: this.player.muted,
-      playback_rate: this.player.playbackRate,
+      position: this.player.currentTime(),
+      duration: this.player.duration(),
+      paused: this.player.paused(),
+      ended: this.player.ended(),
+      buffered: this.player.buffered(),
+      ready: this.player.readyState(),
+      volume: this.player.volume() * 100,
+      muted: this.player.muted(),
+      playback_rate: this.player.playbackRate(),
     };
   }
 
