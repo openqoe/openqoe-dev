@@ -85,7 +85,7 @@ export class PrivacyModule {
   /**
    * Sanitize URL - remove query params and hash
    */
-  sanitizeUrl(url: string): string {
+  static sanitizeUrl(url: string): string {
     try {
       const urlObj = new URL(url);
       return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
@@ -102,14 +102,16 @@ export class PrivacyModule {
 
     // Sanitize URLs
     if (sanitized.video?.source_url) {
-      sanitized.video.source_url = this.sanitizeUrl(sanitized.video.source_url);
+      sanitized.video.source_url = PrivacyModule.sanitizeUrl(
+        sanitized.video.source_url,
+      );
     }
 
     // Remove potentially sensitive data from error context
     if (sanitized.data?.error_context) {
       const context = { ...sanitized.data.error_context };
       if (context.url) {
-        context.url = this.sanitizeUrl(context.url);
+        context.url = PrivacyModule.sanitizeUrl(context.url);
       }
       // Remove raw error stack traces
       delete context.stack;

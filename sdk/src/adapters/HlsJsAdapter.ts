@@ -137,14 +137,7 @@ export class HlsJsAdapter implements PlayerAdapter {
    */
   private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
-    let hls;
-    try {
-      hls = await this.resolveHlsJS();
-    } catch (error) {
-      throw new Error(
-        "hls.js library is not available. Please ensure hls.js is installed.",
-      );
-    }
+    const hls = await this.resolveHlsJS();
     this.onHls(hls.Events.MANIFEST_LOADING, (_event: any, data: any) =>
       this.onManifestLoadingStart(data),
     );

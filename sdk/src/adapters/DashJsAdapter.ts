@@ -13,6 +13,7 @@ import {
 import { EventCollector } from "../core/EventCollector";
 import { BatchManager } from "../core/BatchManager";
 import { Logger } from "../utils/logger";
+import { PrivacyModule } from "../utils/privacy";
 
 export class DashJsAdapter implements PlayerAdapter {
   private player: any = null;
@@ -140,12 +141,7 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
-    let dashjs;
-    try {
-      dashjs = await this.resolveDashJS();
-    } catch (e) {
-      throw e;
-    }
+    const dashjs = await this.resolveDashJS();
     // Get MediaPlayer events enum
     const events = dashjs.MediaPlayer.events;
 
@@ -478,7 +474,7 @@ export class DashJsAdapter implements PlayerAdapter {
         loading_delay: data.request?.delayLoadingTime,
         bandwidth: data.request?.bandwidth,
         service_location: data.request?.serviceLocation,
-        url: data.request?.url,
+        url: PrivacyModule.sanitizeUrl(data.request?.url),
       },
       this.video.currentTime * 1000,
     );

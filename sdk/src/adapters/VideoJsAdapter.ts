@@ -7,6 +7,7 @@ import { EventCollector } from "../core/EventCollector";
 import {
   CMCDData,
   PlayerAdapter,
+  VideoMetadata,
   PlayerError,
   PlayerState,
   Resolution,
@@ -18,6 +19,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   private eventCollector: EventCollector;
   private batchManager: BatchManager;
   private logger: Logger;
+  private metadata: VideoMetadata = {};
   private readonly eventHandlers: Map<string, Function> = new Map();
 
   // State tracking
@@ -46,7 +48,7 @@ export class VideoJsAdapter implements PlayerAdapter {
   /**
    * Attach to Video.js player
    */
-  attach(player: any): void {
+  attach(player: any, metadata: VideoMetadata): void {
     if (!player || typeof player.on !== "function") {
       throw new Error(
         "VideoJsAdapter: player must be a Video.js player instance",
@@ -54,7 +56,7 @@ export class VideoJsAdapter implements PlayerAdapter {
     }
 
     this.player = player;
-
+    this.metadata = metadata;
     // Set player info
     const version = player.constructor?.VERSION || player.VERSION || undefined;
     this.eventCollector.setPlayerInfo({
@@ -625,7 +627,11 @@ export class VideoJsAdapter implements PlayerAdapter {
    * Get CMCD data (not available for basic Video.js)
    */
   getCMCDData(): CMCDData | null {
-    return null;
+    return {
+      br: this.getBitrate() || undefined,
+      bl: this.getBufferLength() || undefined,
+      cid: this.metadata.videoId,
+    };
   }
 
   /**
