@@ -42,6 +42,10 @@ export class DashJsAdapter implements PlayerAdapter {
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
   private currentBitrate: number | null = null;
+  private currentBandwidth: { audio: number | null; video: number | null } = {
+    audio: null,
+    video: null,
+  };
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
 
@@ -146,35 +150,35 @@ export class DashJsAdapter implements PlayerAdapter {
     const events = dashjs.MediaPlayer.events;
 
     // dash.js specific events
+    this.onDash(events.FRAGMENT_LOADING_COMPLETED, (e: any) =>
+      this.onFragmentLoaded(e),
+    );
     this.onDash(events.MANIFEST_LOADING_STARTED, () =>
       this.onManifestLoadingStart(),
     );
     this.onDash(events.MANIFEST_LOADED, () => this.onManifestLoaded());
-    this.onDash(events.PLAYBACK_INITIALIZED, () => this.onPlaybackInit());
-    this.onDash(events.PLAYBACK_PLAYING, () => this.onPlaying());
-    this.onDash(events.PLAYBACK_PAUSED, () => this.onPause());
-    this.onDash(events.PLAYBACK_STARTED, () => this.onPlayingAfterWait());
-    this.onDash(events.PLAYBACK_ENDED, () => this.onEnded());
+    this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
+      this.onBitrateChange(e),
+    );
+    this.onDash(events.BUFFER_LEVEL_STATE_CHANGED, (e: any) =>
+      this.onBufferLevelChange(e),
+    );
     this.onDash(events.QUALITY_CHANGE_REQUESTED, (e: any) =>
       this.onQualityChangeRequested(e),
     );
     this.onDash(events.QUALITY_CHANGE_RENDERED, (e: any) =>
       this.onQualityChangeRendered(e),
     );
+    this.onDash(events.PLAYBACK_INITIALIZED, () => this.onPlaybackInit());
+    this.onDash(events.PLAYBACK_PLAYING, (e: any) => this.onPlaying(e));
+    this.onDash(events.PLAYBACK_PAUSED, () => this.onPause());
+    this.onDash(events.PLAYBACK_STARTED, () => this.onPlayingAfterWait());
+    this.onDash(events.PLAYBACK_ENDED, () => this.onEnded());
     this.onDash(events.PLAYBACK_ERROR, (e: any) => this.onPlaybackError(e));
-    this.onDash(events.FRAGMENT_LOADING_COMPLETED, (e: any) =>
-      this.onFragmentLoaded(e),
-    );
     this.onDash(events.PLAYBACK_SEEKING, () => this.onSeeking());
     this.onDash(events.PLAYBACK_SEEKED, () => this.onSeeked());
     this.onDash(events.PLAYBACK_WAITING, () => this.onStallStart());
     this.onDash(events.PLAYBACK_STALLED, () => this.onStallStart());
-    this.onDash(events.BUFFER_LEVEL_STATE_CHANGED, (e: any) =>
-      this.onBufferLevelChange(e),
-    );
-    this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
-      this.onBitrateChange(e),
-    );
     this.onDash(events.PLAYBACK_RATE_CHANGED, (e: any) =>
       this.onPlaybackRateChanged(e),
     );
@@ -246,9 +250,8 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Playing event
    */
-  private async onPlaying(): Promise<void> {
+  private async onPlaying(e: any): Promise<void> {
     if (!this.video) return;
-
     // Calculate video startup time if this is first play
     const startupTime = this.viewStartTime
       ? performance.now() - this.viewStartTime
@@ -257,6 +260,7 @@ export class DashJsAdapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "playing",
       {
+        ...e,
         video_startup_time: startupTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),

@@ -28,6 +28,11 @@ type resolution struct {
 }
 type computedMetrics struct {
 	events_total               metric.Int64Counter
+	network_bandwidth          metric.Int64Gauge
+	loading_delay              metric.Int64Gauge
+	frag_size                  metric.Int64Gauge
+	frag_duration              metric.Int64Gauge
+	buffered_duration          metric.Int64Counter
 	player_startup_time        metric.Float64Gauge
 	page_load_time             metric.Float64Gauge
 	views_started_total        metric.Int64Counter
