@@ -9,11 +9,12 @@ import (
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
-func (ms *MetricsService) extractBaseLabels(event requesthandlers.BaseEvent) map[string]string {
+func (ms *MetricsService) extractBaseLabels(event requesthandlers.BaseEvent, marker string) map[string]string {
 	labels := map[string]string{
 		"org_id":     event.OrgId,
 		"player_id":  event.PlayerId,
 		"event_type": event.EventType,
+		"marker":     marker,
 	}
 	// Add optional labels
 	if event.Env != "" {

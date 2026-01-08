@@ -4,13 +4,15 @@ import (
 	"context"
 	"maps"
 	"strconv"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
-func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set, base_lables map[string]string) {
+func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_lables map[string]string) {
 	media_type := ""
 	service_loc := ""
 	if event.Data["media_type"] != nil {
@@ -23,9 +25,17 @@ func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evn
 	if val, ok := event.Data["bandwidth"]; ok && val != nil {
 		ms.metrics.network_bandwidth.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(labels))
 	}
-	if val, ok := event.Data["loading_delay"]; ok && val != nil {
-		ms.metrics.loading_delay.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(labels))
+	load_start := time.Time{}
+	if val, ok := event.Data["load_start"]; ok && val != nil {
+		load_start, _ = time.Parse(time.RFC3339Nano, val.(string))
+
 	}
+	load_complete := time.Now()
+	if val, ok := event.Data["load_complete"]; ok && val != nil {
+		load_complete = time.UnixMilli(int64(val.(float64)))
+	}
+	ms.otel_service.Logger.Debug("load times", zap.Time("start", load_start), zap.Time("end", load_complete))
+	ms.metrics.loading_delay.Record(evnt_ctx, load_complete.Sub(load_start).Nanoseconds(), metric.WithAttributeSet(labels))
 	if val, ok := event.Data["duration"]; ok && val != nil {
 		num_val := int64(val.(float64))
 		ms.metrics.frag_duration.Record(evnt_ctx, num_val, metric.WithAttributeSet(labels))
@@ -34,29 +44,34 @@ func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evn
 
 }
 
+func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marker string, evnt_ctx context.Context, base_attributes *attribute.Set) {
+	if val, ok := event.Data["page_load_time"]; ok && val != nil {
+		ms.metrics.page_load_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		ms.config.Redis_client.SetHash("metrics.page_entry."+event.SessionId, map[string]string{
+			"event_ts": strconv.FormatInt(event.EventTime, 10),
+			"marker":   marker,
+		}, 24*time.Hour)
+	}
+}
+
 func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["player_startup_time"]; ok && val != nil {
 		ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
 	}
-	if val, ok := event.Data["page_load_time"]; ok && val != nil {
-		ms.metrics.page_load_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+}
+
+func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
+	if val, ok := event.Data["video_startup_time"]; ok && val != nil {
+		ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
 	}
 }
 
-func (ms *MetricsService) onViewStart(evnt_ctx context.Context, base_attributes *attribute.Set) {
+func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.views_started_total.Add(evnt_ctx, 1, metric.WithAttributeSet(*base_attributes))
-}
-
-func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
-	videoStartupTime := getFloat64(event, "video_startup_time", 0)
-	if videoStartupTime > 0 {
-		ms.metrics.video_startup_time.Record(evnt_ctx, videoStartupTime, metric.WithAttributeSet(*base_attributes))
-	}
 	bitrate := getFloat64(event, "bitrate", 0)
 	if bitrate > 0 {
 		ms.metrics.bitrate.Record(evnt_ctx, bitrate, metric.WithAttributeSet(*base_attributes))
 	}
-	ms.recordResolutionMetric(event, evnt_ctx, base_labels)
 }
 
 func (ms *MetricsService) onStallStart(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {

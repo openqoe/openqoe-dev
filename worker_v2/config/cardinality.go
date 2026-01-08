@@ -80,7 +80,7 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 	defer close(res_chan)
 	const key = "cardinality:" // Redis key prefix
 	// Get current cardinality set from K
-	existing_json, err := cs.config.redis_client.GetValue(key + dimension)
+	existing_json, err := cs.config.Redis_client.GetValue(key + dimension)
 	if err != nil {
 		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
 	}
@@ -115,7 +115,7 @@ func (cs *CardinalityService) handleAllow(dimension string, value string, max_ca
 		cs.logger.Error("Failed to marshal cardinality data", zap.Error(err))
 		return
 	}
-	err = cs.config.redis_client.SetValueWithTTL(key+dimension, string(json_data), 86400*time.Second)
+	err = cs.config.Redis_client.SetValueWithTTL(key+dimension, string(json_data), 86400*time.Second)
 	if err != nil {
 		cs.logger.Error("Failed to set cardinality data with TTL", zap.Error(err))
 	}
@@ -169,7 +169,7 @@ func (cs *CardinalityService) ApplyGovernanceToLabels(labels map[string]string) 
 
 func (cs *CardinalityService) GetCardinalityStats(dimension string) *CardinalityStat {
 	const key = "cardinality:"
-	existing_json, err := cs.config.redis_client.GetValue(key + dimension)
+	existing_json, err := cs.config.Redis_client.GetValue(key + dimension)
 	if err != nil || existing_json == "" {
 		cs.logger.Error("Failed to get existing cardinality data", zap.Error(err))
 		return &CardinalityStat{Count: 0, Values: []string{}}
@@ -185,7 +185,7 @@ func (cs *CardinalityService) GetCardinalityStats(dimension string) *Cardinality
 func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<- bool) {
 	defer close(res_chan)
 	const key = "cardinality:"
-	err := cs.config.redis_client.DeleteValue(key + dimension)
+	err := cs.config.Redis_client.DeleteValue(key + dimension)
 	if err != nil {
 		cs.logger.Error("Error resetting cardinality", zap.Error(err), zap.String("dimension", dimension))
 		res_chan <- false

@@ -42,10 +42,6 @@ export class DashJsAdapter implements PlayerAdapter {
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
   private currentBitrate: number | null = null;
-  private currentBandwidth: { audio: number | null; video: number | null } = {
-    audio: null,
-    video: null,
-  };
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
 
@@ -153,10 +149,8 @@ export class DashJsAdapter implements PlayerAdapter {
     this.onDash(events.FRAGMENT_LOADING_COMPLETED, (e: any) =>
       this.onFragmentLoaded(e),
     );
-    this.onDash(events.MANIFEST_LOADING_STARTED, () =>
-      this.onManifestLoadingStart(),
-    );
-    this.onDash(events.MANIFEST_LOADED, () => this.onManifestLoaded());
+    this.onDash(events.MANIFEST_LOADING_FINISHED, () => this.onManifestLoad());
+    this.onDash(events.MANIFEST_LOADED, () => this.onPlayerReady());
     this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
       this.onBitrateChange(e),
     );
@@ -169,7 +163,9 @@ export class DashJsAdapter implements PlayerAdapter {
     this.onDash(events.QUALITY_CHANGE_RENDERED, (e: any) =>
       this.onQualityChangeRendered(e),
     );
-    this.onDash(events.PLAYBACK_INITIALIZED, () => this.onPlaybackInit());
+    this.onDash(events.CAN_PLAY, () => {
+      this.onCanPlay();
+    });
     this.onDash(events.PLAYBACK_PLAYING, (e: any) => this.onPlaying(e));
     this.onDash(events.PLAYBACK_PAUSED, () => this.onPause());
     this.onDash(events.PLAYBACK_STARTED, () => this.onPlayingAfterWait());
@@ -201,7 +197,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Manifest Loading Start event
    */
-  private async onManifestLoadingStart(): Promise<void> {
+  private async onManifestLoad(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -211,12 +207,9 @@ export class DashJsAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent(
-      "manifestloadingstart",
-      {
-        page_load_time: pageLoadTime,
-      },
-    );
+    const event = await this.eventCollector.createEvent("manifestload", {
+      page_load_time: pageLoadTime,
+    });
 
     this.batchManager.addEvent(event);
     this.logger.debug("manifestloadingstart event fired");
@@ -225,7 +218,7 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Manifest Loaded event (Player Ready)
    */
-  private async onManifestLoaded(): Promise<void> {
+  private async onPlayerReady(): Promise<void> {
     const event = await this.eventCollector.createEvent("playerready", {
       player_startup_time: performance.now(),
     });
@@ -236,15 +229,13 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * View Start event
    */
-  private async onPlaybackInit(): Promise<void> {
-    this.viewStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent("viewstart", {
-      preroll_requested: false,
+  private async onCanPlay(): Promise<void> {
+    const event = await this.eventCollector.createEvent("canplay", {
+      video_startup_time: performance.now(),
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("viewstart event fired");
+    this.logger.debug("canplay event fired");
   }
 
   /**
@@ -252,16 +243,10 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onPlaying(e: any): Promise<void> {
     if (!this.video) return;
-    // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : undefined;
-
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        ...e,
-        video_startup_time: startupTime,
+        playing_time: e.playingTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: this.getFramerate(),
@@ -475,7 +460,8 @@ export class DashJsAdapter implements PlayerAdapter {
         duration: data.request?.duration,
         size_bytes: data.request?.bytesLoaded,
         total_bytes: data.request?.bytesTotal,
-        loading_delay: data.request?.delayLoadingTime,
+        load_start: data.request?.availabilityStartTime,
+        load_complete: data.request?.delayLoadingTime,
         bandwidth: data.request?.bandwidth,
         service_location: data.request?.serviceLocation,
         url: PrivacyModule.sanitizeUrl(data.request?.url),

@@ -56,6 +56,21 @@ func (r *RedisConnection) SetValueWithTTL(key string, value string, ttl time.Dur
 	}
 	return nil
 }
+func (r *RedisConnection) GetHash(key string) (map[string]string, error) {
+	data, err := r.client.HGetAll(r.ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (r *RedisConnection) SetHash(key string, value map[string]string, ttl time.Duration) error {
+	_, err := r.client.HSet(r.ctx, key, value).Result()
+	if err != nil {
+		return err
+	}
+	return r.client.Expire(r.ctx, key, ttl).Err()
+}
 
 func (r *RedisConnection) DeleteValue(key string) error {
 	err := r.client.Del(r.ctx, key).Err()

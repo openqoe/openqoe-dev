@@ -14,7 +14,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	meter := otelservice.Meter
 	events_total, _ := meter.Int64Counter("openqoe.events_total", metric.WithDescription("Total number of events received"))
 	network_bandwidth, _ := meter.Int64Gauge("openqoe.network_bandwidth", metric.WithDescription("Current network bandwidth measured for the given media"), metric.WithUnit("bps"))
-	loading_delay, _ := meter.Int64Gauge("openqoe.loading_delay", metric.WithDescription("loading delay of the fragments"), metric.WithUnit("ms"))
+	loading_delay, _ := meter.Int64Gauge("openqoe.loading_delay", metric.WithDescription("loading delay of the fragments"), metric.WithUnit("ns"))
 	frag_size, _ := meter.Int64Gauge("openqoe.fragment_size", metric.WithDescription("size of the current fragment"), metric.WithUnit("bytes"))
 	frag_duration, _ := meter.Int64Gauge("openqoe.fragment_duration", metric.WithDescription("duration of the current fragment"), metric.WithUnit("s"))
 	buffered_duration, _ := meter.Int64Counter("openqoe.buffered_duration", metric.WithDescription("total duration of buffered content, measured by adding up downloaded fragment durations"), metric.WithUnit("s"))
@@ -98,25 +98,27 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 func (ms *MetricsService) ComputeMetrics(events_chunk *requesthandlers.IngestRequestWithContext, logger *zap.Logger) {
 	logger = logger.With(zap.String("sub-component", "metrics-compute-service"))
 	for _, event := range events_chunk.Events {
-		ms.otel_service.Logger.Debug("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
-		ms.transformEventsToMetrics(events_chunk.Ctx, event)
-		ms.otel_service.Logger.Debug("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		logger.Debug("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		ms.transformEventsToMetrics(events_chunk.Ctx, event, events_chunk.Marker)
+		logger.Debug("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}
 }
 
-func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, event requesthandlers.BaseEvent) {
-	base_labels := ms.extractBaseLabels(event)
+func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, event requesthandlers.BaseEvent, marker string) {
+	base_labels := ms.extractBaseLabels(event, marker)
 	base_attributes := mapToAttributeSet(base_labels)
 	ms.metrics.events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
 	switch event.EventType {
 	case "fragmentloaded":
-		ms.onFragmentLoaded(&event, evnt_ctx, &base_attributes, base_labels)
+		ms.onFragmentLoaded(&event, evnt_ctx, base_labels)
+	case "manifestload":
+		ms.onManifestLoad(&event, marker, evnt_ctx, &base_attributes)
 	case "playerready":
 		ms.onPlayerReady(&event, evnt_ctx, &base_attributes)
-	case "viewstart":
-		ms.onViewStart(evnt_ctx, &base_attributes)
+	case "canplay":
+		ms.onCanPlay(&event, evnt_ctx, &base_attributes)
 	case "playing":
-		ms.onPlaying(&event, evnt_ctx, &base_attributes, base_labels)
+		ms.onPlaying(&event, evnt_ctx, &base_attributes)
 	case "stallstart":
 		ms.onStallStart(&event, evnt_ctx, &base_attributes)
 	case "stallend":

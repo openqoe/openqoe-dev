@@ -14,7 +14,7 @@ type Config struct {
 	env                 *Env
 	cardinality_config  *CardinalityConfig
 	destination_manager *DestinationManager
-	redis_client        *RedisConnection
+	Redis_client        *RedisConnection
 }
 
 func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfig {
@@ -30,6 +30,8 @@ func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfi
 				// Bucket medium-cardinality dimensions
 				"video_id":    {Max_Cardinality: 100000, Action: Allow},
 				"video_title": {Max_Cardinality: 100000, Action: Allow},
+				// Allow device id tracking (to be changed in future)
+				"marker": {Max_Cardinality: math.MaxInt64, Action: Allow},
 				// Hash high-cardinality dimensions
 				// max cardinality mimicks infinity
 				"session_id": {Max_Cardinality: math.MaxInt64, Action: Hash},
@@ -42,7 +44,6 @@ func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfi
 				// Network - bucket by country/region
 				"network_country": {Max_Cardinality: 250, Action: Allow},
 				"network_region":  {Max_Cardinality: 1000, Action: Bucket, Bucket_Size: 100},
-
 				// Drop very high cardinality
 				"video_source_url": {Max_Cardinality: 0, Action: Drop},
 			},
@@ -91,7 +92,7 @@ func NewConfig(ctx context.Context, env *Env, parentLogger *zap.Logger) *Config 
 		env:                 env,
 		cardinality_config:  cardinalityConfig,
 		destination_manager: destinationManager,
-		redis_client:        redisClient,
+		Redis_client:        redisClient,
 	}
 }
 
