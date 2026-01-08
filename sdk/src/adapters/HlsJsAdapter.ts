@@ -355,7 +355,7 @@ export class HlsJsAdapter implements PlayerAdapter {
         url: data.frag.base.url,
         rel_url: data.frag.relurl,
         bandwidth: data.frag.stats?.bwEstimate,
-        buffer_length: this.getBufferAhead(data.timeRanges[data.type]),
+        buffer_len_ms: this.getBufferAhead(data.timeRanges[data.type]),
         buffer_gap: data.timeRanges[data.type].length > 1,
       },
       this.video.currentTime * 1000,

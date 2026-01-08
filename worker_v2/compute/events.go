@@ -57,12 +57,48 @@ func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marke
 func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["player_startup_time"]; ok && val != nil {
 		ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		ms.config.Redis_client.SetValueWithTTL("metrics.player_startup_time"+event.SessionId, strconv.FormatFloat(val.(float64), 'f', -1, 64), 10*time.Minute)
+	}
+}
+
+func (ms *MetricsService) onBitrateChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
+	if val, ok := event.Data["bitrate_kb"]; ok && val != nil {
+		ms.metrics.bitrate.Record(evnt_ctx, val.(float64)*1000, metric.WithAttributeSet(*base_attributes))
+	}
+	if val, ok := event.Data["bandwidth"]; ok && val != nil {
+		ms.metrics.network_bandwidth.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(*base_attributes))
+	}
+	if val, ok := event.Data["resolution"]; ok && val != nil {
+		ms.recordResolutionMetric(event, evnt_ctx, base_labels)
+	}
+	if val, ok := event.Data["framerate"]; ok && val != nil {
+		ms.metrics.framerate.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(*base_attributes))
+	}
+}
+
+func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
+	if val, ok := event.Data["buffer_len_ms"]; ok && val != nil {
+		ms.metrics.buffer_length.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+	}
+	if val, ok := event.Data["bitrate_kb"]; ok && val != nil {
+		ms.metrics.bitrate.Record(evnt_ctx, val.(float64)*1000, metric.WithAttributeSet(*base_attributes))
 	}
 }
 
 func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["video_startup_time"]; ok && val != nil {
-		ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		res, err := ms.config.Redis_client.GetValue("metrics.player_startup_time" + event.SessionId)
+		if err != nil {
+			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		}
+		video_startup_time := val.(float64)
+		player_startup_time, err := strconv.ParseFloat(res, 64)
+		if err != nil {
+			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		}
+		dur := video_startup_time - player_startup_time
+		ms.metrics.video_startup_time.Record(evnt_ctx, dur, metric.WithAttributeSet(*base_attributes))
+		ms.config.Redis_client.DeleteValue("metrics.player_startup_time" + event.SessionId)
 	}
 }
 
@@ -70,7 +106,7 @@ func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, evnt_ctx c
 	ms.metrics.views_started_total.Add(evnt_ctx, 1, metric.WithAttributeSet(*base_attributes))
 	bitrate := getFloat64(event, "bitrate", 0)
 	if bitrate > 0 {
-		ms.metrics.bitrate.Record(evnt_ctx, bitrate, metric.WithAttributeSet(*base_attributes))
+		ms.metrics.bitrate.Record(evnt_ctx, bitrate*1000, metric.WithAttributeSet(*base_attributes))
 	}
 }
 

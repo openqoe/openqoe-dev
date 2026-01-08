@@ -24,9 +24,10 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	video_startup_time, _ := meter.Float64Histogram("openqoe.video_startup_time",
 		metric.WithDescription("Time taken by video to start"),
 		metric.WithUnit("ms"),
-		metric.WithExplicitBucketBoundaries(500, 1000, 2000, 3000, 5000, 10000, 15000, 30000),
+		metric.WithExplicitBucketBoundaries(100, 250, 500, 1000, 2000, 3000, 5000, 10000, 15000, 30000),
 	)
 	bitrate, _ := meter.Float64Gauge("openqoe.bitrate", metric.WithDescription("Bitrate of the video"), metric.WithUnit("bps"))
+	framerate, _ := meter.Int64Gauge("openqoe.framerate", metric.WithDescription("frames per secons for the video"), metric.WithUnit("fps"))
 	resolution_total, _ := meter.Int64Counter("openqoe.resolution_total", metric.WithDescription("Total number of viewers who started watching the video"))
 	rebuffer_events_total, _ := meter.Int64Counter("openqoe.rebuffer_events_total", metric.WithDescription("Total number of rebuffer events"))
 	buffer_length, _ := meter.Float64Gauge("openqoe.buffer_length", metric.WithDescription("Buffer length of the video"), metric.WithUnit("ms"))
@@ -71,6 +72,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 			views_started_total:        view_started_total,
 			video_startup_time:         video_startup_time,
 			bitrate:                    bitrate,
+			framerate:                  framerate,
 			resolution_total:           resolution_total,
 			rebuffer_events_total:      rebuffer_events_total,
 			buffer_length:              buffer_length,
@@ -113,6 +115,10 @@ func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, eve
 		ms.onFragmentLoaded(&event, evnt_ctx, base_labels)
 	case "manifestload":
 		ms.onManifestLoad(&event, marker, evnt_ctx, &base_attributes)
+	case "bitratechange":
+		ms.onBitrateChange(&event, evnt_ctx, &base_attributes, base_labels)
+	case "bufferlevelchange":
+		ms.onBufferLevelChange(&event, evnt_ctx, &base_attributes)
 	case "playerready":
 		ms.onPlayerReady(&event, evnt_ctx, &base_attributes)
 	case "canplay":

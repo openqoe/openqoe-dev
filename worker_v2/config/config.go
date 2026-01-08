@@ -31,7 +31,7 @@ func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfi
 				"video_id":    {Max_Cardinality: 100000, Action: Allow},
 				"video_title": {Max_Cardinality: 100000, Action: Allow},
 				// Allow device id tracking (to be changed in future)
-				"marker": {Max_Cardinality: math.MaxInt64, Action: Allow},
+				"marker": {Max_Cardinality: 100000, Action: Allow},
 				// Hash high-cardinality dimensions
 				// max cardinality mimicks infinity
 				"session_id": {Max_Cardinality: math.MaxInt64, Action: Hash},

@@ -299,7 +299,7 @@ export class DashJsAdapter implements PlayerAdapter {
         "stallend",
         {
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
         },
         this.video.currentTime * 1000,
       );
@@ -519,7 +519,7 @@ export class DashJsAdapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "stallstart",
       {
-        buffer_length: this.getBufferLength(),
+        buffer_len_ms: this.getBufferLength(),
         bitrate: this.getBitrate(),
       },
       this.video.currentTime * 1000,
@@ -540,7 +540,7 @@ export class DashJsAdapter implements PlayerAdapter {
         state: data.state,
         media_type: data.mediaType,
         buffer_len_ms: this.getBufferLength(data.mediaType),
-        bitrate: this.getBitrate(),
+        bitrate_kb: this.getBitrate(),
       },
       this.video.currentTime * 1000,
     );
@@ -688,7 +688,7 @@ export class DashJsAdapter implements PlayerAdapter {
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
           dropped_frames: this.getDroppedFrames(),
         },
         this.video.currentTime * 1000,

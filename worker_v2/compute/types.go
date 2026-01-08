@@ -38,6 +38,7 @@ type computedMetrics struct {
 	views_started_total        metric.Int64Counter
 	video_startup_time         metric.Float64Histogram
 	bitrate                    metric.Float64Gauge
+	framerate                  metric.Int64Gauge
 	resolution_total           metric.Int64Counter
 	rebuffer_events_total      metric.Int64Counter
 	buffer_length              metric.Float64Gauge
