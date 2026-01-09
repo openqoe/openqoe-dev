@@ -6,6 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	datastructure "openqoe.dev/worker_v2/data_structure"
 )
 
 type RedisConnection struct {
@@ -56,24 +57,57 @@ func (r *RedisConnection) SetValueWithTTL(key string, value string, ttl time.Dur
 	}
 	return nil
 }
-func (r *RedisConnection) GetHash(key string) (map[string]string, error) {
-	data, err := r.client.HGetAll(r.ctx, key).Result()
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
 
-func (r *RedisConnection) SetHash(key string, value map[string]string, ttl time.Duration) error {
-	_, err := r.client.HSet(r.ctx, key, value).Result()
+func (r *RedisConnection) Delete(key string) error {
+	err := r.client.Del(r.ctx, key).Err()
 	if err != nil {
 		return err
 	}
-	return r.client.Expire(r.ctx, key, ttl).Err()
+	return nil
 }
 
-func (r *RedisConnection) DeleteValue(key string) error {
-	err := r.client.Del(r.ctx, key).Err()
+func (r *RedisConnection) GetHashFields(key string, fields []string) (map[string]string, error) {
+	res_map := make(map[string]string)
+	for _, f := range fields {
+		value, err := r.client.HGet(r.ctx, key, f).Result()
+		if err == redis.Nil {
+			res_map[f] = ""
+		}
+		if err != nil {
+			return nil, err
+		}
+		res_map[f] = value
+	}
+	return res_map, nil
+}
+
+func (r *RedisConnection) SetOrUpdateHash(key string, value_with_ttl map[string]datastructure.Pair[string, time.Duration]) error {
+	value := make(map[string]string, len(value_with_ttl))
+	group_fields_by_ttl := make(map[time.Duration][]string)
+
+	for field_name, pair := range value_with_ttl {
+		value[field_name] = pair.First
+		secondsOnly := (pair.Second / time.Second) * time.Second
+		group_fields_by_ttl[secondsOnly] = append(group_fields_by_ttl[secondsOnly], field_name)
+	}
+	pipe := r.client.Pipeline()
+
+	pipe.HSet(r.ctx, key, value)
+
+	for ttl, fields := range group_fields_by_ttl {
+		if ttl > 0 {
+			pipe.HExpire(r.ctx, key, ttl, fields...)
+		}
+	}
+
+	pipe.Expire(r.ctx, key, 24*time.Hour)
+
+	_, err := pipe.Exec(r.ctx)
+	return err
+}
+
+func (r *RedisConnection) DeleteHashField(key string, field string) error {
+	err := r.client.HDel(r.ctx, key, field).Err()
 	if err != nil {
 		return err
 	}

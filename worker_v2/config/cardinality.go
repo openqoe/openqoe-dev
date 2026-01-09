@@ -185,7 +185,7 @@ func (cs *CardinalityService) GetCardinalityStats(dimension string) *Cardinality
 func (cs *CardinalityService) resetCardinality(dimension string, res_chan chan<- bool) {
 	defer close(res_chan)
 	const key = "cardinality:"
-	err := cs.config.Redis_client.DeleteValue(key + dimension)
+	err := cs.config.Redis_client.Delete(key + dimension)
 	if err != nil {
 		cs.logger.Error("Error resetting cardinality", zap.Error(err), zap.String("dimension", dimension))
 		res_chan <- false

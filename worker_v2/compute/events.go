@@ -8,38 +8,40 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.uber.org/zap"
+	datastructure "openqoe.dev/worker_v2/data_structure"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
 func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_lables map[string]string) {
-	media_type := ""
-	service_loc := ""
-	if event.Data["media_type"] != nil {
-		media_type = event.Data["media_type"].(string)
+	labels := map[string]string{
+		"media_type":       "",
+		"service_location": "",
+		"url":              "",
+		"is_outlier":       "false",
 	}
-	if event.Data["service_location"] != nil {
-		service_loc = event.Data["service_location"].(string)
+	if val, ok := event.Data["media_type"]; ok && val != nil {
+		labels["media_type"] = val.(string)
 	}
-	labels := addAttributes(base_lables, map[string]string{"media_type": media_type, "service_location": service_loc})
-	if val, ok := event.Data["bandwidth"]; ok && val != nil {
-		ms.metrics.network_bandwidth.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(labels))
+	if val, ok := event.Data["service_location"]; ok && val != nil {
+		labels["service_location"] = val.(string)
 	}
-	load_start := time.Time{}
-	if val, ok := event.Data["load_start"]; ok && val != nil {
-		load_start, _ = time.Parse(time.RFC3339Nano, val.(string))
-
+	if val, ok := event.Data["url"]; ok && val != nil {
+		labels["url"] = val.(string)
 	}
-	load_complete := time.Now()
-	if val, ok := event.Data["load_complete"]; ok && val != nil {
-		load_complete = time.UnixMilli(int64(val.(float64)))
+	if val, ok := event.Data["is_outlier"]; ok && val != nil {
+		labels["is_outlier"] = strconv.FormatBool(val.(bool))
 	}
-	ms.otel_service.Logger.Debug("load times", zap.Time("start", load_start), zap.Time("end", load_complete))
-	ms.metrics.loading_delay.Record(evnt_ctx, load_complete.Sub(load_start).Nanoseconds(), metric.WithAttributeSet(labels))
-	if val, ok := event.Data["duration"]; ok && val != nil {
+	attributes := addAttributes(base_lables, labels)
+	if val, ok := event.Data["ttfb_ms"]; ok && val != nil {
+		ms.metrics.network_latency.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(attributes))
+	}
+	if val, ok := event.Data["z_score"]; ok && val != nil {
+		ms.metrics.network_latency_deviation.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(attributes))
+	}
+	if val, ok := event.Data["frag_duration"]; ok && val != nil {
 		num_val := int64(val.(float64))
-		ms.metrics.frag_duration.Record(evnt_ctx, num_val, metric.WithAttributeSet(labels))
-		ms.metrics.buffered_duration.Add(evnt_ctx, num_val, metric.WithAttributeSet(labels))
+		ms.metrics.frag_duration.Record(evnt_ctx, num_val, metric.WithAttributeSet(attributes))
+		ms.metrics.buffered_duration.Add(evnt_ctx, num_val, metric.WithAttributeSet(attributes))
 	}
 
 }
@@ -47,47 +49,158 @@ func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, evn
 func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marker string, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["page_load_time"]; ok && val != nil {
 		ms.metrics.page_load_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.SetHash("metrics.page_entry."+event.SessionId, map[string]string{
-			"event_ts": strconv.FormatInt(event.EventTime, 10),
-			"marker":   marker,
-		}, 24*time.Hour)
+		page_entry := strconv.FormatInt(event.EventTime, 10)
+		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+			map[string]datastructure.Pair[string, time.Duration]{
+				"page_entry": {First: page_entry, Second: 24 * time.Hour},
+				"marker":     {First: marker, Second: 24 * time.Hour},
+			})
 	}
 }
 
 func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["player_startup_time"]; ok && val != nil {
 		ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.SetValueWithTTL("metrics.player_startup_time"+event.SessionId, strconv.FormatFloat(val.(float64), 'f', -1, 64), 10*time.Minute)
+		ms.config.Redis_client.SetValueWithTTL("metrics:player_startup_time"+event.SessionId, strconv.FormatFloat(val.(float64), 'f', -1, 64), 10*time.Minute)
 	}
 }
 
-func (ms *MetricsService) onBitrateChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
-	if val, ok := event.Data["bitrate_kb"]; ok && val != nil {
-		ms.metrics.bitrate.Record(evnt_ctx, val.(float64)*1000, metric.WithAttributeSet(*base_attributes))
+func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
+	labels := make(map[string]string)
+	attributes := *base_attributes
+	if val, ok := event.Data["media_type"]; ok && val != nil {
+		labels["media_type"] = val.(string)
 	}
-	if val, ok := event.Data["bandwidth"]; ok && val != nil {
-		ms.metrics.network_bandwidth.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(*base_attributes))
+	if val, ok := event.Data["is_outlier"]; ok && val != nil {
+		labels["is_outlier"] = strconv.FormatBool(val.(bool))
 	}
-	if val, ok := event.Data["resolution"]; ok && val != nil {
-		ms.recordResolutionMetric(event, evnt_ctx, base_labels)
-	}
-	if val, ok := event.Data["framerate"]; ok && val != nil {
-		ms.metrics.framerate.Record(evnt_ctx, int64(val.(float64)), metric.WithAttributeSet(*base_attributes))
-	}
-}
-
-func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
+	attributes = addAttributes(base_labels, labels)
 	if val, ok := event.Data["buffer_len_ms"]; ok && val != nil {
-		ms.metrics.buffer_length.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		ms.metrics.buffer_length.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(attributes))
 	}
+	if val, ok := event.Data["z_score"]; ok && val != nil {
+		ms.metrics.buffer_instability_index.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(attributes))
+	}
+}
+
+func (ms *MetricsService) onBandwidthChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_labels map[string]string) {
+	labels := map[string]string{
+		"media_type": "",
+		"codec":      "",
+	}
+	if val, ok := event.Data["media_type"]; ok && val != nil {
+		labels["media_type"] = val.(string)
+	}
+	if val, ok := event.Data["codec"]; ok && val != nil {
+		labels["codec"] = val.(string)
+	}
+	attributes := addAttributes(base_labels, labels)
+	field := "bandwidth"
+	if val, ok := event.Data[field]; ok && val != nil {
+		cur_bandwidth := int64(val.(float64)) * 1000
+		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{field})
+		if err != nil || res_map[field] == "" {
+			ms.metrics.network_bandwidth.Add(evnt_ctx, cur_bandwidth, metric.WithAttributeSet(attributes))
+		}
+		prev_bandwidth, _ := strconv.ParseInt(res_map[field], 10, 64)
+		ms.metrics.network_bandwidth.Add(evnt_ctx, cur_bandwidth-prev_bandwidth, metric.WithAttributeSet(attributes))
+		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+			field: {First: strconv.FormatInt(cur_bandwidth, 10), Second: 15 * time.Minute},
+		})
+	}
+}
+
+func (ms *MetricsService) onQualityChangeRequested(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_labels map[string]string) {
+	labels := map[string]string{
+		"media_type": "",
+	}
+	if val, ok := event.Data["media_type"]; ok && val != nil {
+		labels["media_type"] = val.(string)
+	}
+	attributes := addAttributes(base_labels, labels)
+	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+		map[string]datastructure.Pair[string, time.Duration]{
+			"qual_switch_req_ts_" + labels["media_type"]: {First: strconv.FormatInt(event.EventTime, 10), Second: 20 * time.Minute},
+		})
+	ms.metrics.quality_change_request_total.Add(evnt_ctx, 1, metric.WithAttributeSet(attributes))
+	bitrate_old := 0.00
+	bitrate_new := 0.00
+	if val, ok := event.Data["old"]; ok && val != nil {
+		old_rep := val.(map[string]any)
+		bitrate_old = old_rep["bitrate_kb"].(float64) * 1000
+	}
+	if val, ok := event.Data["new"]; ok && val != nil {
+		new_rep := val.(map[string]any)
+		bitrate_new = new_rep["bitrate_kb"].(float64) * 1000
+	}
+	ms.metrics.requested_bitrate.Add(evnt_ctx, bitrate_new-bitrate_old, metric.WithAttributeSet(attributes))
+}
+
+func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_labels map[string]string) {
+	labels := map[string]string{
+		"media_type": "",
+		"framerate":  "",
+		"codec":      "",
+	}
+	if val, ok := event.Data["media_type"]; ok && val != nil {
+		labels["media_type"] = val.(string)
+	}
+	framerate := 0.00
+	if val, ok := event.Data["framerate"]; ok && val != nil {
+		framerate = val.(float64)
+		labels["framerate"] = strconv.FormatFloat(framerate, 'f', -1, 64)
+	}
+	if val, ok := event.Data["codec"]; ok && val != nil {
+		labels["codec"] = val.(string)
+	}
+	attributes := addAttributes(base_labels, labels)
+
+	ms.metrics.quality_change_total.Add(evnt_ctx, 1, metric.WithAttributeSet(attributes))
+
+	last_br := "qual_switch_req_ts_" + labels["media_type"]
+	res_map, _ := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{last_br})
+	req_ts, _ := strconv.ParseInt(res_map[last_br], 10, 64)
+	qs_lat := event.EventTime - req_ts
+	ms.metrics.quality_switch_latency.Record(evnt_ctx, qs_lat, metric.WithAttributeSet(attributes))
+	ms.config.Redis_client.DeleteHashField("metrics:session_analytics:"+event.SessionId, last_br)
+
+	ms.recordResolutionMetric(event, evnt_ctx, base_labels)
+
 	if val, ok := event.Data["bitrate_kb"]; ok && val != nil {
-		ms.metrics.bitrate.Record(evnt_ctx, val.(float64)*1000, metric.WithAttributeSet(*base_attributes))
+		cur_br := val.(float64)
+		last_br_field_name := "last_bitrate"
+		last_qual_ren_ts_field_name := "last_quality_rendered_ts"
+		res_map, _ = ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{last_br_field_name, last_qual_ren_ts_field_name})
+		if res_map[last_br_field_name] != "" && res_map[last_qual_ren_ts_field_name] != "" {
+			last_br, _ := strconv.ParseFloat(res_map[last_br_field_name], 64)
+			last_qual_ren_ts, _ := strconv.ParseFloat(res_map[last_qual_ren_ts_field_name], 64)
+			dur := event.PlaybackTime - last_qual_ren_ts
+			res := (last_br * dur) / event.PlaybackTime
+			ms.metrics.time_weighted_average_bitrate.Record(evnt_ctx, res, metric.WithAttributeSet(attributes))
+
+		}
+		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+			last_br_field_name:          {First: strconv.FormatFloat(cur_br, 'f', -1, 64), Second: 15 * time.Minute},
+			last_qual_ren_ts_field_name: {First: strconv.FormatFloat(event.PlaybackTime, 'f', -1, 64), Second: 15 * time.Minute},
+		})
+		// had to make it 1 to avoid divide by 0
+		width := 1.00
+		height := 1.00
+		if val, ok := event.Data["video_width"]; ok && val != nil {
+			width = val.(float64)
+		}
+		if val, ok := event.Data["video_height"]; ok && val != nil {
+			height = val.(float64)
+		}
+		bpp := cur_br * 1000 / (width * height * framerate)
+		ms.metrics.perceived_quality_index.Record(evnt_ctx, bpp, metric.WithAttributeSet(attributes))
 	}
+
 }
 
 func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["video_startup_time"]; ok && val != nil {
-		res, err := ms.config.Redis_client.GetValue("metrics.player_startup_time" + event.SessionId)
+		res, err := ms.config.Redis_client.GetValue("metrics:player_startup_time" + event.SessionId)
 		if err != nil {
 			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
 		}
@@ -98,7 +211,7 @@ func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, evnt_ctx c
 		}
 		dur := video_startup_time - player_startup_time
 		ms.metrics.video_startup_time.Record(evnt_ctx, dur, metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.DeleteValue("metrics.player_startup_time" + event.SessionId)
+		ms.config.Redis_client.Delete("metrics:player_startup_time" + event.SessionId)
 	}
 }
 
@@ -106,7 +219,7 @@ func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, evnt_ctx c
 	ms.metrics.views_started_total.Add(evnt_ctx, 1, metric.WithAttributeSet(*base_attributes))
 	bitrate := getFloat64(event, "bitrate", 0)
 	if bitrate > 0 {
-		ms.metrics.bitrate.Record(evnt_ctx, bitrate*1000, metric.WithAttributeSet(*base_attributes))
+		ms.metrics.requested_bitrate.Add(evnt_ctx, bitrate*1000, metric.WithAttributeSet(*base_attributes))
 	}
 }
 
@@ -186,20 +299,4 @@ func (ms *MetricsService) onPause(event *requesthandlers.BaseEvent, evnt_ctx con
 	if playing_time > 0 {
 		ms.metrics.pause_playing_time.Record(evnt_ctx, playing_time, metric.WithAttributeSet(*base_attributes))
 	}
-}
-
-func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_labels map[string]string, base_attributes *attribute.Set) {
-	labels := maps.Clone(base_labels)
-	labels["trigger"] = getString(event, "trigger", "unknown")
-	ms.metrics.quality_change_total.Add(evnt_ctx, 1, metric.WithAttributeSet(mapToAttributeSet(ms.cardinality_service.ApplyGovernanceToLabels(labels))))
-
-	new_bitrate := getFloat64(event, "new_bitrate", 0)
-	if new_bitrate > 0 {
-		ms.metrics.quality_change_bitrate.Record(evnt_ctx, new_bitrate, metric.WithAttributeSet(*base_attributes))
-	}
-	old_bitrate := getFloat64(event, "old_bitrate", 0)
-	if old_bitrate > 0 {
-		ms.metrics.quality_change_old_bitrate.Record(evnt_ctx, old_bitrate, metric.WithAttributeSet(*base_attributes))
-	}
-	ms.recordResolutionMetric(event, evnt_ctx, base_labels)
 }

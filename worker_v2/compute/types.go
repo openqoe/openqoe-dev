@@ -27,38 +27,44 @@ type resolution struct {
 	height int64
 }
 type computedMetrics struct {
-	events_total               metric.Int64Counter
-	network_bandwidth          metric.Int64Gauge
-	loading_delay              metric.Int64Gauge
-	frag_size                  metric.Int64Gauge
-	frag_duration              metric.Int64Gauge
-	buffered_duration          metric.Int64Counter
-	player_startup_time        metric.Float64Gauge
-	page_load_time             metric.Float64Gauge
-	views_started_total        metric.Int64Counter
-	video_startup_time         metric.Float64Histogram
-	bitrate                    metric.Float64Gauge
-	framerate                  metric.Int64Gauge
-	resolution_total           metric.Int64Counter
-	rebuffer_events_total      metric.Int64Counter
-	buffer_length              metric.Float64Gauge
-	rebuffer_duration          metric.Float64Histogram
-	seek_total                 metric.Int64Counter
-	seek_latency               metric.Float64Histogram
-	views_completed_total      metric.Int64Counter
-	playing_time               metric.Float64Gauge
-	completion_rate            metric.Float64Gauge
-	rebuffer_count             metric.Float64Gauge
-	errors_total               metric.Int64Counter
-	heart_beat_playing_time    metric.Float64Gauge
-	heart_beat_bitrate         metric.Float64Gauge
-	dropped_frames_total       metric.Float64Gauge
-	quartile_reached_total     metric.Int64Counter
-	pause_events_total         metric.Int64Counter
-	pause_playing_time         metric.Float64Gauge
-	quality_change_total       metric.Int64Counter
-	quality_change_bitrate     metric.Float64Gauge
-	quality_change_old_bitrate metric.Float64Gauge
+	requested_bitrate             metric.Float64Counter
+	buffer_instability_index      metric.Float64Gauge
+	buffer_length                 metric.Float64Histogram
+	buffered_duration             metric.Int64Counter
+	completion_rate               metric.Float64Gauge
+	dropped_frames_total          metric.Float64Gauge
+	errors_total                  metric.Int64Counter
+	events_total                  metric.Int64Counter
+	frag_duration                 metric.Int64Gauge
+	frag_size                     metric.Int64Gauge
+	framerate                     metric.Int64Gauge
+	heart_beat_bitrate            metric.Float64Gauge
+	heart_beat_playing_time       metric.Float64Gauge
+	network_bandwidth             metric.Int64Counter
+	network_latency               metric.Int64Gauge
+	network_latency_deviation     metric.Float64Gauge
+	page_load_time                metric.Float64Gauge
+	pause_events_total            metric.Int64Counter
+	pause_playing_time            metric.Float64Gauge
+	perceived_quality_index       metric.Float64Histogram
+	player_startup_time           metric.Float64Gauge
+	playing_time                  metric.Float64Gauge
+	quality_change_bitrate        metric.Float64Gauge
+	quality_change_old_bitrate    metric.Float64Gauge
+	quality_change_request_total  metric.Int64Counter
+	quality_change_total          metric.Int64Counter
+	quality_switch_latency        metric.Int64Gauge
+	quartile_reached_total        metric.Int64Counter
+	rebuffer_count                metric.Float64Gauge
+	rebuffer_duration             metric.Float64Histogram
+	rebuffer_events_total         metric.Int64Counter
+	resolution_total              metric.Int64Counter
+	seek_latency                  metric.Float64Histogram
+	seek_total                    metric.Int64Counter
+	time_weighted_average_bitrate metric.Float64Gauge
+	video_startup_time            metric.Float64Histogram
+	views_completed_total         metric.Int64Counter
+	views_started_total           metric.Int64Counter
 }
 type MetricsService struct {
 	config              *config.Config
