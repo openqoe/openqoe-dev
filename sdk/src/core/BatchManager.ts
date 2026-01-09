@@ -74,7 +74,7 @@ export class BatchManager {
     const eventsToSend = [...this.batch];
     this.batch = [];
 
-    this.logger.info(`Flushing batch of ${eventsToSend.length} events`);
+    this.logger.debug(`Flushing batch of ${eventsToSend.length} events`);
 
     try {
       await this.asyncFlushCallback(eventsToSend);
@@ -99,7 +99,7 @@ export class BatchManager {
     const eventsToSend = [...this.batch];
     this.batch = [];
 
-    this.logger.info(
+    this.logger.debug(
       `Flushing batch synchronously: ${eventsToSend.length} events`,
     );
 

@@ -44,6 +44,12 @@ export class DashJsAdapter implements PlayerAdapter {
   private currentBitrate: number | null = null;
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
+  private bufferStats = { mean: 0, m2: 0, count: 0 };
+  private bufferSampleRate = 0.2; // 5% baseline sampling
+  private bufferZThreshold = 2.0; // Report if data is > 2 standard deviations away
+  private fragStats = { mean: 0, m2: 0, count: 0 };
+  private fragSampleRate = 0.3; // 10% baseline (slightly higher than buffer for network visibility)
+  private fragZThreshold = 3.0; // Higher threshold (3.0) for network because latency is naturally jittery
 
   constructor(
     eventCollector: EventCollector,
@@ -151,11 +157,11 @@ export class DashJsAdapter implements PlayerAdapter {
     );
     this.onDash(events.MANIFEST_LOADING_FINISHED, () => this.onManifestLoad());
     this.onDash(events.MANIFEST_LOADED, () => this.onPlayerReady());
-    this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
-      this.onBitrateChange(e),
-    );
-    this.onDash(events.BUFFER_LEVEL_STATE_CHANGED, (e: any) =>
+    this.onDash(events.BUFFER_LEVEL_UPDATED, (e: any) =>
       this.onBufferLevelChange(e),
+    );
+    this.onDash(events.REPRESENTATION_SWITCH, (e: any) =>
+      this.onBandwidthChange(e),
     );
     this.onDash(events.QUALITY_CHANGE_REQUESTED, (e: any) =>
       this.onQualityChangeRequested(e),
@@ -195,6 +201,68 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Fragment Loaded event
+   */
+  private async onFragmentLoaded(data: any): Promise<void> {
+    if (!this.video || !data || !data.request) return;
+    // Calculate the actual network latency (Time till first byte in ms)
+    // We use firstByteDate - availabilityStartTime to get the network latency
+    const endTime = new Date(data.request.firstByteDate).getTime();
+    const startTime = new Date(data.request.availabilityStartTime).getTime();
+    // time till first byte
+    const ttfb = endTime - startTime;
+
+    // 1. Update running stats (Welford's Algorithm)
+    this.fragStats.count++;
+    const delta = ttfb - this.fragStats.mean;
+    this.fragStats.mean += delta / this.fragStats.count;
+    const delta2 = ttfb - this.fragStats.mean;
+    this.fragStats.m2 += delta * delta2;
+
+    // 2. Calculate Standard Deviation and Z-Score
+    const stdDev =
+      this.fragStats.count > 1
+        ? Math.sqrt(this.fragStats.m2 / (this.fragStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(ttfb - this.fragStats.mean) / stdDev : 0;
+
+    // 3. Decision Logic
+    const isOutlier = zScore > this.fragZThreshold;
+    const isRandomSample = Math.random() < this.fragSampleRate;
+
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "fragmentloaded",
+        {
+          frag_duration: data.request.duration,
+          size_bytes: data.request.bytesTotal,
+          time_to_load:
+            new Date(data.request.endDate).getTime() -
+            new Date(data.request.availabilityStartTime).getTime(),
+          ttfb_ms: ttfb,
+          z_score: parseFloat(zScore.toFixed(2)),
+          service_location: data.request.serviceLocation,
+          url: PrivacyModule.sanitizeUrl(data.request.url),
+          media_type: data.request.mediaType,
+          type: data.request.type,
+          is_outlier: isOutlier,
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.logger.debug(
+        `Fragment loaded ${isOutlier ? "[OUTLIER]" : "[SAMPLE]"}`,
+        {
+          latency: ttfb,
+          z: zScore.toFixed(2),
+        },
+      );
+    }
+  }
+
+  /**
    * Manifest Loading Start event
    */
   private async onManifestLoad(): Promise<void> {
@@ -224,6 +292,141 @@ export class DashJsAdapter implements PlayerAdapter {
     });
     this.batchManager.addEvent(event);
     this.logger.debug("playerready event fired");
+  }
+
+  /**
+   * Buffer Level Change event
+   */
+  private async onBufferLevelChange(data: any): Promise<void> {
+    if (!this.video) return;
+
+    const currentLevel = data.bufferLevel * 1000;
+
+    // 1. Update running stats (Welford's Algorithm)
+    this.bufferStats.count++;
+    const delta = currentLevel - this.bufferStats.mean;
+    this.bufferStats.mean += delta / this.bufferStats.count;
+    const delta2 = currentLevel - this.bufferStats.mean;
+    this.bufferStats.m2 += delta * delta2;
+
+    // 2. Calculate Standard Deviation and Z-Score
+    const stdDev =
+      this.bufferStats.count > 1
+        ? Math.sqrt(this.bufferStats.m2 / (this.bufferStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(currentLevel - this.bufferStats.mean) / stdDev : 0;
+
+    // 3. Decision Logic: Is this a "boring" sample or a "critical" outlier?
+    const isOutlier = zScore > this.bufferZThreshold;
+    const isRandomSample = Math.random() < this.bufferSampleRate;
+
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "bufferlevelchange",
+        {
+          buffer_len_ms: currentLevel,
+          z_score: parseFloat(zScore.toFixed(2)),
+          // Optional: add metadata so backend knows WHY this was sent
+          is_outlier: isOutlier,
+          media_type: data.mediaType,
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.logger.debug(
+        `buffer_level_change ${isOutlier ? "[OUTLIER]" : "[SAMPLE]"} added to batch`,
+      );
+    }
+  }
+
+  /**
+   * Bitrate Change event
+   */
+  private async onBandwidthChange(data: any): Promise<void> {
+    if (!this.video || !data) return;
+    const event = await this.eventCollector.createEvent(
+      "bandwidthchange",
+      {
+        media_type: data.mediaType,
+        bandwidth: data.currentRepresentation?.bandwidth || null,
+        codec: data.currentRepresentation?.codecFamily || null,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("bandwidthchange event fired");
+  }
+
+  /**
+   * Quality Change Requested event
+   */
+  private async onQualityChangeRequested(data: any): Promise<void> {
+    if (!this.video || !data) return;
+    const event = await this.eventCollector.createEvent(
+      "qualitychangerequested",
+      {
+        old: {
+          bitrate_kb: data.oldRepresentation?.bitrateInKbit || null,
+          resolution: {
+            width: data.oldRepresentation?.width || null,
+            height: data.oldRepresentation?.height || null,
+          },
+          framerate: data.oldRepresentation?.frameRate || null,
+          codec: data.oldRepresentation?.codecFamily || null,
+        },
+        new: {
+          bitrate_kb: data.newRepresentation?.bitrateInKbit || null,
+          resolution: {
+            width: data.newRepresentation?.width || null,
+            height: data.newRepresentation?.height || null,
+          },
+          framerate: data.newRepresentation?.frameRate || null,
+          codec: data.newRepresentation?.codecFamily || null,
+        },
+        media_type: data.mediaType,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("qualitychange_requested event fired");
+  }
+
+  /**
+   * Quality Change Rendered event
+   */
+  private async onQualityChangeRendered(data: any): Promise<void> {
+    if (!this.video || !data) return;
+    this.currentBitrate = data.newRepresentation?.bitrateInKbit || null;
+    this.currentResolution = {
+      width: data.newRepresentation?.width || null,
+      height: data.newRepresentation?.height || null,
+    };
+    this.currentFPS = data.newRepresentation?.frameRate || null;
+
+    const event = await this.eventCollector.createEvent(
+      "qualitychangecompleted",
+      {
+        bitrate_kb: this.currentBitrate,
+        media_type: data.mediaType,
+        resolution: this.currentResolution,
+        bits_per_pixel:
+          data.mediaType == "video"
+            ? data.newRepresentation.bitsPerPixel
+            : null,
+        video_width: this.video.videoWidth,
+        video_height: this.video.videoHeight,
+        framerate: this.currentFPS,
+        codec: data.newRepresentation?.codecFamily || null,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("qualitychange event fired");
   }
 
   /**
@@ -343,70 +546,6 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Quality Change Requested event
-   */
-  private async onQualityChangeRequested(data: any): Promise<void> {
-    if (!this.video || !data) return;
-    const event = await this.eventCollector.createEvent(
-      "qualitychangerequested",
-      {
-        old: {
-          bitrate_kb: data.oldRepresentation?.bitrateInKbit || null,
-          bandwidth: data.oldRepresentation?.bandwidth || null,
-          resolution: {
-            width: data.oldRepresentation?.width || null,
-            height: data.oldRepresentation?.height || null,
-          },
-          framerate: data.oldRepresentation?.frameRate || null,
-          codec: data.oldRepresentation?.codecFamily || null,
-        },
-        new: {
-          bitrate_kb: data.newRepresentation?.bitrateInKbit || null,
-          bandwidth: data.newRepresentation?.bandwidth || null,
-          resolution: {
-            width: data.newRepresentation?.width || null,
-            height: data.newRepresentation?.height || null,
-          },
-          framerate: data.newRepresentation?.frameRate || null,
-          codec: data.newRepresentation?.codecFamily || null,
-        },
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("qualitychange_requested event fired");
-  }
-
-  /**
-   * Quality Change Rendered event
-   */
-  private async onQualityChangeRendered(data: any): Promise<void> {
-    if (!this.video || !data) return;
-    this.currentBitrate = data.newRepresentation?.bitrateInKbit || null;
-    this.currentResolution = {
-      width: data.newRepresentation?.width || null,
-      height: data.newRepresentation?.height || null,
-    };
-    this.currentFPS = data.newRepresentation?.frameRate || null;
-
-    const event = await this.eventCollector.createEvent(
-      "qualitychangecompleted",
-      {
-        bitrate_kb: this.currentBitrate,
-        bandwidth: data.newRepresentation?.bandwidth || null,
-        resolution: this.currentResolution,
-        framerate: this.currentFPS,
-        codec: data.newRepresentation?.codecFamily || null,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("qualitychange event fired");
-  }
-
-  /**
    * Playback Error event
    */
   private async onPlaybackError(data: any): Promise<void> {
@@ -444,35 +583,6 @@ export class DashJsAdapter implements PlayerAdapter {
         error_family: errorFamily,
         error_data: data,
       },
-    });
-  }
-
-  /**
-   * Fragment Loaded event
-   */
-  private async onFragmentLoaded(data: any): Promise<void> {
-    if (!this.video || !data) return;
-    const event = await this.eventCollector.createEvent(
-      "fragmentloaded",
-      {
-        media_type: data.request?.mediaType,
-        type: data.request?.type,
-        duration: data.request?.duration,
-        size_bytes: data.request?.bytesLoaded,
-        total_bytes: data.request?.bytesTotal,
-        load_start: data.request?.availabilityStartTime,
-        load_complete: data.request?.delayLoadingTime,
-        bandwidth: data.request?.bandwidth,
-        service_location: data.request?.serviceLocation,
-        url: PrivacyModule.sanitizeUrl(data.request?.url),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("Fragment loaded", {
-      duration: data.request?.duration,
-      type: data.request?.type,
     });
   }
 
@@ -530,53 +640,6 @@ export class DashJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Buffer Level Change event
-   */
-  private async onBufferLevelChange(data: any): Promise<void> {
-    if (!this.video) return;
-    const event = await this.eventCollector.createEvent(
-      "bufferlevelchange",
-      {
-        state: data.state,
-        media_type: data.mediaType,
-        buffer_len_ms: this.getBufferLength(data.mediaType),
-        bitrate_kb: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("buffer_level_change event fired");
-  }
-
-  /**
-   * Bitrate Change event
-   */
-  private async onBitrateChange(data: any): Promise<void> {
-    if (!this.video || !data) return;
-    this.currentBitrate = data.currentRepresentation?.bitrateInKbit || null;
-    this.currentResolution = {
-      width: data.currentRepresentation?.width || null,
-      height: data.currentRepresentation?.height || null,
-    };
-    this.currentFPS = data.currentRepresentation?.frameRate || null;
-    const event = await this.eventCollector.createEvent(
-      "bitratechange",
-      {
-        bitrate_kb: this.currentBitrate,
-        bandwidth: data.currentRepresentation?.bandwidth || null,
-        resolution: this.currentResolution,
-        framerate: this.currentFPS,
-        codec: data.currentRepresentation?.codecFamily || null,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("bitratechange event fired");
-  }
-
-  /**
    * Playback Rate Change event
    */
   private async onPlaybackRateChanged(data: any): Promise<void> {
@@ -609,27 +672,6 @@ export class DashJsAdapter implements PlayerAdapter {
 
     this.batchManager.addEvent(event);
     this.logger.debug("playbackvolumechange event fired");
-  }
-
-  /**
-   * Error handler
-   */
-  private async onError(error: PlayerError): Promise<void> {
-    if (!this.video) return;
-
-    const event = await this.eventCollector.createEvent(
-      "error",
-      {
-        error_family: error.context?.error_family || "source",
-        error_code: String(error.code),
-        error_message: error.message,
-        error_context: error.context,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("error event fired", error);
   }
 
   /**
@@ -672,6 +714,27 @@ export class DashJsAdapter implements PlayerAdapter {
 
     this.lastPlaybackTime = this.video.currentTime;
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
+  }
+
+  /**
+   * Error handler
+   */
+  private async onError(error: PlayerError): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "error",
+      {
+        error_family: error.context?.error_family || "source",
+        error_code: String(error.code),
+        error_message: error.message,
+        error_context: error.context,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("error event fired", error);
   }
 
   /**

@@ -2,11 +2,11 @@
  * Event Collector - Collects and enriches events
  */
 
-import { BaseEvent, VideoMetadata, CMCDData, PlayerInfo } from '../types';
-import { Logger } from '../utils/logger';
-import { SessionManager } from './SessionManager';
-import { PrivacyModule } from '../utils/privacy';
-import { DeviceDetector } from '../utils/device';
+import { BaseEvent, VideoMetadata, CMCDData, PlayerInfo } from "../types";
+import { Logger } from "../utils/logger";
+import { SessionManager } from "./SessionManager";
+import { PrivacyModule } from "../utils/privacy";
+import { DeviceDetector } from "../utils/device";
 
 export class EventCollector {
   private orgId: string;
@@ -31,7 +31,7 @@ export class EventCollector {
     logger: Logger,
     env?: string,
     appName?: string,
-    appVersion?: string
+    appVersion?: string,
   ) {
     this.orgId = orgId;
     this.playerId = playerId;
@@ -52,7 +52,7 @@ export class EventCollector {
    */
   private async initializeViewerId(): Promise<void> {
     this.viewerId = await this.privacy.generateViewerId();
-    this.logger.debug('Viewer ID initialized');
+    this.logger.debug("Viewer ID initialized");
   }
 
   /**
@@ -76,7 +76,7 @@ export class EventCollector {
     eventType: string,
     data?: Record<string, any>,
     playbackTime?: number,
-    cmcd?: CMCDData
+    cmcd?: CMCDData,
   ): Promise<BaseEvent> {
     // Ensure viewer ID is initialized
     if (!this.viewerId) {
@@ -93,9 +93,9 @@ export class EventCollector {
       // Session identifiers
       org_id: this.orgId,
       player_id: this.playerId,
-      view_id: this.sessionManager.getViewId() || 'unknown',
-      session_id: this.sessionManager.getSessionId() || 'unknown',
-      viewer_id: this.viewerId || 'unknown',
+      view_id: this.sessionManager.getViewId() || "unknown",
+      session_id: this.sessionManager.getSessionId() || "unknown",
+      viewer_id: this.viewerId || "unknown",
 
       // Environment
       env: this.env,
@@ -110,20 +110,23 @@ export class EventCollector {
       network: await this.deviceDetector.getNetworkInfo(),
 
       // Video metadata
-      video: this.videoMetadata ? {
-        id: this.videoMetadata.videoId,
-        title: this.videoMetadata.videoTitle,
-        series: this.videoMetadata.videoSeries,
-        duration: this.videoMetadata.duration,
-        source_url: this.videoMetadata.sourceUrl ?
-          this.privacy.sanitizeUrl(this.videoMetadata.sourceUrl) : undefined
-      } : undefined,
+      video: this.videoMetadata
+        ? {
+            id: this.videoMetadata.videoId,
+            title: this.videoMetadata.videoTitle,
+            series: this.videoMetadata.videoSeries,
+            duration: this.videoMetadata.duration,
+            source_url: this.videoMetadata.sourceUrl
+              ? PrivacyModule.sanitizeUrl(this.videoMetadata.sourceUrl)
+              : undefined,
+          }
+        : undefined,
 
       // CMCD
       cmcd: cmcd,
 
       // Event-specific data
-      data: data
+      data: data,
     };
 
     // Sanitize event
@@ -137,7 +140,10 @@ export class EventCollector {
   /**
    * Track custom event
    */
-  async trackEvent(eventType: string, data?: Record<string, any>): Promise<BaseEvent> {
+  async trackEvent(
+    eventType: string,
+    data?: Record<string, any>,
+  ): Promise<BaseEvent> {
     return await this.createEvent(eventType, data);
   }
 }

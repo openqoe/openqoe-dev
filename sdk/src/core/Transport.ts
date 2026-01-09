@@ -66,7 +66,7 @@ export class Transport {
 
         // Success - remove from queue
         this.queueManager.dequeue();
-        this.logger.info(`Batch ${batch.id} sent successfully`);
+        this.logger.debug(`Batch ${batch.id} sent successfully`);
       } catch (error) {
         this.logger.error(`Failed to send batch ${batch.id}:`, error);
 
@@ -152,7 +152,7 @@ export class Transport {
       });
       const sent = navigator.sendBeacon(this.endpointUrl, blob);
       if (sent) {
-        this.logger.info(`Sent ${events.length} events via sendBeacon`);
+        this.logger.debug(`Sent ${events.length} events via sendBeacon`);
       } else {
         this.logger.warn("sendBeacon failed");
       }
