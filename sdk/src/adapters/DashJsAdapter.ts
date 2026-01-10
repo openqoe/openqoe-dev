@@ -408,7 +408,7 @@ export class DashJsAdapter implements PlayerAdapter {
     this.currentFPS = data.newRepresentation?.frameRate || null;
 
     const event = await this.eventCollector.createEvent(
-      "qualitychangecompleted",
+      "qualitychange",
       {
         bitrate_kb: this.currentBitrate,
         media_type: data.mediaType,
@@ -419,6 +419,9 @@ export class DashJsAdapter implements PlayerAdapter {
             : null,
         video_width: this.video.videoWidth,
         video_height: this.video.videoHeight,
+        player_width: this.player.offsetWidth,
+        player_height: this.player.offsetHeight,
+        device_pixel_ratio: window.devicePixelRatio,
         framerate: this.currentFPS,
         codec: data.newRepresentation?.codecFamily || null,
       },

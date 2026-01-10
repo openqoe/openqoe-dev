@@ -61,7 +61,9 @@ func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marke
 func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["player_startup_time"]; ok && val != nil {
 		ms.metrics.player_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.SetValueWithTTL("metrics:player_startup_time"+event.SessionId, strconv.FormatFloat(val.(float64), 'f', -1, 64), 10*time.Minute)
+		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+			"player_ready_ts": {First: strconv.FormatFloat(val.(float64), 'f', -1, 64), Second: 10 * time.Minute},
+		})
 	}
 }
 
@@ -165,23 +167,28 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, evnt
 	ms.config.Redis_client.DeleteHashField("metrics:session_analytics:"+event.SessionId, last_br)
 
 	ms.recordResolutionMetric(event, evnt_ctx, base_labels)
-
 	if val, ok := event.Data["bitrate_kb"]; ok && val != nil {
-		cur_br := val.(float64)
+		last_br_ren_ts_field_name := "last_bitrate_rendered_ts"
 		last_br_field_name := "last_bitrate"
-		last_qual_ren_ts_field_name := "last_quality_rendered_ts"
-		res_map, _ = ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{last_br_field_name, last_qual_ren_ts_field_name})
-		if res_map[last_br_field_name] != "" && res_map[last_qual_ren_ts_field_name] != "" {
-			last_br, _ := strconv.ParseFloat(res_map[last_br_field_name], 64)
-			last_qual_ren_ts, _ := strconv.ParseFloat(res_map[last_qual_ren_ts_field_name], 64)
+		cur_br := val.(float64)
+		res_map, _ = ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{last_br_field_name, last_br_ren_ts_field_name})
+		if res_map[last_br_field_name] != "" && res_map[last_br_ren_ts_field_name] != "" {
+			last_br, err := strconv.ParseFloat(res_map[last_br_field_name], 64)
+			if err != nil {
+				last_br = 0.00
+			}
+			last_qual_ren_ts, err := strconv.ParseFloat(res_map[last_br_ren_ts_field_name], 64)
+			if err != nil {
+				last_qual_ren_ts = 0.00
+			}
 			dur := event.PlaybackTime - last_qual_ren_ts
 			res := (last_br * dur) / event.PlaybackTime
 			ms.metrics.time_weighted_average_bitrate.Record(evnt_ctx, res, metric.WithAttributeSet(attributes))
 
 		}
 		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
-			last_br_field_name:          {First: strconv.FormatFloat(cur_br, 'f', -1, 64), Second: 15 * time.Minute},
-			last_qual_ren_ts_field_name: {First: strconv.FormatFloat(event.PlaybackTime, 'f', -1, 64), Second: 15 * time.Minute},
+			last_br_field_name:        {First: strconv.FormatFloat(cur_br, 'f', -1, 64), Second: 15 * time.Minute},
+			last_br_ren_ts_field_name: {First: strconv.FormatFloat(event.PlaybackTime, 'f', -1, 64), Second: 15 * time.Minute},
 		})
 		// had to make it 1 to avoid divide by 0
 		width := 1.00
@@ -195,23 +202,70 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, evnt
 		bpp := cur_br * 1000 / (width * height * framerate)
 		ms.metrics.perceived_quality_index.Record(evnt_ctx, bpp, metric.WithAttributeSet(attributes))
 	}
+	video_res := &resolution{
+		height: 0,
+		width:  0,
+	}
+	player_res := &resolution{
+		height: 0,
+		width:  0,
+	}
+	device_pixel_ratio := 1.00
+	if val, ok := event.Data["video_width"]; ok && val != nil {
+		video_res.width = int64(val.(float64))
+	}
+	if val, ok := event.Data["video_height"]; ok && val != nil {
+		video_res.height = int64(val.(float64))
+	}
+	if val, ok := event.Data["player_width"]; ok && val != nil {
+		player_res.width = int64(val.(float64))
+	}
+	if val, ok := event.Data["player_height"]; ok && val != nil {
+		player_res.height = int64(val.(float64))
+	}
+	if val, ok := event.Data["device_pixel_ratio"]; ok && val != nil {
+		device_pixel_ratio = val.(float64)
+	}
+	ms.metrics.resolution_to_player_ratio.Record(evnt_ctx, (float64(video_res.width*video_res.height)/float64(player_res.width*player_res.height))/device_pixel_ratio, metric.WithAttributeSet(attributes))
 
+	last_res_field_name := "last_resolution"
+	last_res_ren_ts_field_name := "last_resolution_rendered_ts"
+	res_map, _ = ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{last_res_field_name, last_res_ren_ts_field_name})
+	if res_map[last_res_field_name] != "" && res_map[last_res_ren_ts_field_name] != "" {
+		last_res, err := strconv.ParseInt(res_map[last_res_field_name], 10, 64)
+		if err != nil {
+			last_res = 0
+		}
+		last_res_rendered_ts, err := strconv.ParseFloat(res_map[last_res_ren_ts_field_name], 64)
+		if err != nil {
+			last_res_rendered_ts = 0.00
+		}
+		dur := event.PlaybackTime - last_res_rendered_ts
+		res := float64(last_res) * dur / event.PlaybackTime
+		ms.metrics.time_weighted_average_resolution.Record(evnt_ctx, res, metric.WithAttributeSet(attributes))
+	}
+	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+		last_res_field_name:        {First: strconv.FormatInt(video_res.width*video_res.height, 10), Second: 15 * time.Minute},
+		last_res_ren_ts_field_name: {First: strconv.FormatFloat(event.PlaybackTime, 'f', -1, 64), Second: 15 * time.Minute},
+	})
 }
 
 func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, evnt_ctx context.Context, base_attributes *attribute.Set) {
 	if val, ok := event.Data["video_startup_time"]; ok && val != nil {
-		res, err := ms.config.Redis_client.GetValue("metrics:player_startup_time" + event.SessionId)
+		player_ready_ts_field_name := "player_ready_ts"
+		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
 		if err != nil {
 			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
 		}
-		video_startup_time := val.(float64)
-		player_startup_time, err := strconv.ParseFloat(res, 64)
-		if err != nil {
-			ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+		if res_map[player_ready_ts_field_name] != "" {
+			player_ready_ts, err := strconv.ParseFloat(res_map[player_ready_ts_field_name], 64)
+			if err != nil {
+				ms.metrics.video_startup_time.Record(evnt_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+			}
+			dur := val.(float64) - player_ready_ts
+			ms.metrics.video_startup_time.Record(evnt_ctx, dur, metric.WithAttributeSet(*base_attributes))
 		}
-		dur := video_startup_time - player_startup_time
-		ms.metrics.video_startup_time.Record(evnt_ctx, dur, metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.Delete("metrics:player_startup_time" + event.SessionId)
+		ms.config.Redis_client.DeleteHashField("metrics:session_analytics:"+event.SessionId, player_ready_ts_field_name)
 	}
 }
 

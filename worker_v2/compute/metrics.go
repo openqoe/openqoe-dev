@@ -53,6 +53,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	)
 	rebuffer_events_total, _ := meter.Int64Counter("openqoe.rebuffer_events_total", metric.WithDescription("Total number of rebuffer events"))
 	resolution_total, _ := meter.Int64Counter("openqoe.resolution_total", metric.WithDescription("Total number of viewers who started watching the video"))
+	resolution_to_player_ratio, _ := meter.Float64Histogram("openqoe.resolution_to_player_ratio", metric.WithDescription("Ratio of resolution to player size. Shows under sampling and over sampling of video"), metric.WithUnit("ratio"), metric.WithExplicitBucketBoundaries(0.5, 0.9, 1.1, 2.1, 3.0))
 	seek_latency, _ := meter.Float64Histogram("openqoe.seek_latency",
 		metric.WithDescription("Latency of seeks"),
 		metric.WithUnit("ms"),
@@ -60,6 +61,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	)
 	seek_total, _ := meter.Int64Counter("openqoe.seek_total", metric.WithDescription("Total number of seeks"))
 	time_weighted_average_bitrate, _ := meter.Float64Gauge("openqoe.time_weighted_average_bitrate", metric.WithDescription("Time weighted average of the quality of the rendered video"))
+	time_weighted_average_resolution, _ := meter.Float64Gauge("openqoe.time_weighted_average_resolution", metric.WithDescription("Time weighted average of the resolution of the rendered video"))
 	video_startup_time, _ := meter.Float64Histogram("openqoe.video_startup_time",
 		metric.WithDescription("Time taken by video to start"),
 		metric.WithUnit("ms"),
@@ -73,44 +75,46 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 		cardinality_service: cardinality_service,
 		otel_service:        otelservice,
 		metrics: &computedMetrics{
-			buffer_instability_index:      buffer_instability_index,
-			buffer_length:                 buffer_length,
-			buffered_duration:             buffered_duration,
-			completion_rate:               completion_rate,
-			dropped_frames_total:          dropped_frames_total,
-			errors_total:                  errors_total,
-			events_total:                  events_total,
-			frag_duration:                 frag_duration,
-			frag_size:                     frag_size,
-			framerate:                     framerate,
-			heart_beat_bitrate:            heart_beat_rate_bps,
-			heart_beat_playing_time:       heart_beat_playing_time,
-			network_bandwidth:             network_bandwidth,
-			network_latency:               network_latency,
-			network_latency_deviation:     network_latency_deviation,
-			page_load_time:                page_load_time,
-			pause_events_total:            pause_events_total,
-			pause_playing_time:            pause_playing_time,
-			perceived_quality_index:       perceived_quality_index,
-			player_startup_time:           player_startup_time,
-			playing_time:                  playing_time,
-			quality_change_bitrate:        quality_change_bitrate,
-			quality_switch_latency:        quality_change_latency,
-			quality_change_old_bitrate:    quality_change_old_bitrate,
-			quality_change_request_total:  quality_change_req_total,
-			quality_change_total:          quality_change_total,
-			quartile_reached_total:        quartile_reached_total,
-			rebuffer_count:                rebuffer_count,
-			rebuffer_duration:             rebuffer_duration,
-			rebuffer_events_total:         rebuffer_events_total,
-			requested_bitrate:             requested_bitrate,
-			resolution_total:              resolution_total,
-			seek_latency:                  seek_latency,
-			seek_total:                    seek_total,
-			time_weighted_average_bitrate: time_weighted_average_bitrate,
-			video_startup_time:            video_startup_time,
-			views_completed_total:         views_completed_total,
-			views_started_total:           views_started_total,
+			buffer_instability_index:         buffer_instability_index,
+			buffer_length:                    buffer_length,
+			buffered_duration:                buffered_duration,
+			completion_rate:                  completion_rate,
+			dropped_frames_total:             dropped_frames_total,
+			errors_total:                     errors_total,
+			events_total:                     events_total,
+			frag_duration:                    frag_duration,
+			frag_size:                        frag_size,
+			framerate:                        framerate,
+			heart_beat_bitrate:               heart_beat_rate_bps,
+			heart_beat_playing_time:          heart_beat_playing_time,
+			network_bandwidth:                network_bandwidth,
+			network_latency:                  network_latency,
+			network_latency_deviation:        network_latency_deviation,
+			page_load_time:                   page_load_time,
+			pause_events_total:               pause_events_total,
+			pause_playing_time:               pause_playing_time,
+			perceived_quality_index:          perceived_quality_index,
+			player_startup_time:              player_startup_time,
+			playing_time:                     playing_time,
+			quality_change_bitrate:           quality_change_bitrate,
+			quality_switch_latency:           quality_change_latency,
+			quality_change_old_bitrate:       quality_change_old_bitrate,
+			quality_change_request_total:     quality_change_req_total,
+			quality_change_total:             quality_change_total,
+			quartile_reached_total:           quartile_reached_total,
+			rebuffer_count:                   rebuffer_count,
+			rebuffer_duration:                rebuffer_duration,
+			rebuffer_events_total:            rebuffer_events_total,
+			requested_bitrate:                requested_bitrate,
+			resolution_total:                 resolution_total,
+			resolution_to_player_ratio:       resolution_to_player_ratio,
+			seek_latency:                     seek_latency,
+			seek_total:                       seek_total,
+			time_weighted_average_bitrate:    time_weighted_average_bitrate,
+			time_weighted_average_resolution: time_weighted_average_resolution,
+			video_startup_time:               video_startup_time,
+			views_completed_total:            views_completed_total,
+			views_started_total:              views_started_total,
 		},
 	}
 }
@@ -141,12 +145,12 @@ func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, eve
 		ms.onBandwidthChange(&event, evnt_ctx, base_labels)
 	case "qualitychangerequested":
 		ms.onQualityChangeRequested(&event, evnt_ctx, base_labels)
+	case "qualitychange":
+		ms.onQualityChange(&event, evnt_ctx, base_labels)
 	case "canplay":
 		ms.onCanPlay(&event, evnt_ctx, &base_attributes)
 	case "playing":
 		ms.onPlaying(&event, evnt_ctx, &base_attributes)
-	case "qualitychange":
-		ms.onQualityChange(&event, evnt_ctx, base_labels)
 	case "stallstart":
 		ms.onStallStart(&event, evnt_ctx, &base_attributes)
 	case "stallend":
