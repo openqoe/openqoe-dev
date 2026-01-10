@@ -106,8 +106,8 @@ func (r *RedisConnection) SetOrUpdateHash(key string, value_with_ttl map[string]
 	return err
 }
 
-func (r *RedisConnection) DeleteHashField(key string, field string) error {
-	err := r.client.HDel(r.ctx, key, field).Err()
+func (r *RedisConnection) DeleteHashField(key string, fields []string) error {
+	err := r.client.HDel(r.ctx, key, fields...).Err()
 	if err != nil {
 		return err
 	}

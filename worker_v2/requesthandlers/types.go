@@ -68,7 +68,7 @@ type CMCDData struct {
 }
 
 type BaseEvent struct {
-	EventType    string  `json:"event_type" binding:"required,oneof=manifestload playerready canplay canplaythrough playing pause seek waitstart stallstart stallend ended error quartile heartbeat qualitychangerequested qualitychange fpsdrop fragmentloaded bufferlevelchange bandwidthchange playbackratechange playbackvolumechange playbackdetached"`
+	EventType    string  `json:"event_type" binding:"required,oneof=manifestload playerready canplay canplaythrough playing pause seek waitstart stallstart stallend ended error quartile heartbeat qualitychangerequested qualitychange fpsdrop fragmentloaded bufferlevelchange bandwidthchange playbackratechange playbackvolumechange playbackdetached exit"`
 	EventTime    int64   `json:"event_time" binding:"required,timecheck"`
 	ViewerTime   int     `json:"viewer_time" binding:"required"`
 	PlaybackTime float64 `json:"playback_time"`

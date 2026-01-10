@@ -3,18 +3,20 @@ package compute
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/otelservice"
 	"openqoe.dev/worker_v2/requesthandlers"
 )
 
-func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, otelservice *otelservice.OpenTelemetryService) *MetricsService {
+func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, otelservice *otelservice.OpenTelemetryService, parent_logger *zap.Logger) *MetricsService {
 	meter := otelservice.Meter
-
+	logger := parent_logger.With(zap.String("sub-component", "compute"))
 	// Metrics defined in lexicographical order by variable name
-	requested_bitrate, _ := meter.Float64Counter("openqoe.bitrate", metric.WithDescription("Change of bitrate in the video"), metric.WithUnit("bps"))
+	bitrate_change, _ := meter.Float64Counter("openqoe.bitrate_change", metric.WithDescription("Change of bitrate in the video"), metric.WithUnit("bps"))
 	buffer_instability_index, _ := meter.Float64Gauge("openqoe.buffer_instability_index", metric.WithDescription("Standard deviation of the buffer length from the moving average"))
 	// bucket boundaries are exponential following the curve:
 	// y = (e^(0.15x)-1)*100
@@ -25,6 +27,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	dropped_frames_total, _ := meter.Float64Gauge("openqoe.dropped_frames_total", metric.WithDescription("Total number of dropped frames"))
 	errors_total, _ := meter.Int64Counter("openqoe.errors_total", metric.WithDescription("Total number of errors"))
 	events_total, _ := meter.Int64Counter("openqoe.events_total", metric.WithDescription("Total number of events received"))
+	exit_without_play, _ := meter.Int64Counter("openqoe.exit_without_play", metric.WithDescription("Total number of user exits without playing"))
 	frag_duration, _ := meter.Int64Gauge("openqoe.fragment_duration", metric.WithDescription("duration of the current fragment"), metric.WithUnit("s"))
 	frag_size, _ := meter.Int64Gauge("openqoe.fragment_size", metric.WithDescription("size of the current fragment"), metric.WithUnit("bytes"))
 	framerate, _ := meter.Int64Gauge("openqoe.framerate", metric.WithDescription("frames per secons for the video"), metric.WithUnit("fps"))
@@ -45,13 +48,12 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	quality_change_req_total, _ := meter.Int64Counter("openqoe.quality_change_request_total", metric.WithDescription("Total number of quality change requests"))
 	quality_change_total, _ := meter.Int64Counter("openqoe.quality_change_total", metric.WithDescription("Total number of quality changes"))
 	quartile_reached_total, _ := meter.Int64Counter("openqoe.quartile_reached_total", metric.WithDescription("Total number of quartiles reached"))
-	rebuffer_count, _ := meter.Float64Gauge("openqoe.rebuffer_count", metric.WithDescription("Total number of rebuffer events"))
-	rebuffer_duration, _ := meter.Float64Histogram("openqoe.rebuffer_duration",
+	rebuffer_duration, _ := meter.Int64Histogram("openqoe.rebuffer_duration",
 		metric.WithDescription("Duration of rebuffer events"),
 		metric.WithUnit("ms"),
 		metric.WithExplicitBucketBoundaries(500, 1000, 2000, 3000, 5000, 10000, 30000),
 	)
-	rebuffer_events_total, _ := meter.Int64Counter("openqoe.rebuffer_events_total", metric.WithDescription("Total number of rebuffer events"))
+	rebuffer_events_count, _ := meter.Int64Counter("openqoe.rebuffer_events_count", metric.WithDescription("Count of rebuffer events"))
 	resolution_total, _ := meter.Int64Counter("openqoe.resolution_total", metric.WithDescription("Total number of viewers who started watching the video"))
 	resolution_to_player_ratio, _ := meter.Float64Histogram("openqoe.resolution_to_player_ratio", metric.WithDescription("Ratio of resolution to player size. Shows under sampling and over sampling of video"), metric.WithUnit("ratio"), metric.WithExplicitBucketBoundaries(0.5, 0.9, 1.1, 2.1, 3.0))
 	seek_latency, _ := meter.Float64Histogram("openqoe.seek_latency",
@@ -60,6 +62,8 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 		metric.WithExplicitBucketBoundaries(100, 250, 500, 1000, 2000, 5000),
 	)
 	seek_total, _ := meter.Int64Counter("openqoe.seek_total", metric.WithDescription("Total number of seeks"))
+	stall_position, _ := meter.Int64Histogram("openqoe.stall_position", metric.WithDescription("Position of stalls"), metric.WithUnit("ms"))
+	stay_duration, _ := meter.Int64Histogram("openqoe.stay_duration", metric.WithDescription("Duration of user staying on the page"), metric.WithUnit("ms"))
 	time_weighted_average_bitrate, _ := meter.Float64Gauge("openqoe.time_weighted_average_bitrate", metric.WithDescription("Time weighted average of the quality of the rendered video"))
 	time_weighted_average_resolution, _ := meter.Float64Gauge("openqoe.time_weighted_average_resolution", metric.WithDescription("Time weighted average of the resolution of the rendered video"))
 	video_startup_time, _ := meter.Float64Histogram("openqoe.video_startup_time",
@@ -74,14 +78,17 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 		config:              config,
 		cardinality_service: cardinality_service,
 		otel_service:        otelservice,
+		logger:              logger,
 		metrics: &computedMetrics{
 			buffer_instability_index:         buffer_instability_index,
+			bitrate_change:                   bitrate_change,
 			buffer_length:                    buffer_length,
 			buffered_duration:                buffered_duration,
 			completion_rate:                  completion_rate,
 			dropped_frames_total:             dropped_frames_total,
 			errors_total:                     errors_total,
 			events_total:                     events_total,
+			exit_without_play:                exit_without_play,
 			frag_duration:                    frag_duration,
 			frag_size:                        frag_size,
 			framerate:                        framerate,
@@ -102,14 +109,14 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 			quality_change_request_total:     quality_change_req_total,
 			quality_change_total:             quality_change_total,
 			quartile_reached_total:           quartile_reached_total,
-			rebuffer_count:                   rebuffer_count,
 			rebuffer_duration:                rebuffer_duration,
-			rebuffer_events_total:            rebuffer_events_total,
-			requested_bitrate:                requested_bitrate,
+			rebuffer_events_count:            rebuffer_events_count,
 			resolution_total:                 resolution_total,
 			resolution_to_player_ratio:       resolution_to_player_ratio,
 			seek_latency:                     seek_latency,
 			seek_total:                       seek_total,
+			stall_position:                   stall_position,
+			stay_duration:                    stay_duration,
 			time_weighted_average_bitrate:    time_weighted_average_bitrate,
 			time_weighted_average_resolution: time_weighted_average_resolution,
 			video_startup_time:               video_startup_time,
@@ -119,54 +126,58 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 	}
 }
 
-func (ms *MetricsService) ComputeMetrics(events_chunk *requesthandlers.IngestRequestWithContext, logger *zap.Logger) {
-	logger = logger.With(zap.String("sub-component", "metrics-compute-service"))
+func (ms *MetricsService) ComputeMetrics(events_chunk *requesthandlers.IngestRequestWithContext, tracer trace.Tracer, parent_span_ctx context.Context) {
+	logger := ms.logger.With(zap.String("method", "compute-metrics"))
 	for _, event := range events_chunk.Events {
-		logger.Debug("Processing event", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
-		ms.transformEventsToMetrics(events_chunk.Ctx, event, events_chunk.Marker)
-		logger.Debug("Event processing success", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
+		span_ctx, span := tracer.Start(parent_span_ctx, "compute-metrics", trace.WithSpanKind(trace.SpanKindInternal), trace.WithAttributes(attribute.String("event-type", event.EventType)))
+		logger.Debug("Processing event", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
+		ms.transformEventsToMetrics(span_ctx, event, events_chunk.Marker)
+		logger.Debug("Event processing success", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
+		span.End()
 	}
 }
 
-func (ms *MetricsService) transformEventsToMetrics(evnt_ctx context.Context, event requesthandlers.BaseEvent, marker string) {
+func (ms *MetricsService) transformEventsToMetrics(span_ctx context.Context, event requesthandlers.BaseEvent, marker string) {
 	base_labels := ms.extractBaseLabels(event, marker)
 	base_attributes := mapToAttributeSet(base_labels)
-	ms.metrics.events_total.Add(evnt_ctx, 1, metric.WithAttributeSet(base_attributes))
+	ms.metrics.events_total.Add(span_ctx, 1, metric.WithAttributeSet(base_attributes))
 	switch event.EventType {
 	case "fragmentloaded":
-		ms.onFragmentLoaded(&event, evnt_ctx, base_labels)
+		ms.onFragmentLoaded(&event, span_ctx, base_labels)
 	case "manifestload":
-		ms.onManifestLoad(&event, marker, evnt_ctx, &base_attributes)
+		ms.onManifestLoad(&event, marker, span_ctx, &base_attributes)
 	case "playerready":
-		ms.onPlayerReady(&event, evnt_ctx, &base_attributes)
+		ms.onPlayerReady(&event, span_ctx, &base_attributes)
 	case "bufferlevelchange":
-		ms.onBufferLevelChange(&event, evnt_ctx, &base_attributes, base_labels)
+		ms.onBufferLevelChange(&event, span_ctx, &base_attributes, base_labels)
 	case "bandwidthchange":
-		ms.onBandwidthChange(&event, evnt_ctx, base_labels)
+		ms.onBandwidthChange(&event, span_ctx, base_labels)
 	case "qualitychangerequested":
-		ms.onQualityChangeRequested(&event, evnt_ctx, base_labels)
+		ms.onQualityChangeRequested(&event, span_ctx, base_labels)
 	case "qualitychange":
-		ms.onQualityChange(&event, evnt_ctx, base_labels)
+		ms.onQualityChange(&event, span_ctx, base_labels)
 	case "canplay":
-		ms.onCanPlay(&event, evnt_ctx, &base_attributes)
+		ms.onCanPlay(&event, span_ctx, &base_attributes)
 	case "playing":
-		ms.onPlaying(&event, evnt_ctx, &base_attributes)
+		ms.onPlaying(&event, span_ctx, &base_attributes)
 	case "stallstart":
-		ms.onStallStart(&event, evnt_ctx, &base_attributes)
+		ms.onStallStart(&event, span_ctx, &base_attributes)
 	case "stallend":
-		ms.onStallEnd(&event, evnt_ctx, &base_attributes)
+		ms.onStallEnd(&event, span_ctx, &base_attributes)
 	case "seek":
-		ms.onSeek(&event, evnt_ctx, &base_attributes)
+		ms.onSeek(&event, span_ctx, &base_attributes)
 	case "ended":
-		ms.onEnded(&event, evnt_ctx, &base_attributes)
+		ms.onEnded(&event, span_ctx, &base_attributes)
 	case "error":
-		ms.onError(&event, evnt_ctx, base_labels)
+		ms.onError(&event, span_ctx, base_labels)
 	case "heartbeat":
-		ms.onHeartbeat(&event, evnt_ctx, &base_attributes)
+		ms.onHeartbeat(&event, span_ctx, &base_attributes)
 	case "quartile":
-		ms.onQuartile(&event, evnt_ctx, base_labels)
+		ms.onQuartile(&event, span_ctx, base_labels)
 	case "pause":
-		ms.onPause(&event, evnt_ctx, &base_attributes)
+		ms.onPause(&event, span_ctx, &base_attributes)
+	case "exit":
+		ms.onExit(&event, span_ctx, &base_attributes, base_labels)
 	default:
 		ms.otel_service.Logger.Warn("Unknown event type received for metrics computation", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}

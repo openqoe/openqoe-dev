@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/metric"
+	"go.uber.org/zap"
 	"openqoe.dev/worker_v2/config"
 	"openqoe.dev/worker_v2/otelservice"
 )
@@ -27,7 +28,7 @@ type resolution struct {
 	height int64
 }
 type computedMetrics struct {
-	requested_bitrate                metric.Float64Counter
+	bitrate_change                   metric.Float64Counter
 	buffer_instability_index         metric.Float64Gauge
 	buffer_length                    metric.Float64Histogram
 	buffered_duration                metric.Int64Counter
@@ -35,6 +36,7 @@ type computedMetrics struct {
 	dropped_frames_total             metric.Float64Gauge
 	errors_total                     metric.Int64Counter
 	events_total                     metric.Int64Counter
+	exit_without_play                metric.Int64Counter
 	frag_duration                    metric.Int64Gauge
 	frag_size                        metric.Int64Gauge
 	framerate                        metric.Int64Gauge
@@ -55,13 +57,14 @@ type computedMetrics struct {
 	quality_change_total             metric.Int64Counter
 	quality_switch_latency           metric.Int64Gauge
 	quartile_reached_total           metric.Int64Counter
-	rebuffer_count                   metric.Float64Gauge
-	rebuffer_duration                metric.Float64Histogram
-	rebuffer_events_total            metric.Int64Counter
+	rebuffer_duration                metric.Int64Histogram
+	rebuffer_events_count            metric.Int64Counter
 	resolution_total                 metric.Int64Counter
 	resolution_to_player_ratio       metric.Float64Histogram
 	seek_latency                     metric.Float64Histogram
 	seek_total                       metric.Int64Counter
+	stall_position                   metric.Int64Histogram
+	stay_duration                    metric.Int64Histogram
 	time_weighted_average_bitrate    metric.Float64Gauge
 	time_weighted_average_resolution metric.Float64Gauge
 	video_startup_time               metric.Float64Histogram
@@ -72,5 +75,6 @@ type MetricsService struct {
 	config              *config.Config
 	cardinality_service *config.CardinalityService
 	otel_service        *otelservice.OpenTelemetryService
+	logger              *zap.Logger
 	metrics             *computedMetrics
 }

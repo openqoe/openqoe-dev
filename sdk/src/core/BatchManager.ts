@@ -27,13 +27,9 @@ export class BatchManager {
     this.flushSyncCallback = flushSyncCallback;
     this.logger = logger;
 
-    // Set up beforeunload handler to flush on page unload
+    // Set up to flush on page unload
     if (typeof window !== "undefined") {
-      window.addEventListener("beforeunload", () => {
-        this.flushSync();
-      });
-
-      // Also handle visibility change
+      // Handle visibility change
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") {
           this.flushSync();
@@ -58,6 +54,17 @@ export class BatchManager {
     // Start timer if not already running
     if (!this.flushTimer) {
       this.startTimer();
+    }
+  }
+
+  addBeaconEventAndSend(event: BaseEvent): void {
+    this.batch.push(event);
+    this.logger.debug(`Event added to batch: ${event.event_type}`, event);
+
+    // Check if batch size reached
+    if (this.batch.length >= this.maxBatchSize) {
+      this.flushSync();
+      return;
     }
   }
 

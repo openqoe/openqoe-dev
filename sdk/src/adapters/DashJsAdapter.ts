@@ -22,10 +22,6 @@ export class DashJsAdapter implements PlayerAdapter {
   private batchManager: BatchManager;
   private logger: Logger;
   private metadata: VideoMetadata = {};
-  private readonly eventListeners: Map<
-    string,
-    EventListenerOrEventListenerObject
-  > = new Map();
   private dashEventHandlers: Map<string, Function> = new Map();
   private dashMetrics: any = null;
 
@@ -33,7 +29,6 @@ export class DashJsAdapter implements PlayerAdapter {
   private lastPlaybackTime: number = 0;
   private playingTime: number = 0;
   private watchTime: number = 0;
-  private stallStartTime: number | null = null;
   private viewStartTime: number | null = null;
   private seekStartTime: number = 0;
   private rebufferCount: number = 0;
@@ -45,10 +40,10 @@ export class DashJsAdapter implements PlayerAdapter {
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
   private bufferStats = { mean: 0, m2: 0, count: 0 };
-  private bufferSampleRate = 0.2; // 5% baseline sampling
+  private bufferSampleRate = 0.05; // 5% baseline sampling
   private bufferZThreshold = 2.0; // Report if data is > 2 standard deviations away
   private fragStats = { mean: 0, m2: 0, count: 0 };
-  private fragSampleRate = 0.3; // 10% baseline (slightly higher than buffer for network visibility)
+  private fragSampleRate = 0.1; // 10% baseline (slightly higher than buffer for network visibility)
   private fragZThreshold = 3.0; // Higher threshold (3.0) for network because latency is naturally jittery
 
   constructor(
@@ -61,6 +56,9 @@ export class DashJsAdapter implements PlayerAdapter {
     this.logger = logger;
   }
 
+  private beforeunload = () => {
+    this.onExit();
+  };
   /**
    * Attach to dash.js player
    */
@@ -96,6 +94,9 @@ export class DashJsAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", this.beforeunload);
+    }
 
     this.logger.info("DashJsAdapter attached");
   }
@@ -113,13 +114,7 @@ export class DashJsAdapter implements PlayerAdapter {
       this.player?.off(event, handler);
     });
     this.dashEventHandlers.clear();
-
-    // Remove video event listeners
-    this.eventListeners.forEach((listener, event) => {
-      this.video?.removeEventListener(event, listener);
-    });
-    this.eventListeners.clear();
-
+    window.removeEventListener("beforeunload", this.beforeunload);
     this.video = null;
     this.player = null;
     this.logger.info("DashJsAdapter detached");
@@ -174,7 +169,9 @@ export class DashJsAdapter implements PlayerAdapter {
     });
     this.onDash(events.PLAYBACK_PLAYING, (e: any) => this.onPlaying(e));
     this.onDash(events.PLAYBACK_PAUSED, () => this.onPause());
-    this.onDash(events.PLAYBACK_STARTED, () => this.onPlayingAfterWait());
+    this.onDash(events.PLAYBACK_STARTED, (e: any) =>
+      this.onPlayingAfterWait(e),
+    );
     this.onDash(events.PLAYBACK_ENDED, () => this.onEnded());
     this.onDash(events.PLAYBACK_ERROR, (e: any) => this.onPlaybackError(e));
     this.onDash(events.PLAYBACK_SEEKING, () => this.onSeeking());
@@ -244,6 +241,7 @@ export class DashJsAdapter implements PlayerAdapter {
           z_score: parseFloat(zScore.toFixed(2)),
           service_location: data.request.serviceLocation,
           url: PrivacyModule.sanitizeUrl(data.request.url),
+          frag_id: data.request.representation?.id,
           media_type: data.request.mediaType,
           type: data.request.type,
           is_outlier: isOutlier,
@@ -261,7 +259,6 @@ export class DashJsAdapter implements PlayerAdapter {
       );
     }
   }
-
   /**
    * Manifest Loading Start event
    */
@@ -419,8 +416,8 @@ export class DashJsAdapter implements PlayerAdapter {
             : null,
         video_width: this.video.videoWidth,
         video_height: this.video.videoHeight,
-        player_width: this.player.offsetWidth,
-        player_height: this.player.offsetHeight,
+        player_width: this.video.offsetWidth,
+        player_height: this.video.offsetHeight,
         device_pixel_ratio: window.devicePixelRatio,
         framerate: this.currentFPS,
         codec: data.newRepresentation?.codecFamily || null,
@@ -447,12 +444,12 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Playing event
    */
-  private async onPlaying(e: any): Promise<void> {
+  private async onPlaying(data: any): Promise<void> {
     if (!this.video) return;
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        playing_time: e.playingTime,
+        playing_time: data.playingTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: this.getFramerate(),
@@ -492,28 +489,19 @@ export class DashJsAdapter implements PlayerAdapter {
   /**
    * Playing after waiting - Stall End
    */
-  private async onPlayingAfterWait(): Promise<void> {
+  private async onPlayingAfterWait(data: any): Promise<void> {
     if (!this.video) return;
-
     // If we were stalled, fire stallend
-    if (this.stallStartTime !== null) {
-      const stallDuration = performance.now() - this.stallStartTime;
-      this.rebufferDuration += stallDuration;
-      this.rebufferCount++;
+    const event = await this.eventCollector.createEvent(
+      "stallend",
+      {
+        stall_position_secs: data.startTime,
+      },
+      this.video.currentTime * 1000,
+    );
 
-      const event = await this.eventCollector.createEvent(
-        "stallend",
-        {
-          stall_duration: stallDuration,
-          buffer_len_ms: this.getBufferLength(),
-        },
-        this.video.currentTime * 1000,
-      );
-
-      this.batchManager.addEvent(event);
-      this.stallStartTime = null;
-      this.logger.debug("stallend event fired");
-    }
+    this.batchManager.addEvent(event);
+    this.logger.debug("stallend event fired");
   }
 
   /**
@@ -625,9 +613,7 @@ export class DashJsAdapter implements PlayerAdapter {
    * Stall Start (waiting) event
    */
   private async onStallStart(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
+    if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
       "stallstart",
@@ -717,6 +703,12 @@ export class DashJsAdapter implements PlayerAdapter {
 
     this.lastPlaybackTime = this.video.currentTime;
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
+  }
+
+  private async onExit(): Promise<void> {
+    const event = await this.eventCollector.createEvent("exit", {}, 0);
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("exit event fired");
   }
 
   /**
