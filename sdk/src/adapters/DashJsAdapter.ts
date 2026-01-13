@@ -55,10 +55,6 @@ export class DashJsAdapter implements PlayerAdapter {
     this.batchManager = batchManager;
     this.logger = logger;
   }
-
-  private beforeunload = () => {
-    this.onExit();
-  };
   /**
    * Attach to dash.js player
    */
@@ -94,9 +90,8 @@ export class DashJsAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-    if (typeof window !== "undefined") {
-      window.addEventListener("beforeunload", this.beforeunload);
-    }
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
 
     this.logger.info("DashJsAdapter attached");
   }
@@ -114,11 +109,19 @@ export class DashJsAdapter implements PlayerAdapter {
       this.player?.off(event, handler);
     });
     this.dashEventHandlers.clear();
-    window.removeEventListener("beforeunload", this.beforeunload);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.player = null;
     this.logger.info("DashJsAdapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   private async resolveDashJS(): Promise<any> {
     // 1. Try global (browser UMD)
@@ -705,10 +708,28 @@ export class DashJsAdapter implements PlayerAdapter {
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
   }
 
-  private async onExit(): Promise<void> {
-    const event = await this.eventCollector.createEvent("exit", {}, 0);
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
     this.batchManager.addBeaconEventAndSend(event);
-    this.logger.debug("exit event fired");
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("entry event fired");
   }
 
   /**

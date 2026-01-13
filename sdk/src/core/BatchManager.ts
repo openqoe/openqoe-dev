@@ -29,11 +29,8 @@ export class BatchManager {
 
     // Set up to flush on page unload
     if (typeof window !== "undefined") {
-      // Handle visibility change
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") {
-          this.flushSync();
-        }
+      window.addEventListener("beforeunload", () => {
+        this.flushSync();
       });
     }
   }
@@ -59,13 +56,12 @@ export class BatchManager {
 
   addBeaconEventAndSend(event: BaseEvent): void {
     this.batch.push(event);
-    this.logger.debug(`Event added to batch: ${event.event_type}`, event);
-
-    // Check if batch size reached
-    if (this.batch.length >= this.maxBatchSize) {
-      this.flushSync();
-      return;
-    }
+    this.logger.debug(
+      `Beacon Event added to batch: ${event.event_type}`,
+      event,
+    );
+    this.flushSync();
+    return;
   }
 
   /**

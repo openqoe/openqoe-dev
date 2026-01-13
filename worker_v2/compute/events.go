@@ -390,7 +390,7 @@ func (ms *MetricsService) onQuartile(event *requesthandlers.BaseEvent, parent_sp
 	}
 }
 
-func (ms *MetricsService) onExit(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
+func (ms *MetricsService) onMoveAway(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
 	redis_key := "metrics:session_analytics:" + event.SessionId
 	field_names := []string{"page_entry", "marker", "played_ts"}
 	res_map, _ := ms.config.Redis_client.GetHashFields(redis_key, field_names)
@@ -401,4 +401,15 @@ func (ms *MetricsService) onExit(event *requesthandlers.BaseEvent, parent_span_c
 	stay_dur := event.EventTime - page_entry
 	ms.metrics.stay_duration.Record(parent_span_ctx, stay_dur, metric.WithAttributeSet(*base_attributes))
 	ms.config.Redis_client.DeleteHashField(redis_key, field_names)
+}
+
+func (ms *MetricsService) onMoveBack(event *requesthandlers.BaseEvent, marker string, parent_span_ctx context.Context, base_attributes *attribute.Set) {
+	//user came back they have not exited so reducing count
+	ms.metrics.exit_without_play.Add(parent_span_ctx, -1, metric.WithAttributeSet(*base_attributes))
+	page_entry := strconv.FormatInt(event.EventTime, 10)
+	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+		map[string]datastructure.Pair[string, time.Duration]{
+			"page_entry": {First: page_entry, Second: 24 * time.Hour},
+			"marker":     {First: marker, Second: 24 * time.Hour},
+		})
 }

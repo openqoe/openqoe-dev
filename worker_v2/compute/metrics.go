@@ -176,8 +176,10 @@ func (ms *MetricsService) transformEventsToMetrics(span_ctx context.Context, eve
 		ms.onQuartile(&event, span_ctx, base_labels)
 	case "pause":
 		ms.onPause(&event, span_ctx, &base_attributes)
-	case "exit":
-		ms.onExit(&event, span_ctx, &base_attributes, base_labels)
+	case "moveaway":
+		ms.onMoveAway(&event, span_ctx, &base_attributes, base_labels)
+	case "moveback":
+		ms.onMoveBack(&event, marker, span_ctx, &base_attributes)
 	default:
 		ms.otel_service.Logger.Warn("Unknown event type received for metrics computation", zap.String("event type", event.EventType), zap.String("view id", event.ViewId))
 	}
