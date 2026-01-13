@@ -384,69 +384,169 @@ openqoe:video_startup_seconds:p95
 
 ```
 openqoe/
-├── sdk/                          # JavaScript SDK
-│   ├── src/
-│   │   ├── adapters/            # Player adapters (5 total)
-│   │   ├── core/                # Core SDK modules
-│   │   │   ├── EventCollector.ts
-│   │   │   ├── SessionManager.ts
-│   │   │   ├── BatchManager.ts
-│   │   │   └── Transport.ts
-│   │   ├── utils/               # Privacy, device detection
-│   │   └── OpenQoE.ts           # Main SDK class
-│   ├── dist/                    # Built bundles
-│   └── package.json
-│
-├── worker/                       # Go Ingestion Worker
-│   ├── src/
-│   │   ├── index.ts             # Main handler
-│   │   ├── config.ts            # Configuration
-│   │   ├── destinations.ts      # Destination manager
-│   │   ├── validation.ts        # Event validation
-│   │   ├── prometheus.ts        # Histogram metrics
-│   │   ├── loki.ts              # Log transformation
-│   │   ├── cardinality.ts       # Cardinality governance
-│   │   └── auth.ts              # Authentication
-│   ├── wrangler.toml            # Worker configuration
-│   ├── validate.sh              # Pre-deployment validation
-│   └── package.json
-│
-├── observability/                # Observability stack
-│   ├── dashboards/              # 4 Grafana dashboards (58 panels)
-│   │   ├── vod-monitoring.json
-│   │   ├── live-streaming.json
-│   │   ├── quality-delivery.json
-│   │   └── impact-explorer.json
-│   ├── prometheus/
-│   │   └── rules/
-│   │       ├── openqoe-recording-rules.yml  # 25 rules
-│   │       ├── openqoe-alert-rules.yml      # 18 alerts
-│   │       └── load-rules.sh
-│   ├── mimir/
-│   │   ├── mimir-config.yml
-│   │   └── runtime.yml
-│   ├── loki/
-│   │   └── loki-config.yml
-│   └── grafana/
-│       └── provisioning/
-│
-├── examples/                     # Example/demo pages for all 5 players
-├── docs/                         # Documentation
-│   ├── deployment-guide.md
-│   ├── deployment-checklist.md
-│   ├── production-ready.md
-│   ├── sdk-integration.md
-│   ├── api-reference.md
-│   ├── architecture.md
-│   ├── data-model.md
-│   ├── technical-spec.md
-│   ├── contributing.md
-│   └── observability/
-│       ├── README.md
-│       └── dashboards.md
-├── compose.yml                   # Docker Compose stack
-├── LICENSE                       # Apache 2.0
-└── README.md                     # This file
+├── build
+│   ├── build.ninja
+│   ├── CMakeCache.txt
+│   ├── CMakeFiles
+│   │   ├── 3.28.3
+│   │   │   ├── CMakeCXXCompiler.cmake
+│   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   │   ├── CMakeSystem.cmake
+│   │   │   └── CompilerIdCXX
+│   │   │       ├── a.out
+│   │   │       ├── CMakeCXXCompilerId.cpp
+│   │   │       └── tmp
+│   │   ├── cmake.check_cache
+│   │   ├── CMakeConfigureLog.yaml
+│   │   ├── OpenQoEWorker.dir
+│   │   │   └── src
+│   │   ├── pkgRedirects
+│   │   ├── rules.ninja
+│   │   └── TargetDirectories.txt
+│   ├── cmake_install.cmake
+│   ├── compile_commands.json
+│   └── OpenQoEWorker
+├── compose.yaml
+├── docs
+│   ├── api-reference.md
+│   ├── architecture.md
+│   ├── contributing.md
+│   ├── data-model.md
+│   ├── deployment-checklist.md
+│   ├── deployment-guide.md
+│   ├── observability
+│   │   ├── dashboards.md
+│   │   └── README.md
+│   ├── production-ready.md
+│   ├── sdk-integration.md
+│   └── technical-spec.md
+├── examples
+│   ├── dashjs-demo
+│   │   └── index.html
+│   ├── DEMO_TEMPLATE.md
+│   ├── hlsjs-demo
+│   │   └── index.html
+│   ├── html5-demo
+│   │   └── index.html
+│   ├── README.md
+│   ├── shaka-demo
+│   │   └── index.html
+│   └── videojs-demo
+│       └── index.html
+├── LICENSE
+├── observability
+│   ├── alloy
+│   │   └── config.alloy
+│   ├── dashboards
+│   │   ├── impact-explorer.json
+│   │   ├── live-streaming.json
+│   │   ├── quality-delivery.json
+│   │   └── vod-monitoring.json
+│   ├── grafana
+│   │   └── provisioning
+│   │       ├── dashboards
+│   │       │   └── dashboards.yml
+│   │       └── datasources
+│   │           └── datasources.yml
+│   ├── GRAFANA_DASHBOARDS.md
+│   ├── loki
+│   │   └── loki-config.yaml
+│   ├── mimir
+│   │   ├── mimir-config.yml
+│   │   └── runtime.yml
+│   ├── prometheus
+│   │   ├── prometheus.yml
+│   │   └── rules
+│   │       ├── load-rules.sh
+│   │       ├── openqoe-alert-rules.yml
+│   │       └── openqoe-recording-rules.yml
+│   ├── README.md
+│   └── tempo
+│       └── tempo-config.yaml
+├── openqoe-dev.code-workspace
+├── README.md
+├── sdk
+│   ├── jest.config.js
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── README.md
+│   ├── rollup.config.js
+│   ├── src
+│   │   ├── adapters
+│   │   │   ├── DashJsAdapter.ts
+│   │   │   ├── HlsJsAdapter.ts
+│   │   │   ├── HTML5Adapter.ts
+│   │   │   ├── ShakaAdapter.ts
+│   │   │   └── VideoJsAdapter.ts
+│   │   ├── core
+│   │   │   ├── BatchManager.ts
+│   │   │   ├── EventCollector.ts
+│   │   │   ├── QueueManager.ts
+│   │   │   ├── RetryManager.ts
+│   │   │   ├── SessionManager.ts
+│   │   │   └── Transport.ts
+│   │   ├── index.ts
+│   │   ├── OpenQoE.ts
+│   │   ├── types.ts
+│   │   └── utils
+│   │       ├── device.ts
+│   │       ├── logger.ts
+│   │       └── privacy.ts
+│   ├── tests
+│   │   ├── core
+│   │   │   ├── BatchManager.test.ts
+│   │   │   └── SessionManager.test.ts
+│   │   └── utils
+│   │       └── privacy.test.ts
+│   └── tsconfig.json
+├── sonar-project.properties
+├── test
+│   ├── dashjs-test
+│   │   └── index.html
+│   ├── hlsjs-test
+│   │   └── index.html
+│   ├── html5-test
+│   │   └── index.html
+│   ├── shaka-test
+│   │   └── index.html
+│   └── videojs-test
+│       └── index.html
+└── worker
+    ├── compute
+    │   ├── events.go
+    │   ├── helpers.go
+    │   ├── metrics.go
+    │   ├── system_metrics.go
+    │   └── types.go
+    ├── config
+    │   ├── auth.go
+    │   ├── cardinality.go
+    │   ├── config.go
+    │   ├── destination.go
+    │   ├── env.go
+    │   └── redis.go
+    ├── data_structure
+    │   ├── pair.go
+    │   └── set.go
+    ├── Dockerfile
+    ├── go.mod
+    ├── go.sum
+    ├── main.go
+    ├── middlewares
+    │   ├── auth.go
+    │   └── headers.go
+    ├── otelservice
+    │   ├── setup.go
+    │   ├── tracer.go
+    │   └── types.go
+    ├── pool
+    │   └── worker.go
+    ├── README.md
+    └── requesthandlers
+        ├── controller.go
+        ├── markdevice.go
+        ├── requestvalidation.go
+        └── types.go
 ```
 
 ### Build SDK
