@@ -1,7 +1,7 @@
 # openqoe-core Technical Specification
 
-**Version:** 1.0
-**Last Updated:** 2025-11-04
+**Version:** 2.0.0
+**Last Updated:** January 2026
 **Status:** Final
 
 ---
@@ -13,7 +13,7 @@
 3. [Event Schema Specification](#event-schema-specification)
 4. [Metrics Specification](#metrics-specification)
 5. [Dimensions Catalog](#dimensions-catalog)
-6. [Cloudflare Worker Specification](#cloudflare-worker-specification)
+6. [Go Worker Specification](#go-worker-specification)
 7. [Backend Integration](#backend-integration)
 8. [CMCD Implementation](#cmcd-implementation)
 9. [Performance Requirements](#performance-requirements)
@@ -58,7 +58,7 @@
                      │ Batched Events (JSON)
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Cloudflare Worker (Edge Ingest)                │
+│               Go Worker (Ingest & OTLP)                     │
 │  ┌────────────────────────────────────────────────────┐    │
 │  │  Authentication & Validation Layer                  │    │
 │  │  - Token verification                               │    │
@@ -132,13 +132,11 @@
 | SDK Language | TypeScript | 5.x+ |
 | Build Tool | Rollup/Webpack | Latest |
 | Package Manager | npm/yarn | Latest |
-| Edge Compute | Cloudflare Workers | Runtime API v2 |
-| Metrics Backend | Prometheus/Mimir | 2.x+ |
-| Logs Backend | Grafana Loki | 2.x+ |
-| Visualization | Grafana | 10.x+ |
-| Transport Protocol | HTTPS | TLS 1.2+ |
-| Serialization | JSON | - |
-| Metrics Format | Prometheus remote_write | - |
+| Ingestion Worker | Go (1.21+) | - |
+| Telemetry Collector| Grafana Alloy | - |
+| Tracing Backend | Grafana Tempo | - |
+| Serialization | JSON (Ingest) / OTLP (Export) | - |
+| Metrics Format | OTLP / Prometheus | - |
 
 ---
 
@@ -805,66 +803,40 @@ All events share this base structure:
 
 ---
 
-## Cloudflare Worker Specification
+## Go Worker Specification
 
 ### 1. Worker Architecture
 
-```typescript
-// Worker entry point
-addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request));
-});
+The Go Worker uses the Gin web framework for HTTP handling and a buffered channel with a worker pool for OTLP export.
 
-async function handleRequest(request: Request): Promise<Response> {
-  // 1. Authentication
-  const authResult = await authenticate(request);
-  if (!authResult.valid) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+```go
+// Simplified main handler logic
+func handleEvents(c *gin.Context) {
+    var envelope EventEnvelope
+    if err := c.ShouldBindJSON(&envelope); err != nil {
+        c.JSON(400, gin.H{"error": "invalid schema"})
+        return
+    }
 
-  // 2. Parse & validate
-  const events = await request.json();
-  const validationResult = validateSchema(events);
-  if (!validationResult.valid) {
-    return new Response('Invalid schema', { status: 400 });
-  }
-
-  // 3. Privacy controls
-  const sanitizedEvents = applyPrivacyControls(events);
-
-  // 4. Cardinality governance
-  const governedEvents = applyCardinalityPolicies(sanitizedEvents);
-
-  // 5. Transform & route
-  await Promise.all([
-    sendToLoki(governedEvents),
-    sendToPrometheus(governedEvents)
-  ]);
-
-  return new Response('OK', { status: 200 });
+    // Push to internal queue for async OTLP export
+    eventQueue <- envelope.Events
+    c.Status(202) // Accepted
 }
 ```
 
-### 2. Authentication
+### 2. Implementation Modules
 
-```typescript
-interface AuthConfig {
-  tokenHeader: string;      // e.g., 'X-API-Token'
-  allowedTokens: string[];  // List of valid tokens
-}
+- **Ingestion**: Gin-based REST API for synchronous event reception.
+- **Enrichment**: Adds server-side context (e.g., GeoIP, User-Agent parsing).
+- **Governance**: Protects backends from cardinality explosion.
+- **Export**: OTLP-native exporter for Mimir, Loki, and Tempo.
 
-async function authenticate(request: Request): Promise<AuthResult> {
-  const token = request.headers.get('X-API-Token');
+### 3. Metric Transformation (OTLP)
 
-  // Verify token against KV store or secrets
-  const isValid = await KV.get(`token:${token}`);
-
-  return {
-    valid: !!isValid,
-    orgId: isValid?.orgId
-  };
-}
-```
+Events are mapped to OTel metrics:
+- `playing` → Gauge `openqoe_playing_status`
+- `stall_start/end` → Histogram `openqoe_rebuffer_duration_seconds`
+- `viewstart` → Counter `openqoe_views_started_total`
 
 ### 3. Schema Validation
 
@@ -999,11 +971,11 @@ async function sendToPrometheus(events: Event[]): Promise<void> {
 
 | Metric | Target | Measurement Method |
 |--------|--------|-------------------|
-| P50 Latency | < 50 ms | Cloudflare Analytics |
-| P95 Latency | < 100 ms | Cloudflare Analytics |
-| P99 Latency | < 200 ms | Cloudflare Analytics |
-| Success Rate | > 99.9% | Cloudflare Analytics |
-| CPU Time | < 50 ms | Cloudflare Workers Analytics |
+| P50 Latency | < 50 ms | Worker Internal Stats |
+| P95 Latency | < 100 ms | Worker Internal Stats |
+| P99 Latency | < 200 ms | Worker Internal Stats |
+| Success Rate | > 99.9% | Worker Internal Stats |
+| CPU Time | < 50 ms | Worker Metrics |
 
 ### End-to-End Latency
 
@@ -1044,7 +1016,7 @@ interface TokenConfig {
 ```
 SHA-256(value + per_org_salt)
 - Salt length: 32 bytes (256 bits)
-- Salt storage: Cloudflare KV / Secrets Manager
+- Salt storage: Environment Variables / Secrets Manager
 - Salt rotation: Supported (with migration period)
 ```
 

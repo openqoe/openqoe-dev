@@ -4,32 +4,17 @@ Complete validation checklist for deploying OpenQoE to production.
 
 ## Pre-Deployment Validation
 
-### 1. Worker Code Validation
-
-- [ ] **TypeScript compilation passes**
+- [ ] **Go code builds successfully**
   ```bash
   cd worker
-  npm run type-check
+  go build -o openqoe-worker
   ```
 
-- [ ] **Pre-deployment validation script passes**
-  ```bash
-  cd worker
-  ./validate.sh
-  ```
-
-- [ ] **All environment variables documented** in `wrangler.toml`
-
-- [ ] **Secrets configured** (do NOT commit to git)
-  - [ ] `API_KEY` (if authentication enabled)
-  - [ ] Destination credentials (Mimir/Loki or Grafana Cloud)
-
-- [ ] **KV namespace IDs updated** in `wrangler.toml`
-  ```bash
-  # Create KV namespace
-  wrangler kv:namespace create CARDINALITY_KV
-  # Update ID in wrangler.toml
-  ```
+- [ ] **Environment variables configured** (.env or shell)
+  - [ ] `OTEL_URL` (Alloy endpoint)
+  - [ ] `API_KEY` (Ingest authentication)
+  - [ ] `DESTINATION_TYPE` (SelfHosted or GrafanaCloud)
+  - [ ] `LOG_LEVEL` (info/debug)
 
 ### 2. SDK Validation
 
@@ -48,19 +33,11 @@ Complete validation checklist for deploying OpenQoE to production.
   # Visit http://localhost:8080 and test each player
   ```
 
-- [ ] **All 12 event types captured**
+- [ ] **All 24+ event types captured**
   - [ ] playerready
   - [ ] viewstart
   - [ ] playing
-  - [ ] pause
-  - [ ] seek
-  - [ ] stall_start
-  - [ ] stall_end
-  - [ ] ended
-  - [ ] error
-  - [ ] quartile
-  - [ ] heartbeat
-  - [ ] quality_change
+  - [ ] ... (see API Reference for full list)
 
 ### 3. Observability Stack Validation
 
@@ -187,41 +164,13 @@ Complete validation checklist for deploying OpenQoE to production.
    - Play video
    - Check Grafana dashboards for data
 
-### Option B: Production Deployment to Cloudflare
+1. [ ] **Configure environment variables** (see Step 1)
 
-1. [ ] **Configure production secrets**
+2. [ ] **Build and start worker**
    ```bash
    cd worker
-
-   # For self-hosted with public endpoints
-   wrangler secret put MIMIR_URL
-   wrangler secret put LOKI_URL
-   wrangler secret put API_KEY
-
-   # OR for Grafana Cloud
-   wrangler secret put GRAFANA_CLOUD_INSTANCE_ID
-   wrangler secret put GRAFANA_CLOUD_API_KEY
-   wrangler secret put GRAFANA_CLOUD_METRICS_URL
-   wrangler secret put GRAFANA_CLOUD_LOGS_URL
-   wrangler secret put API_KEY
-   ```
-
-2. [ ] **Update KV namespace IDs** in `wrangler.toml`
-
-3. [ ] **Deploy worker**
-   ```bash
-   wrangler deploy
-   # Note the worker URL
-   ```
-
-4. [ ] **Update SDK endpoint** in your application
-   ```javascript
-   OpenQoE.init({
-     orgId: 'your-org',
-     playerId: 'your-player',
-     endpointUrl: 'https://your-worker.workers.dev/v1/events',  // Update this
-     apiKey: 'your-api-key'
-   });
+   go build -o openqoe-worker
+   ./openqoe-worker
    ```
 
 5. [ ] **Test production deployment**
@@ -454,7 +403,7 @@ If deployment fails:
 
 1. [ ] **Rollback worker**
    ```bash
-   wrangler rollback
+   # Revert to previous stable container/binary version
    ```
 
 2. [ ] **Revert SDK changes** in your application

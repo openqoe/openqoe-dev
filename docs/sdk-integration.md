@@ -926,7 +926,7 @@ qoe.attachPlayer('html5', video2, {
 4. Check browser console for errors
 5. Enable debug mode: `debug: true, logLevel: 'debug'`
 6. Check network tab for failed requests
-7. Verify Cloudflare Worker is deployed
+7. Verify Go Worker is running
 
 **Debug:**
 ```javascript
@@ -964,7 +964,7 @@ const qoe = new OpenQoE({
 **Problem:** Browser blocks requests to ingest endpoint.
 
 **Solution:**
-Ensure Cloudflare Worker returns proper CORS headers:
+Ensure Go Worker returns proper CORS headers:
 ```javascript
 // Worker should include:
 {

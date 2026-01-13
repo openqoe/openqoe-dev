@@ -1,7 +1,7 @@
 # openqoe-core Architecture
 
-**Version:** 1.0
-**Last Updated:** 2025-11-04
+**Version:** 2.0.0
+**Last Updated:** January 2026
 
 ---
 
@@ -22,41 +22,38 @@
 
 ```mermaid
 graph TB
-    subgraph "Browser Environment"
-        VP[Video Player<br/>HTML5/Video.js/HLS.js/dash.js/Shaka]
+    subgraph "Your Application"
+        VP[Video Player<br/>Dash.js - Ready]
         SDK[openqoe-core SDK]
         VP -->|events| SDK
     end
 
-    subgraph "Cloudflare Edge"
-        WORKER[Ingest Worker<br/>Auth, Validate, Transform]
+    subgraph "Worker Environment"
+        WORKER[Go Worker<br/>Auth, Validate, Forward]
     end
 
-    subgraph "Backend (Option 1: Grafana Cloud)"
-        LOKI_CLOUD[Grafana Cloud Loki]
-        PROM_CLOUD[Grafana Cloud Prometheus]
-        GRAF_CLOUD[Grafana Cloud]
+    subgraph "Observability Pipeline"
+        ALLOY[Grafana Alloy<br/>Collector & Processor]
+        LOKI[Grafana Loki]
+        MIMIR[Grafana Mimir]
+        TEMPO[Grafana Tempo]
     end
 
-    subgraph "Backend (Option 2: Self-Hosted)"
-        LOKI_SELF[Loki]
-        PROM_SELF[Prometheus]
-        GRAF_SELF[Grafana]
+    subgraph "Visualization"
+        GRAF[Grafana]
     end
 
-    SDK -->|HTTPS<br/>Batched JSON| WORKER
-    WORKER -->|HTTP POST<br/>JSON| LOKI_CLOUD
-    WORKER -->|remote_write<br/>Protobuf| PROM_CLOUD
-    WORKER -.->|HTTP POST<br/>JSON| LOKI_SELF
-    WORKER -.->|remote_write<br/>Protobuf| PROM_SELF
+    SDK -->|HTTPS /v2/events| WORKER
+    WORKER -->|OTLP| ALLOY
+    ALLOY -->|Logs| LOKI
+    ALLOY -->|Metrics| MIMIR
+    ALLOY -->|Traces| TEMPO
 
-    LOKI_CLOUD --> GRAF_CLOUD
-    PROM_CLOUD --> GRAF_CLOUD
-    LOKI_SELF -.-> GRAF_SELF
-    PROM_SELF -.-> GRAF_SELF
+    LOKI --> GRAF
+    MIMIR --> GRAF
+    TEMPO --> GRAF
 
-    GRAF_CLOUD -->|Alerts| ALERT[Alert Channels<br/>Slack/PagerDuty/Email]
-    GRAF_SELF -.->|Alerts| ALERT
+    GRAF -->|Alerts| ALERT[Alert Channels]
 ```
 
 ---
@@ -217,90 +214,42 @@ classDiagram
 
 ---
 
-### 4. Cloudflare Worker Architecture
+### 4. Go Worker Architecture
 
 ```mermaid
 graph TB
     subgraph "Worker Request Flow"
-        REQUEST[Incoming Request]
-        AUTH[Authentication<br/>Layer]
-        VALIDATE[Validation<br/>Layer]
-        PII[PII Control<br/>Layer]
-        CARDINALITY[Cardinality<br/>Governance Layer]
-        TRANSFORM[Transform &<br/>Route Layer]
-        RESPONSE[Response]
+        REQUEST[Incoming Request /v2/events]
+        GIN[Gin Gonic Web Framework]
+        AUTH[Authentication Middleware]
+        VALIDATE[Request Validator]
+        CHAN[Event Channel / Queue]
+        POOL[Worker Pool]
+        OTEL[OTLP Exporter]
+        RESPONSE[Response 202 Accepted]
     end
 
-    REQUEST --> AUTH
-    AUTH -->|Valid| VALIDATE
-    AUTH -->|Invalid| RESPONSE_401[401 Unauthorized]
-
-    VALIDATE -->|Valid| PII
-    VALIDATE -->|Invalid| RESPONSE_400[400 Bad Request]
-
-    PII -->|Pass| CARDINALITY
-    PII -->|Fail| RESPONSE_403[403 PII Violation]
-
-    CARDINALITY -->|Pass| TRANSFORM
-    CARDINALITY -->|Partial| TRANSFORM
-    CARDINALITY -->|Reject All| RESPONSE_429[429 Quota Exceeded]
-
-    TRANSFORM -->|Success| RESPONSE_200[200 OK]
-    TRANSFORM -->|Partial| RESPONSE_207[207 Multi-Status]
-    TRANSFORM -->|Fail| RESPONSE_500[500 Server Error]
-
-    subgraph "Transform & Route"
-        TRANSFORM --> LOKI_TRANSFORM[Loki Transform]
-        TRANSFORM --> PROM_TRANSFORM[Prom Transform]
-        LOKI_TRANSFORM --> LOKI[Loki HTTP POST]
-        PROM_TRANSFORM --> PROM[Prometheus remote_write]
-        LOKI --> CB[Circuit Breaker]
-        PROM --> CB
-    end
+    REQUEST --> GIN
+    GIN --> AUTH
+    AUTH --> VALIDATE
+    VALIDATE --> RESPONSE
+    VALIDATE --> CHAN
+    CHAN --> POOL
+    POOL --> OTEL
 ```
 
 ### 5. Worker Module Responsibilities
 
-```mermaid
-graph LR
-    subgraph "Authentication Layer"
-        A1[Token Extraction]
-        A2[Token Verification<br/>KV Store]
-        A3[Org ID Resolution]
-    end
-
-    subgraph "Validation Layer"
-        V1[JSON Parsing]
-        V2[Schema Validation<br/>JSON Schema]
-        V3[Version Check]
-    end
-
-    subgraph "PII Control Layer"
-        P1[Hash Verification]
-        P2[Allowlist Check]
-        P3[Redaction Engine]
-    end
-
-    subgraph "Cardinality Governance"
-        C1[Policy Lookup<br/>Per-org]
-        C2[Allow/Bucket/Hash/Drop]
-        C3[Top-K Bucketing]
-        C4[Quota Enforcement]
-        C5[Reject Metrics]
-    end
-
-    subgraph "Transform & Route"
-        T1[Event → Loki JSON]
-        T2[Event → Prom Metrics]
-        T3[Batch Accumulator]
-        T4[Circuit Breaker]
-        T5[Retry Logic]
-    end
-```
+| Module | Responsibility |
+|--------|----------------|
+| **Gin Framework** | HTTP routing, middleware management, health checks |
+| **Auth Middleware** | API key verification and Org ID resolution |
+| **Request Validator** | Schema validation using Go Struct tags |
+| **Worker Pool** | Concurrent processing of events from the queue |
+| **Cardinality Service** | Governance of dimension values to prevent explosion |
+| **OTLP Exporter** | Exporting metrics, logs, and traces to Alloy |
 
 ---
-
-## Data Flow Diagrams
 
 ### 1. Event Lifecycle
 
@@ -309,39 +258,22 @@ sequenceDiagram
     participant Player as Video Player
     participant Adapter as PlayerAdapter
     participant Collector as Event Collector
-    participant Privacy as Privacy Module
-    participant Batch as Batch Manager
-    participant Queue as Offline Queue
-    participant HTTP as HTTP Client
-    participant Worker as CF Worker
-    participant Loki as Loki
-    participant Prom as Prometheus
+    participant SDK as SDK Transport
+    participant Worker as Go Worker
+    participant Alloy as Grafana Alloy
+    participant Backends as Mimir/Loki/Tempo
 
     Player->>Adapter: play event
     Adapter->>Collector: onPlaying()
     Collector->>Collector: Enrich with context
-    Collector->>Privacy: sanitize(event)
-    Privacy->>Privacy: Hash PII fields
-    Privacy->>Batch: addEvent(event)
-
-    Note over Batch: Accumulate until<br/>batch size or interval
-
-    Batch->>Queue: enqueue(batch)
-    Queue->>HTTP: send(batch)
-    HTTP->>Worker: POST /v1/events
-
-    Worker->>Worker: Authenticate
-    Worker->>Worker: Validate schema
-    Worker->>Worker: Apply PII controls
-    Worker->>Worker: Apply cardinality policies
-    Worker->>Loki: POST /loki/api/v1/push
-    Worker->>Prom: POST /api/v1/write
-
-    Loki-->>Worker: 200 OK
-    Prom-->>Worker: 200 OK
-    Worker-->>HTTP: 200 OK
-    HTTP-->>Queue: Success
-    Queue->>Queue: Dequeue batch
+    Collector->>SDK: track(event)
+    SDK->>Worker: POST /v2/events
+    Worker->>Worker: Auth & Validate
+    Worker-->>SDK: 202 Accepted
+    Worker->>Worker: Add to internal queue
+    Worker->>Alloy: OTLP Push
+    Alloy->>Alloy: Batch & Process
+    Alloy->>Backends: Export (Mimir/Loki/Tempo)
 ```
 
 ### 2. Error Handling Flow
@@ -349,36 +281,24 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant SDK as SDK
-    participant HTTP as HTTP Client
-    participant Queue as Offline Queue
-    participant Worker as CF Worker
+    participant Worker as Go Worker
+    participant Alloy as Grafana Alloy
 
-    SDK->>Queue: enqueue(batch)
-    Queue->>HTTP: send(batch)
-    HTTP->>Worker: POST /v1/events
-
+    SDK->>Worker: POST /v2/events
     alt Success
-        Worker-->>HTTP: 200 OK
-        HTTP-->>Queue: Success
-        Queue->>Queue: Dequeue batch
-    else Network Error
-        HTTP->>HTTP: Exponential backoff
-        HTTP->>Worker: Retry (attempt 2)
-        Worker-->>HTTP: 200 OK
+        Worker-->>SDK: 202 Accepted
+    else Auth Failure
+        Worker-->>SDK: 401 Unauthorized
+    else Validation Error
+        Worker-->>SDK: 400 Bad Request
     else Rate Limit
-        Worker-->>HTTP: 429 Rate Limit
-        HTTP->>HTTP: Backoff (60s)
-        HTTP->>Queue: Re-enqueue for later
-    else Schema Error
-        Worker-->>HTTP: 400 Bad Request
-        HTTP-->>Queue: Permanent failure
-        Queue->>Queue: Discard batch
-        Queue->>Queue: Log error
-    else Downstream Failure
-        Worker->>Worker: Circuit breaker OPEN
-        Worker-->>HTTP: 503 Service Unavailable
-        HTTP->>HTTP: Exponential backoff
-        HTTP->>Queue: Re-enqueue
+        Worker-->>SDK: 429 Too Many Requests
+    end
+
+    alt Downstream Error
+        Worker->>Alloy: Push OTLP
+        Alloy--XWorker: Connection Refused
+        Worker->>Worker: Retry with Backoff
     end
 ```
 
@@ -451,7 +371,7 @@ graph TB
 
     subgraph "Production"
         SDK_PROD[SDK Prod Build<br/>npm registry]
-        WORKER_PROD[Worker Prod<br/>Cloudflare Edge]
+        WORKER_PROD[Worker Prod<br/>Go / Container]
 
         subgraph "Option 1: Grafana Cloud"
             LOKI_CLOUD[Grafana Cloud Loki]
@@ -540,7 +460,7 @@ graph TB
         SCHEMA[Schema Validation]
         RATE_LIMIT[Rate Limiting]
         PII_CONTROL[PII Controls]
-        SECRETS_MGR[Secrets Manager<br/>KV/Wrangler]
+        SECRETS_MGR[Secrets Manager<br/>Environment Variables]
     end
 
     subgraph "Backend Security"
@@ -573,7 +493,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant SDK as SDK (Browser)
-    participant Worker as CF Worker
+    participant Worker as Go Worker
     participant KV as KV Store
     participant Backend as Backend
 

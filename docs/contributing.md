@@ -60,14 +60,11 @@ Found a bug? Help us fix it by submitting a detailed bug report.
 - **Screenshots**: If applicable
 
 **Example Bug Report:**
-```markdown
-## Bug: Dashboard shows "No Data" after worker deployment
-
 ### Description
-After deploying the worker to Cloudflare, the Grafana dashboards show "No Data" despite events being sent from the SDK.
+After deploying the Go worker, the Grafana dashboards show "No Data" despite events being sent from the SDK.
 
 ### Steps to Reproduce
-1. Deploy worker: `wrangler deploy`
+1. Start worker: `./openqoe-worker`
 2. Configure SDK with worker URL
 3. Generate test events
 4. Open VOD Monitoring dashboard
@@ -80,9 +77,9 @@ Dashboard panels should display metrics within 1-2 minutes
 All panels remain empty after 10 minutes
 
 ### Environment
-- OpenQoE version: 1.0.0
-- Node.js: v20.10.0
-- Deployment: Cloudflare Workers + Self-hosted Mimir
+- OpenQoE version: 2.0.0
+- Go version: 1.21.x
+- Deployment: Go Worker + Grafana Alloy + Mimir
 - Browser: Chrome 120
 
 ### Logs
@@ -191,7 +188,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
 - **Node.js**: v18.0.0 or higher
 - **npm**: v9.0.0 or higher
 - **Docker**: For running observability stack
-- **Wrangler CLI**: For worker development (`npm install -g wrangler`)
+- **Go**: v1.21.0 or higher
 - **Git**: For version control
 
 ### Setup Instructions
@@ -206,51 +203,30 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    git remote add upstream https://github.com/openqoe/openqoe-dev.git
    ```
 
-2. **Install Dependencies**
+1. **Install Dependencies**
    ```bash
-   # Install worker dependencies
+   # Build Go worker
    cd worker
-   npm install
+   go mod download
+   go build -o openqoe-worker
 
-   # Install SDK dependencies (if working on SDK)
+   # Install SDK dependencies
    cd ../sdk
    npm install
    ```
 
-3. **Start Observability Stack**
+2. **Start Observability Stack**
    ```bash
    # From project root
    docker compose up -d
-
-   # Verify all services are healthy
-   docker compose ps
-
-   # Load recording rules
-   cd observability/prometheus/rules
-   ./load-rules.sh http://localhost:9009
-
-   # Load alert rules
-   curl -X POST \
-     "http://localhost:9009/prometheus/config/v1/rules/anonymous" \
-     -H "Content-Type: application/yaml" \
-     --data-binary "@openqoe-alert-rules.yml"
    ```
 
-4. **Configure Worker**
+3. **Run Worker Locally**
    ```bash
    cd worker
-   cp .dev.vars.example .dev.vars
-
-   # Edit .dev.vars with your local configuration:
-   # - MIMIR_URL=http://localhost:9009/api/v1/push
-   # - LOKI_URL=http://localhost:3100/loki/api/v1/push
-   # - API_KEY=test-key
-   ```
-
-5. **Run Worker Locally**
-   ```bash
-   npm run dev
-   # Worker runs at http://localhost:8787
+   cp .env.example .env
+   # Set OTEL_URL=http://localhost:4317
+   ./openqoe-worker
    ```
 
 6. **Test Your Changes**

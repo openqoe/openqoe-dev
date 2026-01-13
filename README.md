@@ -3,13 +3,14 @@
 **Open-Source Video Quality of Experience (QoE) Monitoring Platform**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](docs/production-ready.md)
+[![Production Ready](https://img.shields.io/badge/Status-Dash.js%20Ready-brightgreen.svg)](docs/production-ready.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://go.dev/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/contributing.md)
 
-> **Production-grade video quality monitoring for web video players with comprehensive business and technical metrics, accurate percentile calculations, and real-time alerting.**
+> **Production-grade video quality monitoring for web video players with comprehensive business and technical metrics, accurate percentile calculations, real-time alerting, and distributed tracing.**
 
-> **This project needs active contribution from the experts in video tech, players and opensource developers. Let's build it together**
+> **OpenQoE v2 is now live with a Go-based worker and OTLP-based observability pipeline.**
 
 ---
 
@@ -42,12 +43,14 @@ OpenQoE is a complete, production-ready observability platform for video streami
 
 | Component | Description | Status |
 |-----------|-------------|--------|
-| **JavaScript SDK** | 5 player adapters capturing 12 event types | ✅ Production Ready |
-| **Cloudflare Worker** | Edge ingestion with validation & routing | ✅ Production Ready |
+| **JavaScript SDK** | 5 player adapters capturing 24+ event types | ✅ Dash.js Ready / 🏗️ Others WIP |
+| **Go Worker** | High-performance OTLP ingestion & processing | ✅ Production Ready |
+| **Grafana Alloy** | Edge telemetry collector & processor | ✅ Production Ready |
 | **Grafana Dashboards** | 4 comprehensive dashboards (58 panels total) | ✅ Production Ready |
 | **Recording Rules** | 25 pre-aggregated metrics for performance | ✅ Production Ready |
 | **Alert Rules** | 18 production-ready alerts | ✅ Production Ready |
-| **Docker Stack** | Self-hosted Mimir + Loki + Grafana | ✅ Production Ready |
+| **Distributed Tracing** | End-to-end tracing with Grafana Tempo | ✅ Production Ready |
+| **Docker Stack** | Self-hosted Mimir + Loki + Tempo + Alloy | ✅ Production Ready |
 
 ---
 
@@ -55,100 +58,68 @@ OpenQoE is a complete, production-ready observability platform for video streami
 
 ### SDK Capabilities
 
-- ✅ **Multi-Player Support**: HTML5, Video.js, HLS.js, dash.js, Shaka Player
-- ✅ **Comprehensive Events**: 12 event types with full context capture
+- ✅ **Multi-Player Support**: HTML5, Video.js, HLS.js, Dash.js, Shaka Player
+- ✅ **Dash.js Production Ready**: Robust integration for MPEG-DASH
+- 🏗️ **WIP Adapters**: Other players are in active development
+- ✅ **Comprehensive Events**: 24+ event types with full context capture
 - ✅ **Privacy-First**: SHA-256 hashing, configurable PII controls
-- ✅ **Offline Support**: LocalStorage-backed queue with exponential backoff retry
 - ✅ **Lightweight**: ~10KB gzipped per adapter
 - ✅ **TypeScript**: Full type definitions included
-- ✅ **Framework Agnostic**: Works with React, Vue, Angular, vanilla JS
 
-### Worker Features
+### Go Worker Features
 
-- ✅ **Histogram Metrics**: Accurate P50/P95/P99 percentile calculations
-- ✅ **Dual Destinations**: Self-hosted (Mimir/Loki) or Grafana Cloud
-- ✅ **Authentication**: Secure header-based API key auth
-- ✅ **Validation**: Comprehensive event schema validation with whitelisting
+- ✅ **OTLP Ingestion**: Native support for OpenTelemetry protocol
+- ✅ **High Concurrency**: Built with Go for scalable event processing
 - ✅ **Cardinality Governance**: Automatic high-cardinality dimension management
-- ✅ **Timeout Protection**: 10-second timeout on all HTTP requests
-- ✅ **Configuration Validation**: Fails fast with clear error messages
-- ✅ **Edge Deployment**: Runs on Cloudflare's global network
+- ✅ **Dual Destinations**: Self-hosted or Grafana Cloud
+- ✅ **Health Monitoring**: Integrated health and stats endpoints
 
 ### Observability Stack
 
-- ✅ **4 Production Dashboards**: VOD, Live Streaming, Quality & Delivery, Impact Explorer
-- ✅ **58 Dashboard Panels**: Comprehensive business + technical coverage
-- ✅ **25 Recording Rules**: Pre-aggregated metrics for 10-50x faster queries
-- ✅ **18 Alert Rules**: Critical quality, business impact, performance, live streaming alerts
-- ✅ **Histogram Support**: Accurate percentile calculations (not approximations)
-- ✅ **Multi-Tenancy**: Full Grafana Cloud support with X-Scope-OrgID header
-- ✅ **Self-Hosted**: Complete Docker Compose stack included
+- ✅ **Full OTLP Pipeline**: Alloy -> Mimir/Loki/Tempo
+- ✅ **Distributed Tracing**: End-to-end visibility with Tempo
+- ✅ **4 Production Dashboards**: VOD, Live, Quality, Impact Explorer
+- ✅ **18 Alert Rules**: Critical quality and performance alerts
+- ✅ **Self-Hosted**: Complete Docker Compose stack (Mimir, Loki, Tempo, Alloy, Grafana)
 
 ---
 
 ## 🏗️ Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                      Your Application                     │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
-│  │ HTML5   │  │Video.js │  │ HLS.js  │  │dash.js/ │    │
-│  │ Player  │  │ Player  │  │ Player  │  │  Shaka  │    │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘    │
-│       └────────────┴─────────────┴────────────┘          │
-│                         │                                 │
-│                 ┌───────▼────────┐                       │
-│                 │  OpenQoE SDK   │                       │
-│                 │  (12 events)   │                       │
-│                 └───────┬────────┘                       │
-└─────────────────────────┼──────────────────────────────┘
-                          │ HTTPS POST /v1/events
-                          ▼
-         ┌────────────────────────────────┐
-         │   Cloudflare Worker (Edge)     │
-         │  • Authentication              │
-         │  • Validation & Sanitization   │
-         │  • Cardinality Governance      │
-         │  • Transform to Histograms     │
-         └────────┬───────────────┬───────┘
-                  │               │
-        Metrics   │               │   Logs
-                  ▼               ▼
-      ┌──────────────┐   ┌──────────────┐
-      │    Mimir     │   │     Loki     │
-      │  (Metrics)   │   │    (Logs)    │
-      │ Prometheus-  │   │ Log          │
-      │ compatible   │   │ Aggregation  │
-      └──────┬───────┘   └──────┬───────┘
-             │                  │
-             └────────┬─────────┘
-                      ▼
-           ┌────────────────────┐
-           │      Grafana       │
-           │  • 4 Dashboards    │
-           │  • 58 Panels       │
-           │  • Recording Rules │
-           │  • Alert Rules     │
-           └────────────────────┘
+```mermaid
+graph TD
+    subgraph "Your Application"
+        SDK[OpenQoE SDK]
+        P1["Dash.js - Ready"]
+        P2["Others - WIP"]
+        P1 -.-> SDK
+        P2 -.-> SDK
+    end
+
+    SDK -- "HTTPS POST /v2/events" --> Worker[Go Worker]
+
+    subgraph "Observability Pipeline"
+        Worker -- "OTLP" --> Alloy[Grafana Alloy]
+        Alloy -- "Metrics" --> Mimir[Grafana Mimir]
+        Alloy -- "Logs" --> Loki[Grafana Loki]
+        Alloy -- "Traces" --> Tempo[Grafana Tempo]
+    end
+
+    subgraph "Visualization"
+        Mimir --- Grafana[Grafana]
+        Loki --- Grafana
+        Tempo --- Grafana
+    end
 ```
 
 **Flow**:
-1. SDK captures events from video players (all major web players supported)
-2. Events batched and sent to Cloudflare Worker edge endpoint
-3. Worker validates, enriches, and transforms to histogram metrics
-4. Metrics sent to Mimir (Prometheus-compatible), logs to Loki
-5. Grafana visualizes with pre-built dashboards and alerts
+1. SDK captures events from video players (Dash.js production ready)
+2. Events batched and sent to Go Worker (`/v2/events`)
+3. Worker validates and forwards via OTLP to Grafana Alloy
+4. Alloy routes data to Mimir (metrics), Loki (logs), and Tempo (traces)
+5. Grafana visualizes with pre-built dashboards and unified observability
 
 ---
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- Docker & Docker Compose v2
-- Cloudflare account (for worker deployment)
-- OR Grafana Cloud account (alternative to self-hosting)
 
 ### 1. Clone Repository
 
@@ -160,91 +131,72 @@ cd openqoe
 ### 2. Start Observability Stack
 
 ```bash
-# Start Mimir, Loki, and Grafana
+# Start Mimir, Loki, Tempo, Alloy, and Grafana
 docker compose up -d
 
 # Verify all services are healthy
 docker compose ps
-
-# Access Grafana at http://localhost:3000 (admin/admin)
 ```
 
-### 3. Load Recording & Alert Rules
-
-```bash
-cd observability/prometheus/rules
-
-# Load recording rules
-./load-rules.sh http://localhost:9009
-
-# Load alert rules
-curl -X POST \
-  "http://localhost:9009/prometheus/config/v1/rules/anonymous" \
-  -H "Content-Type: application/yaml" \
-  --data-binary "@openqoe-alert-rules.yml"
-```
-
-### 4. Deploy Worker (Local Development)
+### 3. Start Go Worker
 
 ```bash
 cd worker
 
-# Install dependencies
-npm install
+# Install dependencies & build
+go mod download
+go build -o openqoe-worker
 
-# Create local config
-cp .dev.vars.example .dev.vars
+# Configure environment (OTEL_URL=http://localhost:4317)
+cp .env.example .env
 
-# Edit .dev.vars with localhost URLs:
-# MIMIR_URL=http://localhost:9009/api/v1/push
-# LOKI_URL=http://localhost:3100/loki/api/v1/push
-
-# Run locally
-npm run dev
-# Worker available at http://localhost:8787
+# Run the worker
+./openqoe-worker
+# Worker available at http://localhost:8788
 ```
 
-### 5. Integrate SDK
+### 4. Integrate SDK (Dash.js Example)
 
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Video Player Example</title>
-</head>
-<body>
-  <video id="myVideo" controls width="640">
-    <source src="https://example.com/video.mp4" type="video/mp4">
-  </video>
+<script type="module">
+  import { OpenQoE } from './sdk/dist/index.js';
 
-  <script type="module">
-    import { OpenQoE } from './sdk/dist/index.js';
+  const qoe = new OpenQoE({
+    orgId: 'my-org',
+    playerId: 'my-website',
+    endpointUrl: 'http://localhost:8788/v2/events'
+  });
 
-    // Initialize SDK
-    const qoe = new OpenQoE({
-      orgId: 'my-org',
-      playerId: 'my-website',
-      endpointUrl: 'http://localhost:8787/v1/events',
-      debug: true
-    });
+  const player = dashjs.MediaPlayer().create();
+  player.initialize(videoElement, url, true);
 
-    // Attach to player
-    const video = document.getElementById('myVideo');
-    qoe.attachPlayer('html5', video, {
-      videoId: 'demo-video-123',
-      videoTitle: 'Demo Video'
-    });
-
-    // SDK will now automatically track all events!
-  </script>
-</body>
-</html>
+  qoe.attachPlayer('dashjs', player, {
+    videoId: 'video-123',
+    videoTitle: 'Production Stream'
+  });
+</script>
 ```
 
-### 6. View Dashboards
+### 5. View Dashboards & Traces
 
-1. Open Grafana: http://localhost:3000
+1. Open Grafana: http://localhost:3000 (admin/admin)
 2. Navigate to **Dashboards** → **OpenQoE** folder
+3. Explore **VOD Monitoring** or **Impact Explorer**
+4. Use the **Explore** tab to view distributed traces in Tempo
+
+**OpenQoE v2 is ready!** 🚀
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Deployment Guide](docs/deployment-guide.md) | V2 setup with Go Worker and Alloy |
+| [API Reference](docs/api-reference.md) | V2 Event Schemas and OTLP details |
+| [SDK Integration](docs/sdk-integration.md) | Dash.js focus (other players WIP) |
+| [Architecture](docs/architecture.md) | Distributed observability pipeline |
+| [Production Ready](docs/production-ready.md) | Production readiness report (Dash.js) |
 3. Open **VOD Monitoring** dashboard
 4. Play a video and watch metrics appear in real-time!
 
@@ -316,26 +268,24 @@ cd worker && npm run dev
 **Best for**: Managed service, zero infrastructure, global scale
 
 ```bash
-# Configure worker with Grafana Cloud credentials
-cd worker
-wrangler secret put GRAFANA_CLOUD_INSTANCE_ID
-wrangler secret put GRAFANA_CLOUD_API_KEY
-wrangler secret put GRAFANA_CLOUD_METRICS_URL
-wrangler secret put GRAFANA_CLOUD_LOGS_URL
+# Configure worker in .env
+DESTINATION_TYPE=GrafanaCloud
+GRAFANA_CLOUD_INSTANCE_ID=123456
+GRAFANA_CLOUD_API_KEY=your-api-key
 
-# Deploy to Cloudflare
-wrangler deploy
+# Run worker
+./openqoe-worker
 ```
 
 **Docs**: [Grafana Cloud Deployment](docs/deployment-guide.md#option-3-grafana-cloud)
 
 ---
 
-### Option 3: Hybrid (Self-Hosted + Cloudflare Worker)
+### Option 3: Hybrid (Self-Hosted + Managed Worker)
 
-**Best for**: Edge ingestion with on-premise storage
+**Best for**: Distributed ingestion with on-premise storage
 
-Combine Cloudflare Worker for global edge ingestion with self-hosted observability stack.
+Combine regional Go workers for global ingestion with a central self-hosted observability stack.
 
 **Docs**: [Hybrid Deployment](docs/deployment-guide.md#network-connectivity-for-self-hosted-deployments)
 
@@ -399,17 +349,17 @@ openqoe:video_startup_seconds:p95
 
 ## 🎨 Supported Players
 
-| Player | Version | Adapter | Events | Status |
-|--------|---------|---------|--------|--------|
-| **HTML5 Video** | Native | `HTML5Adapter` | 11/12* | ✅ Production |
-| **Video.js** | 7.0+ | `VideoJsAdapter` | 12/12 | ✅ Production |
-| **HLS.js** | 1.0+ | `HlsJsAdapter` | 12/12 | ✅ Production |
-| **dash.js** | 4.0+ | `DashJsAdapter` | 12/12 | ✅ Production |
-| **Shaka Player** | 4.0+ | `ShakaAdapter` | 12/12 | ✅ Production |
+| Player | Adapter | Status |
+|--------|---------|--------|
+| **Dash.js** | `DashJsAdapter` | ✅ **Production Ready** |
+| **HTML5** | `HTML5Adapter` | 🏗️ Work In Progress |
+| **Video.js** | `VideoJsAdapter` | 🏗️ Work In Progress |
+| **HLS.js** | `HlsJsAdapter` | 🏗️ Work In Progress |
+| **Shaka Player** | `ShakaAdapter` | 🏗️ Work In Progress |
 
 *HTML5 doesn't support `quality_change` events (no native ABR)
 
-### Events Tracked (12 Total)
+### Events Tracked (24+ Total)
 
 | Event | Description | Business Value |
 |-------|-------------|----------------|
@@ -447,7 +397,7 @@ openqoe/
 │   ├── dist/                    # Built bundles
 │   └── package.json
 │
-├── worker/                       # Cloudflare Worker
+├── worker/                       # Go Ingestion Worker
 │   ├── src/
 │   │   ├── index.ts             # Main handler
 │   │   ├── config.ts            # Configuration
@@ -613,9 +563,9 @@ Inspired by commercial QoE monitoring solutions for continuous improvement and i
 
 ## 📈 Project Status
 
-**Current Version**: 1.0.0
-**Status**: ✅ **Production Ready**
-**Last Updated**: November 2024
+**Current Version**: 2.0.0
+**Status**: ✅ **Dash.js Ready** / 🏗️ **Core v2 In Beta**
+**Last Updated**: January 2026
 
 See [docs/production-ready.md](docs/production-ready.md) for complete production readiness report.
 

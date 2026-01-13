@@ -1,7 +1,7 @@
 # openqoe-core API Reference
 
-**Version:** 1.0
-**Last Updated:** 2025-11-04
+**Version:** 2.0.0
+**Last Updated:** January 2026
 
 ---
 
@@ -149,19 +149,31 @@ Manually track a custom event.
 
 ```typescript
 type EventType =
+  | 'manifestload'
   | 'playerready'
-  | 'viewstart'
+  | 'canplay'
+  | 'canplaythrough'
   | 'playing'
   | 'pause'
   | 'seek'
-  | 'stall_start'
-  | 'stall_end'
-  | 'quality_change'
+  | 'waitstart'
+  | 'stallstart'
+  | 'stallend'
   | 'ended'
   | 'error'
   | 'quartile'
   | 'heartbeat'
-  | string;  // Custom event types allowed
+  | 'qualitychangerequested'
+  | 'qualitychange'
+  | 'fpsdrop'
+  | 'fragmentloaded'
+  | 'bufferlevelchange'
+  | 'bandwidthchange'
+  | 'playbackratechange'
+  | 'playbackvolumechange'
+  | 'playbackdetached'
+  | 'moveaway'
+  | 'moveback';
 
 data: Record<string, any>;
 ```
@@ -258,11 +270,11 @@ Get the current configuration.
 
 ## Ingest API
 
-### POST /v1/events
+### POST /v2/events
 
-Submit events to the ingest endpoint.
+Submit events (OTLP formatted by worker) to the ingest endpoint.
 
-**Endpoint:** `https://ingest.openqoe.example.com/v1/events`
+**Endpoint:** `http://localhost:8788/v2/events`
 
 **Method:** `POST`
 
@@ -271,7 +283,7 @@ Submit events to the ingest endpoint.
 ```http
 Content-Type: application/json
 X-API-Token: <your-api-token>
-X-SDK-Version: 1.0.0
+X-SDK-Version: 2.0.0
 ```
 
 **Request Body:**
@@ -280,10 +292,10 @@ X-SDK-Version: 1.0.0
 {
   "events": [
     {
-      "event_type": "viewstart",
+      "event_type": "playing",
       "event_time": 1699564800000,
-      "viewer_time": 1699564800000,
-      "playback_time": 0,
+      "viewer_time": 4500,
+      "playback_time": 0.5,
 
       "org_id": "org_abc123",
       "player_id": "player_xyz789",
@@ -295,24 +307,13 @@ X-SDK-Version: 1.0.0
       "app_name": "MyVideoApp",
       "app_version": "2.1.0",
 
-      "device": {
-        "name": "MacBook Pro",
-        "category": "desktop"
-      },
-      "os": {
-        "family": "macOS",
-        "version": "14.1"
-      },
-      "browser": {
-        "family": "Chrome",
-        "version": "120.0.0"
-      },
-
-      "video": {
-        "id": "video_123",
-        "title": "Sample Video",
-        "duration": 120000
-      },
+      "device": { "name": "iPhone", "model": "15 Pro", "category": "mobile", "manufacturer": "Apple" },
+      "os": { "family": "iOS", "version": "17.0" },
+      "browser": { "family": "Safari", "version": "17.0" },
+      "player": { "name": "dashjs", "version": "4.7.0", "autoplay": true, "preload": "auto" },
+      "network": { "asn": 16509, "country_code": "US", "region": "CA", "city": "San Jose" },
+      "cdn": { "provider": "Akamai", "edge_pop": "SJC-1", "origin": "aws-s3" },
+      "video": { "id": "vid_123", "title": "Example Video", "series": "S1", "duration": 120, "source_url": "..." },
 
       "data": {
         "video_startup_time": 450
@@ -324,43 +325,25 @@ X-SDK-Version: 1.0.0
 
 **Response:**
 
-**Success (200 OK):**
+**Success (202 Accepted):**
 
 ```json
 {
-  "status": "ok",
-  "accepted": 10,
-  "rejected": 0
+  "success": true,
+  "message": "Events accepted",
+  "events_received": 10,
+  "processing_time_ns": 1250000
 }
 ```
 
-**Partial Success (207 Multi-Status):**
+**Error (429 Too Many Requests):**
 
 ```json
 {
-  "status": "partial",
-  "accepted": 8,
-  "rejected": 2,
-  "errors": [
-    {
-      "index": 3,
-      "error": "Invalid schema: missing required field 'org_id'"
-    },
-    {
-      "index": 7,
-      "error": "Quota exceeded for org_id 'org_abc123'"
-    }
-  ]
-}
-```
-
-**Error (400 Bad Request):**
-
-```json
-{
-  "status": "error",
-  "error": "Invalid JSON",
-  "message": "Request body is not valid JSON"
+  "success": false,
+  "message": "Server overload",
+  "events_received": 10,
+  "processing_time_ns": 1500000
 }
 ```
 
@@ -387,7 +370,7 @@ X-SDK-Version: 1.0.0
 
 ---
 
-### GET /v1/health
+### GET /v2/health
 
 Health check endpoint.
 
@@ -411,11 +394,11 @@ Health check endpoint.
 
 ---
 
-### GET /v1/metrics
+### GET /v2/stats
 
-Worker operational metrics (Prometheus format).
+Worker operational stats and cardinality information.
 
-**Endpoint:** `https://ingest.openqoe.example.com/v1/metrics`
+**Endpoint:** `http://localhost:8788/v2/stats`
 
 **Method:** `GET`
 

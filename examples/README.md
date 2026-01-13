@@ -4,89 +4,29 @@ This directory contains demo applications for testing the OpenQoE SDK with diffe
 
 ## Available Demos
 
-### 1. HTML5 Demo (`html5-demo/`)
-✅ **Complete** - Basic HTML5 video player with event capture
+### 1. Dash.js Demo (`dashjs-demo/`)
+✅ **Complete** - Production ready for OpenQoE v2
 
 **Features:**
-- Custom video URL input
-- Real-time event display
-- Session information
-- Download events as JSON
-- No backend ingestion (testing mode)
-- Keyboard shortcuts (Space, Arrow keys, C)
-
-**Run:**
-```bash
-cd examples/html5-demo
-npx http-server -p 8080
-# Open http://localhost:8080
-```
-
-### 2. Video.js Demo (`videojs-demo/`)
-✅ **Complete** - Video.js player with OpenQoE SDK
-
-**Features:**
-- Video.js 8.x integration
-- Same UI as HTML5 demo
-- Custom plugins and themes
-- Adaptive bitrate streaming support
-
-**Run:**
-```bash
-cd examples/videojs-demo
-npx http-server -p 8080
-# Open http://localhost:8080
-```
-
-### 3. HLS.js Demo (`hlsjs-demo/`)
-✅ **Complete** - HLS.js player for HLS streaming
-
-**Features:**
-- HLS.js integration
-- M3U8 stream support
-- Quality level switching
-- Fragment load tracking
-- Native HLS fallback for Safari
-
-**Run:**
-```bash
-cd examples/hlsjs-demo
-npx http-server -p 8080
-# Open http://localhost:8080
-```
-
-### 4. Dash.js Demo (`dashjs-demo/`)
-✅ **Complete** - Dash.js player for MPEG-DASH
-
-**Features:**
-- Dash.js integration
-- MPD manifest support
-- Adaptive streaming
-- Buffer metrics
+- Full v2 event coverage (24+ events)
+- Adaptive bitrate tracking
+- OTLP integration testing
+- Real-time buffer metrics
 
 **Run:**
 ```bash
 cd examples/dashjs-demo
 npx http-server -p 8080
-# Open http://localhost:8080
 ```
 
-### 5. Shaka Player Demo (`shaka-demo/`)
-✅ **Complete** - Shaka Player for adaptive streaming
+### 2. Other Player Demos
+🏗️ **Work in Progress** - Core v2 compatibility pending
 
-**Features:**
-- Shaka Player integration
-- DASH and HLS support
-- Multi-codec support
-- Advanced metrics
-- Built-in UI controls
-
-**Run:**
-```bash
-cd examples/shaka-demo
-npx http-server -p 8080
-# Open http://localhost:8080
-```
+The following demos are being updated for v2.0.0 architecture:
+- **HTML5 Demo** (`html5-demo/`)
+- **Video.js Demo** (`videojs-demo/`)
+- **HLS.js Demo** (`hlsjs-demo/`)
+- **Shaka Player Demo** (`shaka-demo/`)
 
 ## Demo Features (All Players)
 
@@ -194,27 +134,27 @@ Developers can use these demos as:
 
 ```
 ┌─────────────────┐
-│   Video Player  │ (HTML5/Video.js/HLS.js/etc)
+│   Video Player  │ (Dash.js / HTML5 / etc)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Player Adapter │ (HTML5Adapter, VideoJsAdapter, etc)
+│  Player Adapter │ (DashjsAdapter, etc)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  OpenQoE Core   │ (Event Collection & Processing)
+│  OpenQoE SDK    │ (Event Collection & Transport)
 └────────┬────────┘
-         │
+         │ POST /v2/events
          ▼
 ┌─────────────────┐
-│ Event Interceptor│ (Captures events locally in demo)
+│  Go Worker      │ (Ingestion & OTLP Export)
 └────────┬────────┘
-         │
+         │ OTLP
          ▼
 ┌─────────────────┐
-│   UI Display    │ (Real-time event visualization)
+│ Grafana Alloy   │ (Collector / Processor)
 └─────────────────┘
 ```
 

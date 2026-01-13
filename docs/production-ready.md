@@ -1,8 +1,8 @@
 # OpenQoE - Production Ready Status
 
-**Status**: ✅ **PRODUCTION READY** (MVP Complete)
-**Date**: November 5, 2025
-**Version**: 1.0.0
+**Status**: ✅ **DASH.JS READY** / 🏗️ **CORE V2 IN BETA**
+**Date**: January 2026
+**Version**: 2.0.0
 
 ---
 
@@ -12,37 +12,25 @@ OpenQoE is **100% production-ready** for business-critical video QoE monitoring.
 
 ### What's Included
 
-- ✅ **5 Player SDK Adapters** - Capture all 12 QoE events
-- ✅ **Cloudflare Worker** - Validate, transform, and route events
+- ✅ **Dash.js SDK Adapter** - Production ready for MPEG-DASH
+- 🏗️ **Other Player SDK Adapters** - Work in Progress for v2
+- ✅ **Go Worker** - High-performance OTLP ingestion
+- ✅ **Grafana Alloy** - OTLP collection and processing
+- ✅ **Grafana Tempo** - end-to-end distributed tracing
+- ✅ **24+ Event Types** - Comprehensive playback context
 - ✅ **4 Grafana Dashboards** - Complete business + technical monitoring
-- ✅ **25 Recording Rules** - Pre-aggregated metrics for performance
-- ✅ **18 Alert Rules** - Production-ready alerting
-- ✅ **Histogram Metrics** - Accurate P50/P95/P99 percentile calculations
-- ✅ **Self-Hosted Stack** - Docker Compose with Mimir + Loki + Grafana
-- ✅ **Grafana Cloud Support** - Full multi-tenant support
-- ✅ **Complete Documentation** - Deployment guides, API reference, dashboards
+- ✅ **Production-grade Alerting** - 18 pre-built alerts
+- ✅ **Self-Hosted Stack** - Docker Compose (v2 stack)
 
-### Deployment Options
+### SDK Adapter Status
 
-1. **Self-Hosted** - Complete Docker stack (Mimir + Loki + Grafana)
-2. **Hybrid** - Self-hosted observability + Cloudflare worker
-3. **Grafana Cloud** - Fully managed Grafana Cloud Metrics + Logs
-
----
-
-## Component Status
-
-### 1. SDK - ✅ COMPLETE (Production Ready)
-
-**Location**: `/sdk`
-
-| Player Adapter | Events | Status | Production Ready |
-|---------------|--------|--------|------------------|
-| HTML5 | 11/12 | ✅ Complete | YES |
-| Video.js | 12/12 | ✅ Complete | YES |
-| HLS.js | 12/12 | ✅ Complete | YES |
-| dash.js | 12/12 | ✅ Complete | YES |
-| Shaka Player | 12/12 | ✅ Complete | YES |
+| Player Adapter | Status | Production Ready |
+|---------------|--------|------------------|
+| Dash.js | ✅ Complete | **YES** |
+| HTML5 | 🏗️ WIP | NO |
+| Video.js | 🏗️ WIP | NO |
+| HLS.js | 🏗️ WIP | NO |
+| Shaka Player | 🏗️ WIP | NO |
 
 **Features**:
 - All 12 event types captured (playerready, viewstart, playing, pause, seek, stall_start, stall_end, ended, error, quartile, heartbeat, quality_change)
@@ -58,32 +46,18 @@ OpenQoE is **100% production-ready** for business-critical video QoE monitoring.
 
 ---
 
-### 2. Worker - ✅ COMPLETE (Production Ready)
+### 2. Go Worker - ✅ COMPLETE (Production Ready)
 
 **Location**: `/worker`
-
-**Endpoint**: `POST /v1/events`
+**Endpoint**: `POST /v2/events`
 
 **Features**:
-- ✅ Event validation with whitelist
-- ✅ Histogram metrics for accurate percentiles (VST, rebuffer duration, seek latency)
-- ✅ Resolution tracking (NEW)
-- ✅ Header-based authentication (secure)
-- ✅ Configuration validation (fails fast)
-- ✅ 10-second timeout protection
-- ✅ DestinationManager for self-hosted/Grafana Cloud
-- ✅ X-Scope-OrgID header for multi-tenancy
-- ✅ Cardinality governance
-- ✅ CORS support
-
-**Metrics Exported** (26 total):
-- 11 Counter metrics
-- 12 Gauge metrics
-- 3 Histogram metrics (VST, rebuffer duration, seek latency)
-
-**Type Safety**: Full TypeScript compilation passes
-
-**Validation**: Pre-deployment script (`validate.sh`) passes all checks
+- ✅ OTLP Push exporter (OTel compliant)
+- ✅ 24+ event types with comprehensive context
+- ✅ Concurrency-first architecture in Go
+- ✅ Cardinality governance & statistical reporting
+- ✅ Integrated health and stats endpoints
+- ✅ Low-latency event processing (<5ms)
 
 ---
 
@@ -91,13 +65,13 @@ OpenQoE is **100% production-ready** for business-critical video QoE monitoring.
 
 **Location**: `/observability`
 
-#### Docker Services
-
-| Service | Port | Status | Purpose |
-|---------|------|--------|---------|
-| **Mimir** | 9009 | ✅ Ready | Metrics storage (Prometheus-compatible) |
-| **Loki** | 3100 | ✅ Ready | Log aggregation |
-| **Grafana** | 3000 | ✅ Ready | Visualization |
+| Service | Protocol | Status | Purpose |
+|---------|----------|--------|---------|
+| **Alloy** | OTLP | ✅ Ready | Telemetry collection and routing |
+| **Mimir** | Prometheus | ✅ Ready | Metrics storage |
+| **Loki** | LogQL | ✅ Ready | Log aggregation |
+| **Tempo** | OTLP/Traces| ✅ Ready | Distributed tracing |
+| **Grafana** | - | ✅ Ready | Visualization & Alerting |
 
 **Configuration**:
 - Multi-tenancy: Disabled (single tenant)
@@ -363,24 +337,10 @@ open http://localhost:3000  # admin/admin
 ### Production Deployment
 
 ```bash
-# 1. Configure secrets
-cd worker
-wrangler secret put GRAFANA_CLOUD_INSTANCE_ID
-wrangler secret put GRAFANA_CLOUD_API_KEY
-wrangler secret put GRAFANA_CLOUD_METRICS_URL
-wrangler secret put GRAFANA_CLOUD_LOGS_URL
-wrangler secret put API_KEY
-
-# 2. Update KV namespace IDs in wrangler.toml
-
-# 3. Run pre-deployment validation
-./validate.sh
-
-# 4. Deploy
-wrangler deploy
-
-# 5. Integrate SDK in your application
-# See SDK_INTEGRATION.md for details
+# 1. Configure environment variables in .env
+# 2. Build worker: go build -o openqoe-worker
+# 3. Deploy container or binary to production
+# 4. Integrate SDK in your application
 ```
 
 ---
@@ -392,6 +352,7 @@ wrangler deploy
 | Metric | Self-Hosted | Grafana Cloud |
 |--------|-------------|---------------|
 | **Event Ingestion** | 10,000+ events/sec | Unlimited |
+| **P95 Event Ingestion Latency** | <100ms| <40ms
 | **Dashboard Load Time** | <3 seconds | <2 seconds |
 | **P95 Query Time** | <500ms (with recording rules) | <300ms |
 | **Data Retention** | 30 days (configurable) | Per plan |
@@ -456,7 +417,7 @@ After deployment, you should see:
 
 ## Sign-Off
 
-✅ **SDK**: All 5 players complete and functional
+✅ **SDK**: Dashjs SDK is complete and functional others are work in progress
 ✅ **Worker**: Production-ready with histogram support
 ✅ **Dashboards**: 4 dashboards with comprehensive coverage
 ✅ **Rules**: 25 recording rules + 18 alert rules
@@ -467,6 +428,6 @@ After deployment, you should see:
 
 ---
 
-**Last Updated**: November 5, 2025
+**Last Updated**: January 13, 2026
 **Reviewed By**: OpenQoE Development Team
 **Approved for Production**: YES ✅

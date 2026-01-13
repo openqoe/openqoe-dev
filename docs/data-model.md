@@ -1,7 +1,7 @@
 # openqoe-core Data Model Specification
 
-**Version:** 1.0
-**Last Updated:** 2025-11-04
+**Version:** 2.0.0
+**Last Updated:** January 2026
 
 ---
 
@@ -35,69 +35,63 @@ All events share this base structure:
 
 ```json
 {
-  // Event metadata
-  "event_type": "string",           // Required
-  "event_time": 1234567890123,      // Required (Unix ms)
-  "viewer_time": 1234567890123,     // Required (Unix ms)
-  "playback_time": 5432,            // Optional (ms)
+  "event_type": "string",           // Required (e.g., "playing")
+  "event_time": 1736784000000,      // Required (Unix ms)
+  "viewer_time": 4500,              // Required (ms from start)
+  "playback_time": 4.5,             // Optional (seconds)
 
-  // Session identifiers
   "org_id": "string",               // Required
   "player_id": "string",            // Required
-  "view_id": "uuid-v4",             // Required
-  "session_id": "uuid-v4",          // Required
-  "viewer_id": "hashed-sha256",     // Required
+  "view_id": "uuid",                // Required
+  "session_id": "uuid",             // Required
+  "viewer_id": "hashed-string",     // Required
 
-  // Environment
   "env": "prod",                    // Optional
   "app_name": "string",             // Optional
   "app_version": "string",          // Optional
 
-  // Context objects
-  "device": { },                    // Optional
-  "os": { },                        // Optional
-  "browser": { },                   // Optional
-  "player": { },                    // Optional
-  "network": { },                   // Optional
-  "cdn": { },                       // Optional
-  "video": { },                     // Optional
+  "device": { "name": "...", "model": "...", "category": "...", "manufacturer": "..." },
+  "os": { "family": "...", "version": "..." },
+  "browser": { "family": "...", "version": "..." },
+  "player": { "name": "...", "version": "...", "autoplay": true, "preload": "..." },
+  "network": { "asn": 123, "country_code": "...", "region": "...", "city": "..." },
+  "cdn": { "provider": "...", "edge_pop": "...", "origin": "..." },
+  "video": { "id": "...", "title": "...", "series": "...", "duration": 120, "source_url": "..." },
 
-  // Event-specific data
-  "data": { }                       // Varies by event type
+  "data": { }                       // Event-specific data
 }
 ```
 
 ### Event Types
 
-#### 1. playerready
+OpenQoE v2 supports 24+ event types covering the entire playback lifecycle:
 
-Player initialized and ready to play.
-
-**event_type:** `"playerready"`
-
-**data:**
-```json
-{
-  "player_startup_time": 125,     // ms (optional)
-  "page_load_time": 1234          // ms (optional)
-}
-```
-
----
-
-#### 2. viewstart
-
-Video view/session started.
-
-**event_type:** `"viewstart"`
-
-**data:**
-```json
-{
-  "video_startup_time": 450,      // ms (optional)
-  "preroll_requested": false      // boolean (optional)
-}
-```
+| Event Type | Description |
+|------------|-------------|
+| `manifestload` | Manifest request/load started |
+| `playerready` | Player initialized and ready |
+| `canplay` | Enough data to start playback |
+| `canplaythrough` | Full video can be played without stalling |
+| `playing` | Playback actually started |
+| `pause` | Playback paused |
+| `seek` | Seek initiated |
+| `waitstart` | Waiting for data (buffering) |
+| `stallstart` | Explicit stall detected |
+| `stallend` | Stall recovered |
+| `ended` | Playback completed |
+| `error` | Playback error |
+| `quartile` | 25/50/75/100% milestones |
+| `heartbeat` | Periodic status update |
+| `qualitychangerequested` | Rendition switch requested |
+| `qualitychange` | Rendition switch completed |
+| `fpsdrop` | Frame rate degradation |
+| `fragmentloaded` | Media segment loaded |
+| `bandwidthchange` | Network capacity change |
+| `playbackratechange` | Speed change |
+| `playbackvolumechange` | Volume change |
+| `playbackdetached` | Player unmounted |
+| `moveaway` | Page became invisible |
+| `moveback` | Page became visible |
 
 ---
 
