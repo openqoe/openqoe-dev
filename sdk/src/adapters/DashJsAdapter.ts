@@ -280,7 +280,7 @@ export class DashJsAdapter implements PlayerAdapter {
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("manifestloadingstart event fired");
+    this.logger.debug("manifestload event fired");
   }
 
   /**

@@ -35,6 +35,8 @@ export class HTML5Adapter implements PlayerAdapter {
   private rebufferDuration: number = 0;
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private seekFrom: number = 0;
+  private seekStartTime: number = 0;
 
   constructor(
     eventCollector: EventCollector,
@@ -95,21 +97,19 @@ export class HTML5Adapter implements PlayerAdapter {
   private attachEventListeners(): void {
     if (!this.video) return;
     this.addEventListener("loadstart", () => this.onLoadStart());
-    this.addEventListener("loadedmetadata", () => this.onLoadedMetaData());
     this.addEventListener("loadeddata", () => this.onPlayerReady());
     this.addEventListener("canplay", () => this.onCanPlay());
-    this.addEventListener("canplaythrough", () => this.onCanPlayThrough());
     this.addEventListener("play", () => this.onPlaying());
     this.addEventListener("pause", () => this.onPause());
+    this.addEventListener("playing", () => this.onPlayingAfterWait());
+    this.addEventListener("ended", () => this.onEnded());
+    this.addEventListener("error", () => this.onPlaybackError());
     this.addEventListener("seeking", () => this.onSeeking());
     this.addEventListener("seeked", () => this.onSeeked());
-    this.addEventListener("waiting", () => this.onWaiting());
+    this.addEventListener("waiting", () => this.onStallStart());
     this.addEventListener("stalled", () => this.onStallStart());
-    this.addEventListener("playing", () => this.onPlayingAfterWait());
     this.addEventListener("ratechange", () => this.onRateChange());
     this.addEventListener("volumechange", () => this.onVolumeChange());
-    this.addEventListener("ended", () => this.onEnded());
-    this.addEventListener("error", () => this.onErrorEvent());
     this.addEventListener("timeupdate", () => this.onTimeUpdate());
   }
 
@@ -137,29 +137,12 @@ export class HTML5Adapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent(
-      "manifestsloadingstart",
-      {
-        page_load_time: pageLoadTime,
-      },
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("viewstart event fired");
-  }
-
-  /**
-   * Metadata Load complete event
-   */
-  private async onLoadedMetaData(): Promise<void> {
-    if (!this.video) return;
-    const event = await this.eventCollector.createEvent("viewstart", {
-      preroll_requested: false,
-      buf_len: this.getBufferLength(),
+    const event = await this.eventCollector.createEvent("manifestload", {
+      page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("loadeddata event fired");
+    this.logger.debug("maanifestload event fired");
   }
 
   /**
@@ -181,21 +164,11 @@ export class HTML5Adapter implements PlayerAdapter {
 
     const event = await this.eventCollector.createEvent("canplay", {
       buf_len: this.getBufferLength(),
+      video_startup_time: performance.now(),
     });
 
     this.batchManager.addEvent(event);
     this.logger.debug("canplay event fired");
-  }
-
-  private async onCanPlayThrough(): Promise<void> {
-    if (!this.video) return;
-
-    const event = await this.eventCollector.createEvent("canplaythrough", {
-      buf_len: this.getBufferLength(),
-    });
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("canplaythrough event fired");
   }
 
   /**
@@ -204,15 +177,10 @@ export class HTML5Adapter implements PlayerAdapter {
   private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
-    // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : undefined;
-
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        video_startup_time: startupTime,
+        playing_time: this.video.currentTime * 1000,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: undefined, // HTML5 doesn't expose framerate directly
@@ -250,13 +218,114 @@ export class HTML5Adapter implements PlayerAdapter {
   }
 
   /**
+   * Playing after waiting - Stall End
+   */
+  private async onPlayingAfterWait(): Promise<void> {
+    if (!this.video) return;
+
+    // If we were stalled, fire stallend
+    if (this.stallStartTime !== null) {
+      const stallDuration = performance.now() - this.stallStartTime;
+      this.rebufferDuration += stallDuration;
+      this.rebufferCount++;
+
+      const event = await this.eventCollector.createEvent(
+        "stallend",
+        {
+          stall_position_secs: this.video.currentTime,
+          stall_duration: stallDuration,
+          buffer_length: this.getBufferLength(),
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.stallStartTime = null;
+      this.logger.debug("stallend event fired");
+    }
+  }
+
+  /**
+   * Ended event
+   */
+  private async onEnded(): Promise<void> {
+    if (!this.video) return;
+
+    this.stopHeartbeat();
+
+    const totalWatchTime = this.viewStartTime
+      ? performance.now() - this.viewStartTime
+      : 0;
+    const completionRate =
+      this.video.duration > 0
+        ? this.video.currentTime / this.video.duration
+        : 1;
+
+    const event = await this.eventCollector.createEvent(
+      "ended",
+      {
+        playing_time: this.playingTime,
+        total_watch_time: totalWatchTime,
+        completion_rate: completionRate,
+        rebuffer_count: this.rebufferCount,
+        rebuffer_duration: this.rebufferDuration,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("ended event fired");
+  }
+
+  /**
+   * Error event
+   */
+  private async onPlaybackError(): Promise<void> {
+    if (!this.video || !this.video.error) return;
+
+    const errorCode = this.video.error.code;
+    let errorFamily: string;
+    let errorMessage: string;
+
+    switch (errorCode) {
+      case 1: // MEDIA_ERR_ABORTED
+        errorFamily = "source";
+        errorMessage = "Media loading aborted";
+        break;
+      case 2: // MEDIA_ERR_NETWORK
+        errorFamily = "network";
+        errorMessage = "Network error while loading media";
+        break;
+      case 3: // MEDIA_ERR_DECODE
+        errorFamily = "decoder";
+        errorMessage = "Media decoding error";
+        break;
+      case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+        errorFamily = "source";
+        errorMessage = "Media format not supported";
+        break;
+      default:
+        errorFamily = "source";
+        errorMessage = "Unknown error";
+    }
+
+    this.onError({
+      code: errorCode,
+      message: errorMessage,
+      fatal: true,
+      context: {
+        error_family: errorFamily,
+      },
+    });
+  }
+
+  /**
    * Seeking event
    */
-  private seekFrom: number = 0;
-
   private async onSeeking(): Promise<void> {
     if (!this.video) return;
     this.seekFrom = this.video.currentTime * 1000;
+    this.seekStartTime = performance.now();
   }
 
   /**
@@ -281,8 +350,6 @@ export class HTML5Adapter implements PlayerAdapter {
     this.batchManager.addEvent(event);
     this.logger.debug("seek event fired");
   }
-
-  private seekStartTime: number = 0;
 
   /**
    * Stall Start (waiting) event
@@ -324,33 +391,6 @@ export class HTML5Adapter implements PlayerAdapter {
   }
 
   /**
-   * Playing after waiting - Stall End
-   */
-  private async onPlayingAfterWait(): Promise<void> {
-    if (!this.video) return;
-
-    // If we were stalled, fire stallend
-    if (this.stallStartTime !== null) {
-      const stallDuration = performance.now() - this.stallStartTime;
-      this.rebufferDuration += stallDuration;
-      this.rebufferCount++;
-
-      const event = await this.eventCollector.createEvent(
-        "stallend",
-        {
-          stall_duration: stallDuration,
-          buffer_length: this.getBufferLength(),
-        },
-        this.video.currentTime * 1000,
-      );
-
-      this.batchManager.addEvent(event);
-      this.stallStartTime = null;
-      this.logger.debug("stallend event fired");
-    }
-  }
-
-  /**
    * Playback rate change
    */
   private async onRateChange(): Promise<void> {
@@ -382,80 +422,6 @@ export class HTML5Adapter implements PlayerAdapter {
 
     this.batchManager.addEvent(event);
     this.logger.debug("playbackvolumechange event fired");
-  }
-
-  /**
-   * Ended event
-   */
-  private async onEnded(): Promise<void> {
-    if (!this.video) return;
-
-    this.stopHeartbeat();
-
-    const totalWatchTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : 0;
-    const completionRate =
-      this.video.duration > 0
-        ? this.video.currentTime / this.video.duration
-        : 1;
-
-    const event = await this.eventCollector.createEvent(
-      "ended",
-      {
-        playing_time: this.playingTime,
-        total_watch_time: totalWatchTime,
-        completion_rate: completionRate,
-        rebuffer_count: this.rebufferCount,
-        rebuffer_duration: this.rebufferDuration,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("ended event fired");
-  }
-
-  /**
-   * Error event
-   */
-  private async onErrorEvent(): Promise<void> {
-    if (!this.video || !this.video.error) return;
-
-    const errorCode = this.video.error.code;
-    let errorFamily: string;
-    let errorMessage: string;
-
-    switch (errorCode) {
-      case 1: // MEDIA_ERR_ABORTED
-        errorFamily = "source";
-        errorMessage = "Media loading aborted";
-        break;
-      case 2: // MEDIA_ERR_NETWORK
-        errorFamily = "network";
-        errorMessage = "Network error while loading media";
-        break;
-      case 3: // MEDIA_ERR_DECODE
-        errorFamily = "decoder";
-        errorMessage = "Media decoding error";
-        break;
-      case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorFamily = "source";
-        errorMessage = "Media format not supported";
-        break;
-      default:
-        errorFamily = "source";
-        errorMessage = "Unknown error";
-    }
-
-    this.onError({
-      code: errorCode,
-      message: errorMessage,
-      fatal: true,
-      context: {
-        error_family: errorFamily,
-      },
-    });
   }
 
   /**
