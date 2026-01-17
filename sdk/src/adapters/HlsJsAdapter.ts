@@ -52,6 +52,8 @@ export class HlsJsAdapter implements PlayerAdapter {
   private fragStats = { mean: 0, m2: 0, count: 0 };
   private fragSampleRate = 0.1;
   private fragZThreshold = 3.0;
+  private qualityLevelMap: Map<string, any> = new Map();
+
   constructor(
     eventCollector: EventCollector,
     batchManager: BatchManager,
@@ -152,26 +154,21 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.onHls(hls.Events.BUFFER_APPENDED, (_event: any, data: any) =>
       this.onBufferLevelChange(data),
     );
-    this.onHls(hls.Events.MEDIA_DETACHED, (_event: any, data: any) =>
-      this.onPlaybackDetached(data),
-    );
     this.onHls(hls.Events.LEVEL_SWITCHING, (_event: any, data: any) =>
       this.onQualityChangeRequested(data),
     );
     this.onHls(hls.Events.LEVEL_SWITCHED, (_event: any, data: any) =>
-      this.onLevelSwitched(data),
-    );
-    this.onHls(hls.Events.FPS_DROP, (_event: any, data: any) =>
-      this.onFPSDrop(data),
+      this.onQualityChangeRendered(data),
     );
     this.onHls(hls.Events.ERROR, (_event: any, data: any) =>
       this.onHlsError(data),
     );
-    // TODO: need to change function
-    this.addEventListener("canplay", () => this.onPlayerReady());
+    this.onHls(hls.Events.MEDIA_DETACHED, (_event: any, data: any) =>
+      this.onPlaybackDetached(data),
+    );
 
     // Standard video element events
-    // this.addEventListener("loadstart", () => this.onViewStart());
+    this.addEventListener("canplay", () => this.onCanPlay());
     this.addEventListener("play", () => this.onPlaying());
     this.addEventListener("pause", () => this.onPause());
     this.addEventListener("seeking", () => this.onSeeking());
@@ -271,12 +268,12 @@ export class HlsJsAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent("manifestsload", {
+    const event = await this.eventCollector.createEvent("manifestload", {
       page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("manifestsloadingstart event fired");
+    this.logger.debug("manifestload event fired");
   }
 
   /**
@@ -291,68 +288,83 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Playback Detached event
-   */
-  private async onPlaybackDetached(data: any): Promise<void> {
-    this.logger.debug("Media detached: ", data);
-    const event = await this.eventCollector.createEvent("playbackdetached");
-    this.batchManager.addEvent(event);
-    this.logger.debug("playbackdetached event fired");
-  }
-
-  /**
    * Quality Change Request event
    */
   private async onQualityChangeRequested(data: any): Promise<void> {
-    this.bandwidth = data.averageBitrate;
-    this.currentBitrate = data.bitrate || null;
-    this.currentResolution = {
-      width: data.width || null,
-      height: data.height || null,
-    };
-    this.currentFPS = parseInt(data.attrs["FRAME-RATE"]) || null;
-    this.currentCodec = data.videoCodec || null;
-    const event = await this.eventCollector.createEvent(
+    if (!this.video) return;
+    this.qualityLevelMap.set(data.level, data);
+    const event1 = await this.eventCollector.createEvent(
       "qualitychangerequested",
       {
         new: {
-          bitrate_kb: data.bitrate,
-          bandwidth: this.bandwidth,
-          resolution: this.currentResolution,
-          codec: this.currentCodec,
-          framerate: this.currentFPS,
-          max_bitrate: data.maxBitrate,
-          requested_level: data.level,
-          audio_codec: data.audioCodec,
+          bitrate_kb: data.averageBitrate / 1000,
+          resolution: {
+            width: data.width,
+            height: data.height,
+          },
+          codec: data.codecSet,
+          framerate: data.attrs["FRAME-RATE"],
+          level: data.level,
         },
-      },
-      this.video ? this.video.currentTime * 1000 : undefined,
-    );
-    this.batchManager.addEvent(event);
-    this.logger.debug("qualitychangerequested event fired");
-  }
-
-  /**
-   * Level Switched event (Quality Change)
-   */
-  private async onLevelSwitched(data: any): Promise<void> {
-    if (!this.video) return;
-    this.currentLevel = data.level;
-    const event = await this.eventCollector.createEvent(
-      "qualitychangecompleted",
-      {
-        bitrate_kb: this.currentBitrate,
-        bandwidth: this.bandwidth,
-        resolution: this.currentResolution,
-        framerate: this.currentFPS,
-        codec: this.currentCodec || null,
-        level: this.currentLevel,
       },
       this.video.currentTime * 1000,
     );
+    const event2 = await this.eventCollector.createEvent(
+      "bandwidthchange",
+      {
+        media_type: data.mediaType,
+        bandwidth: parseFloat(data.attrs["AVERAGE-BANDWIDTH"]),
+        codec: data.codecSet,
+      },
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event1);
+    this.batchManager.addEvent(event2);
+    this.logger.debug("qualitychangerequested event fired");
+    this.logger.debug("bandwidthchange event fired");
+  }
+
+  /**
+   * Quality Change Rendered
+   */
+  private async onQualityChangeRendered(data: any): Promise<void> {
+    if (!this.video) return;
+    const reqData = this.qualityLevelMap.get(data.level);
+    const event = await this.eventCollector.createEvent(
+      "qualitychange",
+      {
+        bitrate_kb: reqData.averageBitrate / 1000,
+        media_type: "",
+        resolution: {
+          width: reqData.width,
+          height: reqData.height,
+        },
+        bits_per_pixel: null,
+        video_width: this.video.videoWidth,
+        video_height: this.video.videoHeight,
+        player_width: this.video.offsetWidth,
+        player_height: this.video.offsetHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+        framerate: reqData.attrs["FRAME-RATE"],
+        codec: data.codecSet,
+      },
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.qualityLevelMap.delete(data.level);
+    this.logger.debug("qualitychange event fired");
+  }
+
+  /**
+   * Can Play Event
+   */
+  private async onCanPlay(): Promise<void> {
+    const event = await this.eventCollector.createEvent("canplay", {
+      video_startup_time: performance.now(),
+    });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("qualitychange event fired");
+    this.logger.debug("canplay event fired");
   }
 
   /**
@@ -361,7 +373,6 @@ export class HlsJsAdapter implements PlayerAdapter {
   private async onBufferLevelChange(data: any): Promise<void> {
     // Can be used for buffer analysis
     if (!this.video) return;
-    console.info("buffer level change, ", data);
     const bufferAhead = this.getBufferAhead(data.timeRanges[data.type]);
     const currentLevel = bufferAhead !== undefined ? bufferAhead : 0;
     this.bufferStats.count++;
@@ -399,17 +410,14 @@ export class HlsJsAdapter implements PlayerAdapter {
     }
   }
 
-  private async onFPSDrop(data: any): Promise<void> {
-    if (!this.video) return;
-    this.logger.info("FPS dropped", data);
-    const event = await this.eventCollector.createEvent(
-      "fpsdrop",
-      data,
-      this.video.currentTime * 1000,
-    );
-
+  /**
+   * Playback Detached event
+   */
+  private async onPlaybackDetached(data: any): Promise<void> {
+    this.logger.debug("Media detached: ", data);
+    const event = await this.eventCollector.createEvent("playbackdetached");
     this.batchManager.addEvent(event);
-    this.logger.debug("FPS dropped event fired");
+    this.logger.debug("playbackdetached event fired");
   }
 
   /**
@@ -461,15 +469,10 @@ export class HlsJsAdapter implements PlayerAdapter {
   private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
-    // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : undefined;
-
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        video_startup_time: startupTime,
+        playing_time: data.playingTime,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: this.getFramerate(),
