@@ -234,7 +234,7 @@ export class HTML5Adapter implements PlayerAdapter {
         {
           stall_position_secs: this.video.currentTime,
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
         },
         this.video.currentTime * 1000,
       );
@@ -362,7 +362,7 @@ export class HTML5Adapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "waitstart",
       {
-        buffer_length: this.getBufferLength(),
+        buffer_len_ms: this.getBufferLength(),
         bitrate: this.getBitrate(),
       },
       this.video.currentTime * 1000,
@@ -380,7 +380,7 @@ export class HTML5Adapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "stallstart",
       {
-        buffer_length: this.getBufferLength(),
+        buffer_len_ms: this.getBufferLength(),
         bitrate: this.getBitrate(),
       },
       this.video.currentTime * 1000,
@@ -414,7 +414,7 @@ export class HTML5Adapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "playbackvolumechange",
       {
-        playback_volume: this.video.volume * 100,
+        volume: this.video.volume * 100,
         muted: this.video.muted,
       },
       this.video.currentTime * 1000,
@@ -501,7 +501,7 @@ export class HTML5Adapter implements PlayerAdapter {
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
           dropped_frames: undefined, // HTML5 doesn't expose this
         },
         this.video.currentTime * 1000,
