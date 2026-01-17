@@ -159,6 +159,9 @@ export class HTML5Adapter implements PlayerAdapter {
     this.logger.debug("playerready event fired");
   }
 
+  /**
+   * On Can Play
+   */
   private async onCanPlay(): Promise<void> {
     if (!this.video) return;
 
@@ -352,26 +355,8 @@ export class HTML5Adapter implements PlayerAdapter {
   }
 
   /**
-   * Stall Start (waiting) event
+   * On Stall Start
    */
-  private async onWaiting(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent(
-      "waitstart",
-      {
-        buffer_len_ms: this.getBufferLength(),
-        bitrate: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("waitstart event fired");
-  }
-
   private async onStallStart(): Promise<void> {
     if (!this.video || this.stallStartTime !== null) return;
 
@@ -408,6 +393,9 @@ export class HTML5Adapter implements PlayerAdapter {
     this.logger.debug("rate_change event fired");
   }
 
+  /**
+   * On Volume Change
+   */
   private async onVolumeChange(): Promise<void> {
     if (!this.video) return;
 
