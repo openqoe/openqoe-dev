@@ -13,6 +13,7 @@ import {
 import { EventCollector } from "../core/EventCollector";
 import { BatchManager } from "../core/BatchManager";
 import { Logger } from "../utils/logger";
+import { PrivacyModule } from "../utils/privacy";
 
 export class HlsJsAdapter implements PlayerAdapter {
   private player: any = null;
@@ -45,7 +46,9 @@ export class HlsJsAdapter implements PlayerAdapter {
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
   private currentCodec: string | null = null;
-
+  private fragStats = { mean: 0, m2: 0, count: 0 };
+  private fragSampleRate = 0.1;
+  private fragZThreshold = 3.0;
   constructor(
     eventCollector: EventCollector,
     batchManager: BatchManager,
@@ -138,12 +141,11 @@ export class HlsJsAdapter implements PlayerAdapter {
   private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
     const hls = await this.resolveHlsJS();
-    this.onHls(hls.Events.MANIFEST_LOADING, (_event: any, data: any) =>
-      this.onManifestLoadingStart(data),
+    this.onHls(hls.Events.FRAG_LOADED, (_event: any, data: any) =>
+      this.onFragLoaded(data),
     );
-    this.onHls(hls.Events.MANIFEST_PARSED, (_event: any, data: any) =>
-      this.onManifestParsed(data),
-    );
+    this.onHls(hls.Events.MANIFEST_LOADED, () => this.onManifestLoadingStart());
+    this.addEventListener("canplay", () => this.onPlayerReady());
     this.onHls(hls.Events.MEDIA_ATTACHED, (_event: any, data: any) =>
       this.onPlaybackInit(data),
     );
@@ -155,9 +157,6 @@ export class HlsJsAdapter implements PlayerAdapter {
     );
     this.onHls(hls.Events.LEVEL_SWITCHED, (_event: any, data: any) =>
       this.onLevelSwitched(data),
-    );
-    this.onHls(hls.Events.FRAG_BUFFERED, (_event: any, data: any) =>
-      this.onFragBuffered(data),
     );
     this.onHls(hls.Events.BUFFER_APPENDED, (_event: any, data: any) =>
       this.onBufferAppended(data),
@@ -205,9 +204,57 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Fragment Buffered event
+   */
+  private async onFragLoaded(data: any): Promise<void> {
+    if (!this.video) return;
+    this.logger.info("frag loaded, ", data);
+    const endTime = data.frag.stats.loading.first;
+    const startTime = data.frag.stats.loading.start;
+    const ttfb = endTime - startTime;
+    this.fragStats.count++;
+    const delta = ttfb - this.fragStats.mean;
+    this.fragStats.mean += delta / this.fragStats.count;
+    const delta2 = ttfb - this.fragStats.mean;
+    this.fragStats.m2 += delta * delta2;
+    const stdDev =
+      this.fragStats.count > 1
+        ? Math.sqrt(this.fragStats.m2 / (this.fragStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(ttfb - this.fragStats.mean) / stdDev : 0;
+    const isOutlier = zScore > this.fragZThreshold;
+    const isRandomSample = Math.random() < this.fragSampleRate;
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "fragmentloaded",
+        {
+          frag_duration: data.frag.duration,
+          size_bytes: data.frag.stats.loaded,
+          time_to_load:
+            data.frag.stats.loading.end - data.frag.stats.loading.start,
+          ttfb_ms: ttfb,
+          z_score: zScore,
+          service_location: PrivacyModule.sanitizeUrl(data.frag.base.url),
+          bandwidth: data.frag.stats.bwEstimate,
+          url: PrivacyModule.sanitizeUrl(data.frag._url),
+          frag_id: data.frag.relurl,
+          media_type: data.frag.type,
+          type: "",
+          is_outlier: isOutlier,
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.logger.debug("Fragmentbuffered event fired");
+    }
+  }
+
+  /**
    * Manifest Loading Start
    */
-  private async onManifestLoadingStart(data: any): Promise<void> {
+  private async onManifestLoadingStart(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -217,16 +264,23 @@ export class HlsJsAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent(
-      "manifestsloadingstart",
-      {
-        ...data,
-        page_load_time: pageLoadTime,
-      },
-    );
+    const event = await this.eventCollector.createEvent("manifestsload", {
+      page_load_time: pageLoadTime,
+    });
 
     this.batchManager.addEvent(event);
     this.logger.debug("manifestsloadingstart event fired");
+  }
+
+  /**
+   * On Player Ready
+   */
+  private async onPlayerReady(): Promise<void> {
+    const event = await this.eventCollector.createEvent("playerready", {
+      player_startup_time: performance.now(),
+    });
+    this.batchManager.addEvent(event);
+    this.logger.debug("playerready event fired");
   }
 
   /**
@@ -317,29 +371,6 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     this.batchManager.addEvent(event);
     this.logger.debug("qualitychange event fired");
-  }
-
-  /**
-   * Fragment Buffered event
-   */
-  private async onFragBuffered(data: any): Promise<void> {
-    if (!this.video) return;
-    this.bandwidth = data.stats.bwEstimate;
-    const event = await this.eventCollector.createEvent(
-      "fragmentloaded",
-      {
-        duration: data.frag.duration,
-        bandwidth: this.bandwidth,
-        aborted: data.stats.aborted,
-        url: data.frag.base.url,
-        rel_url: data.frag.relurl,
-        media_type: data.frag.type,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("Fragmentbuffered event fired");
   }
 
   /**
