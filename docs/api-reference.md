@@ -30,28 +30,28 @@ Creates a new OpenQoE SDK instance.
 ```typescript
 interface OpenQoEConfig {
   // Required
-  orgId: string;                    // Organization identifier
-  playerId: string;                 // Player instance identifier
-  endpointUrl: string;              // Ingest endpoint URL
+  orgId: string; // Organization identifier
+  playerId: string; // Player instance identifier
+  endpointUrl: string; // Ingest endpoint URL
 
   // Optional
-  env?: 'dev' | 'staging' | 'prod'; // Environment (default: 'prod')
-  appName?: string;                 // Application name
-  appVersion?: string;              // Application version
-  samplingRate?: number;            // 0.0 - 1.0 (default: 1.0)
+  env?: "dev" | "staging" | "prod"; // Environment (default: 'prod')
+  appName?: string; // Application name
+  appVersion?: string; // Application version
+  samplingRate?: number; // 0.0 - 1.0 (default: 1.0)
 
   // Privacy
-  enablePII?: boolean;              // Enable PII collection (default: false)
-  hashSalt?: string;                // Per-org salt for hashing
+  enablePII?: boolean; // Enable PII collection (default: false)
+  hashSalt?: string; // Per-org salt for hashing
 
   // Performance
-  batchSize?: number;               // Events per batch (default: 10)
-  batchInterval?: number;           // Batch flush interval ms (default: 5000)
-  maxQueueSize?: number;            // Max offline queue (default: 100)
+  batchSize?: number; // Events per batch (default: 10)
+  batchInterval?: number; // Batch flush interval ms (default: 5000)
+  maxQueueSize?: number; // Max offline queue (default: 100)
 
   // Debugging
-  debug?: boolean;                  // Enable console logging (default: false)
-  logLevel?: 'error' | 'warn' | 'info' | 'debug'; // (default: 'warn')
+  debug?: boolean; // Enable console logging (default: false)
+  logLevel?: "error" | "warn" | "info" | "debug"; // (default: 'warn')
 }
 ```
 
@@ -60,18 +60,18 @@ interface OpenQoEConfig {
 **Example:**
 
 ```typescript
-import { OpenQoE } from '@openqoe/core';
+import { OpenQoE } from "@openqoe/core";
 
 const qoe = new OpenQoE({
-  orgId: 'org_abc123',
-  playerId: 'player_xyz789',
-  endpointUrl: 'https://ingest.openqoe.example.com/v2/events',
-  env: 'prod',
-  appName: 'MyVideoApp',
-  appVersion: '2.1.0',
+  orgId: "org_abc123",
+  playerId: "player_xyz789",
+  endpointUrl: "https://ingest.openqoe.example.com/v2/events",
+  env: "prod",
+  appName: "MyVideoApp",
+  appVersion: "2.1.0",
   samplingRate: 1.0,
   batchSize: 10,
-  batchInterval: 5000
+  batchInterval: 5000,
 });
 ```
 
@@ -86,13 +86,13 @@ Attaches the SDK to a video player instance.
 **Parameters:**
 
 ```typescript
-type PlayerType = 'html5' | 'videojs' | 'hlsjs' | 'dashjs' | 'shaka';
+type PlayerType = "html5" | "videojs" | "hlsjs" | "dashjs" | "shaka";
 
 interface VideoMetadata {
   videoId?: string;
   videoTitle?: string;
   videoSeries?: string;
-  duration?: number;           // ms
+  duration?: number; // ms
   customDimensions?: Record<string, string>;
 }
 ```
@@ -103,37 +103,37 @@ interface VideoMetadata {
 
 ```typescript
 // HTML5
-const video = document.querySelector('video');
-qoe.attachPlayer('html5', video, {
-  videoId: 'video_123',
-  videoTitle: 'Sample Video',
-  videoSeries: 'Season 1'
+const video = document.querySelector("video");
+qoe.attachPlayer("html5", video, {
+  videoId: "video_123",
+  videoTitle: "Sample Video",
+  videoSeries: "Season 1",
 });
 
 // Video.js
-const player = videojs('my-video');
-qoe.attachPlayer('videojs', player, {
-  videoId: 'video_123'
+const player = videojs("my-video");
+qoe.attachPlayer("videojs", player, {
+  videoId: "video_123",
 });
 
 // HLS.js
 const hls = new Hls();
 hls.attachMedia(video);
-qoe.attachPlayer('hlsjs', hls, {
-  videoId: 'video_123'
+qoe.attachPlayer("hlsjs", hls, {
+  videoId: "video_123",
 });
 
 // dash.js
 const player = dashjs.MediaPlayer().create();
 player.initialize(video, url, true);
-qoe.attachPlayer('dashjs', player, {
-  videoId: 'video_123'
+qoe.attachPlayer("dashjs", player, {
+  videoId: "video_123",
 });
 
 // Shaka Player
 const player = new shaka.Player(video);
-qoe.attachPlayer('shaka', player, {
-  videoId: 'video_123'
+qoe.attachPlayer("shaka", player, {
+  videoId: "video_123",
 });
 ```
 
@@ -149,31 +149,31 @@ Manually track a custom event.
 
 ```typescript
 type EventType =
-  | 'manifestload'
-  | 'playerready'
-  | 'canplay'
-  | 'canplaythrough'
-  | 'playing'
-  | 'pause'
-  | 'seek'
-  | 'waitstart'
-  | 'stallstart'
-  | 'stallend'
-  | 'ended'
-  | 'error'
-  | 'quartile'
-  | 'heartbeat'
-  | 'qualitychangerequested'
-  | 'qualitychange'
-  | 'fpsdrop'
-  | 'fragmentloaded'
-  | 'bufferlevelchange'
-  | 'bandwidthchange'
-  | 'playbackratechange'
-  | 'playbackvolumechange'
-  | 'playbackdetached'
-  | 'moveaway'
-  | 'moveback';
+  | "manifestload"
+  | "playerready"
+  | "canplay"
+  | "canplaythrough"
+  | "playing"
+  | "pause"
+  | "seek"
+  | "waitstart"
+  | "stallstart"
+  | "stallend"
+  | "ended"
+  | "error"
+  | "quartile"
+  | "heartbeat"
+  | "qualitychangerequested"
+  | "qualitychange"
+  | "fpsdrop"
+  | "fragmentloaded"
+  | "bufferlevelchange"
+  | "bandwidthchange"
+  | "playbackratechange"
+  | "playbackvolumechange"
+  | "playbackdetached"
+  | "moveaway"
+  | "moveback";
 
 data: Record<string, any>;
 ```
@@ -184,17 +184,17 @@ data: Record<string, any>;
 
 ```typescript
 // Track custom business event
-qoe.trackEvent('subscription_upsell_shown', {
-  plan: 'premium',
+qoe.trackEvent("subscription_upsell_shown", {
+  plan: "premium",
   price: 9.99,
-  position: 'mid_roll'
+  position: "mid_roll",
 });
 
 // Track custom error
-qoe.trackEvent('error', {
-  error_family: 'business',
-  error_code: 'SUBSCRIPTION_EXPIRED',
-  error_message: 'User subscription expired'
+qoe.trackEvent("error", {
+  error_family: "business",
+  error_code: "SUBSCRIPTION_EXPIRED",
+  error_message: "User subscription expired",
 });
 ```
 
@@ -212,7 +212,7 @@ Manually start a new session (usually automatic).
 
 ```typescript
 const sessionId = qoe.startSession();
-console.log('Session started:', sessionId);
+console.log("Session started:", sessionId);
 ```
 
 #### `endSession()`
@@ -307,13 +307,34 @@ X-SDK-Version: 2.0.0
       "app_name": "MyVideoApp",
       "app_version": "2.1.0",
 
-      "device": { "name": "iPhone", "model": "15 Pro", "category": "mobile", "manufacturer": "Apple" },
+      "device": {
+        "name": "iPhone",
+        "model": "15 Pro",
+        "category": "mobile",
+        "manufacturer": "Apple"
+      },
       "os": { "family": "iOS", "version": "17.0" },
       "browser": { "family": "Safari", "version": "17.0" },
-      "player": { "name": "dashjs", "version": "4.7.0", "autoplay": true, "preload": "auto" },
-      "network": { "asn": 16509, "country_code": "US", "region": "CA", "city": "San Jose" },
+      "player": {
+        "name": "dashjs",
+        "version": "4.7.0",
+        "autoplay": true,
+        "preload": "auto"
+      },
+      "network": {
+        "asn": 16509,
+        "country_code": "US",
+        "region": "CA",
+        "city": "San Jose"
+      },
       "cdn": { "provider": "Akamai", "edge_pop": "SJC-1", "origin": "aws-s3" },
-      "video": { "id": "vid_123", "title": "Example Video", "series": "S1", "duration": 120, "source_url": "..." },
+      "video": {
+        "id": "vid_123",
+        "title": "Example Video",
+        "series": "S1",
+        "duration": 120,
+        "source_url": "..."
+      },
 
       "data": {
         "video_startup_time": 450
@@ -1053,7 +1074,8 @@ openqoe_metric{org_id="org_abc123"}[7d]
 #### Order By
 
 **Options:**
-- `negative_impact` - Worst-performing first (delta from average * view count)
+
+- `negative_impact` - Worst-performing first (delta from average \* view count)
 - `views` - By view count
 - `value` - By metric value
 - `field` - By dimension value (alphabetical)
@@ -1069,6 +1091,7 @@ openqoe_metric{org_id="org_abc123"}[7d]
 #### Order Direction
 
 **Options:**
+
 - `asc` - Ascending
 - `desc` - Descending (default)
 
@@ -1109,46 +1132,46 @@ topk(100, openqoe_metric{org_id="org_abc123"})
 
 ### SDK Error Codes
 
-| Code | Error | Description |
-|------|-------|-------------|
-| `SDK_001` | `INVALID_CONFIG` | Invalid SDK configuration |
-| `SDK_002` | `PLAYER_NOT_SUPPORTED` | Player type not supported |
+| Code      | Error                  | Description                |
+| --------- | ---------------------- | -------------------------- |
+| `SDK_001` | `INVALID_CONFIG`       | Invalid SDK configuration  |
+| `SDK_002` | `PLAYER_NOT_SUPPORTED` | Player type not supported  |
 | `SDK_003` | `PLAYER_ATTACH_FAILED` | Failed to attach to player |
-| `SDK_004` | `NETWORK_ERROR` | Network request failed |
-| `SDK_005` | `QUEUE_FULL` | Event queue is full |
-| `SDK_006` | `INVALID_EVENT` | Invalid event data |
+| `SDK_004` | `NETWORK_ERROR`        | Network request failed     |
+| `SDK_005` | `QUEUE_FULL`           | Event queue is full        |
+| `SDK_006` | `INVALID_EVENT`        | Invalid event data         |
 
 ### Ingest API Error Codes
 
-| Code | HTTP Status | Error | Description |
-|------|-------------|-------|-------------|
-| `ING_001` | 400 | `INVALID_JSON` | Request body is not valid JSON |
-| `ING_002` | 400 | `SCHEMA_VALIDATION_FAILED` | Event schema validation failed |
-| `ING_003` | 401 | `UNAUTHORIZED` | Invalid or missing API token |
-| `ING_004` | 403 | `FORBIDDEN` | Org ID not authorized for this token |
-| `ING_005` | 429 | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded |
-| `ING_006` | 429 | `QUOTA_EXCEEDED` | Org quota exceeded |
-| `ING_007` | 400 | `CARDINALITY_EXCEEDED` | Dimension cardinality limit exceeded |
-| `ING_008` | 400 | `PII_DETECTED` | Unallowed PII detected in event |
-| `ING_009` | 500 | `DOWNSTREAM_ERROR` | Loki/Prometheus downstream error |
-| `ING_010` | 503 | `SERVICE_UNAVAILABLE` | Service temporarily unavailable |
+| Code      | HTTP Status | Error                      | Description                          |
+| --------- | ----------- | -------------------------- | ------------------------------------ |
+| `ING_001` | 400         | `INVALID_JSON`             | Request body is not valid JSON       |
+| `ING_002` | 400         | `SCHEMA_VALIDATION_FAILED` | Event schema validation failed       |
+| `ING_003` | 401         | `UNAUTHORIZED`             | Invalid or missing API token         |
+| `ING_004` | 403         | `FORBIDDEN`                | Org ID not authorized for this token |
+| `ING_005` | 429         | `RATE_LIMIT_EXCEEDED`      | Rate limit exceeded                  |
+| `ING_006` | 429         | `QUOTA_EXCEEDED`           | Org quota exceeded                   |
+| `ING_007` | 400         | `CARDINALITY_EXCEEDED`     | Dimension cardinality limit exceeded |
+| `ING_008` | 400         | `PII_DETECTED`             | Unallowed PII detected in event      |
+| `ING_009` | 500         | `DOWNSTREAM_ERROR`         | Loki/Prometheus downstream error     |
+| `ING_010` | 503         | `SERVICE_UNAVAILABLE`      | Service temporarily unavailable      |
 
 ### Player Error Codes
 
 Error codes reported in `error` events:
 
-| Family | Code | Description |
-|--------|------|-------------|
-| `network` | `MANIFEST_LOAD_ERROR` | Failed to load manifest |
-| `network` | `FRAGMENT_LOAD_ERROR` | Failed to load media fragment |
-| `network` | `TIMEOUT` | Request timeout |
-| `decoder` | `MEDIA_DECODE_ERROR` | Failed to decode media |
-| `decoder` | `UNSUPPORTED_CODEC` | Codec not supported |
-| `source` | `INVALID_MANIFEST` | Manifest parsing error |
-| `source` | `INVALID_MEDIA` | Invalid media format |
-| `drm` | `LICENSE_REQUEST_FAILED` | DRM license request failed |
-| `drm` | `KEY_SYSTEM_ERROR` | Key system error |
+| Family    | Code                     | Description                   |
+| --------- | ------------------------ | ----------------------------- |
+| `network` | `MANIFEST_LOAD_ERROR`    | Failed to load manifest       |
+| `network` | `FRAGMENT_LOAD_ERROR`    | Failed to load media fragment |
+| `network` | `TIMEOUT`                | Request timeout               |
+| `decoder` | `MEDIA_DECODE_ERROR`     | Failed to decode media        |
+| `decoder` | `UNSUPPORTED_CODEC`      | Codec not supported           |
+| `source`  | `INVALID_MANIFEST`       | Manifest parsing error        |
+| `source`  | `INVALID_MEDIA`          | Invalid media format          |
+| `drm`     | `LICENSE_REQUEST_FAILED` | DRM license request failed    |
+| `drm`     | `KEY_SYSTEM_ERROR`       | Key system error              |
 
 ---
 
-**End of API Reference v1.0**
+**End of API Reference v2.0**

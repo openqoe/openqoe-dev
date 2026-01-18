@@ -123,19 +123,19 @@ graph TB
 
 ### 2. SDK Module Responsibilities
 
-| Module | Responsibility | Interface |
-|--------|----------------|-----------|
-| **OpenQoE Class** | Public API, initialization, lifecycle | `new OpenQoE(config)`, `attachPlayer()`, `destroy()` |
-| **Configuration** | Validate config, store settings | `OpenQoEConfig` interface |
-| **Player Adapters** | Translate player-specific events to standard events | `PlayerAdapter` interface |
-| **Event Collector** | Receive events, enrich with context | `trackEvent(type, data)` |
-| **Session Manager** | Generate IDs, track session state | `startSession()`, `endSession()`, `getSessionId()` |
-| **Privacy Module** | Hash PII fields, apply privacy policies | `hash(value)`, `sanitize(event)` |
-| **CMCD Processor** | Extract, normalize, de-duplicate CMCD | `extractCMCD(player)`, `normalizeCMCD(data)` |
-| **Batch Manager** | Accumulate events, trigger flushes | `addEvent(event)`, `flush()` |
-| **Offline Queue** | Store events when offline, persist to storage | `enqueue(event)`, `dequeue()`, `persist()` |
-| **Retry Logic** | Exponential backoff, circuit breaker | `send(batch)`, `retry(batch, attempt)` |
-| **HTTP Client** | Send batches to ingest endpoint | `post(url, data)` |
+| Module              | Responsibility                                      | Interface                                            |
+| ------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| **OpenQoE Class**   | Public API, initialization, lifecycle               | `new OpenQoE(config)`, `attachPlayer()`, `destroy()` |
+| **Configuration**   | Validate config, store settings                     | `OpenQoEConfig` interface                            |
+| **Player Adapters** | Translate player-specific events to standard events | `PlayerAdapter` interface                            |
+| **Event Collector** | Receive events, enrich with context                 | `trackEvent(type, data)`                             |
+| **Session Manager** | Generate IDs, track session state                   | `startSession()`, `endSession()`, `getSessionId()`   |
+| **Privacy Module**  | Hash PII fields, apply privacy policies             | `hash(value)`, `sanitize(event)`                     |
+| **CMCD Processor**  | Extract, normalize, de-duplicate CMCD               | `extractCMCD(player)`, `normalizeCMCD(data)`         |
+| **Batch Manager**   | Accumulate events, trigger flushes                  | `addEvent(event)`, `flush()`                         |
+| **Offline Queue**   | Store events when offline, persist to storage       | `enqueue(event)`, `dequeue()`, `persist()`           |
+| **Retry Logic**     | Exponential backoff, circuit breaker                | `send(batch)`, `retry(batch, attempt)`               |
+| **HTTP Client**     | Send batches to ingest endpoint                     | `post(url, data)`                                    |
 
 ### 3. PlayerAdapter Interface
 
@@ -240,14 +240,14 @@ graph TB
 
 ### 5. Worker Module Responsibilities
 
-| Module | Responsibility |
-|--------|----------------|
-| **Gin Framework** | HTTP routing, middleware management, health checks |
-| **Auth Middleware** | API key verification and Org ID resolution |
-| **Request Validator** | Schema validation using Go Struct tags |
-| **Worker Pool** | Concurrent processing of events from the queue |
+| Module                  | Responsibility                                      |
+| ----------------------- | --------------------------------------------------- |
+| **Gin Framework**       | HTTP routing, middleware management, health checks  |
+| **Auth Middleware**     | API key verification and Org ID resolution          |
+| **Request Validator**   | Schema validation using Go Struct tags              |
+| **Worker Pool**         | Concurrent processing of events from the queue      |
 | **Cardinality Service** | Governance of dimension values to prevent explosion |
-| **OTLP Exporter** | Exporting metrics, logs, and traces to Alloy |
+| **OTLP Exporter**       | Exporting metrics, logs, and traces to Alloy        |
 
 ---
 
@@ -429,6 +429,7 @@ graph TB
 ```
 
 **Benefits:**
+
 - Low latency (<100ms) from any location
 - High availability (auto-failover)
 - DDoS protection
@@ -699,4 +700,4 @@ graph TB
 
 ---
 
-**End of Architecture v1.0**
+**End of Architecture v2.0**

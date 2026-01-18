@@ -20,23 +20,26 @@ The Go Worker is the core ingestion component of OpenQoE v2. It replaces the leg
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.25+
 - Access to an OTLP-compatible collector (e.g., Grafana Alloy)
 
 ### Build & Run
 
 1. **Install Dependencies**:
+
    ```bash
    go mod download
    ```
 
 2. **Configure Environment**:
+
    ```bash
    cp .env.example .env
    # Edit .env with your OTEL_URL (default: http://localhost:4317)
    ```
 
 3. **Build**:
+
    ```bash
    go build -o openqoe-worker
    ```
@@ -52,11 +55,11 @@ The worker will start on port `8788`.
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v2/events` | `POST` | Ingest playback events |
-| `/v2/health` | `GET` | Service health status |
-| `/v2/stats` | `GET` | Operational stats & cardinality |
+| Endpoint     | Method | Description                     |
+| ------------ | ------ | ------------------------------- |
+| `/v2/events` | `POST` | Ingest playback events          |
+| `/v2/health` | `GET`  | Service health status           |
+| `/v2/stats`  | `GET`  | Operational stats & cardinality |
 
 ### Event Ingestion
 
@@ -68,12 +71,12 @@ Accepts a JSON body containing an array of events. See [API Reference](../docs/a
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OTEL_URL` | `http://localhost:4317` | OTLP collector endpoint |
-| `API_KEY` | - | Secret key for auth middleware |
-| `LOG_LEVEL` | `info` | zap logger level |
-| `DESTINATION_TYPE` | `SelfHosted` | `SelfHosted` or `GrafanaCloud` |
+| Variable           | Default                 | Description                    |
+| ------------------ | ----------------------- | ------------------------------ |
+| `OTEL_URL`         | `http://localhost:4317` | OTLP collector endpoint        |
+| `API_KEY`          | -                       | Secret key for auth middleware |
+| `LOG_LEVEL`        | `info`                  | zap logger level               |
+| `DESTINATION_TYPE` | `SelfHosted`            | `SelfHosted` or `GrafanaCloud` |
 
 ---
 

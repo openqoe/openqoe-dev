@@ -55,6 +55,7 @@ docker compose ps
 ```
 
 Expected output:
+
 ```
 NAME                STATUS              PORTS
 openqoe-mimir       Up (healthy)        0.0.0.0:9009->9009/tcp
@@ -117,11 +118,13 @@ npm run dev
 ### Prerequisites
 
 **Option A - Mimir (Recommended):**
+
 - Grafana Mimir 2.0+
 - Loki 2.8+
 - Grafana 9.0+
 
 **Option B - Prometheus (Backward Compatible):**
+
 - Prometheus 2.40+ with remote write receiver enabled
 - Loki 2.8+
 - Grafana 9.0+
@@ -148,6 +151,7 @@ remote_write:
 ```
 
 Start Prometheus with:
+
 ```bash
 prometheus --config.file=prometheus.yml \
   --web.enable-remote-write-receiver \
@@ -232,12 +236,14 @@ Add OpenQoE data to your existing Grafana:
 4. Navigate to **Details**
 
 **Get Metrics Details (Mimir):**
+
 - Go to **Prometheus** section
 - Copy **Remote Write Endpoint** (e.g., `https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push`)
 - Copy **Instance ID** (e.g., `123456`)
 - Generate **API Key** with MetricsPublisher permission
 
 **Get Logs Details (Loki):**
+
 - Go to **Loki** section
 - Copy **Loki URL** (e.g., `https://logs-prod-eu-west-0.grafana.net/loki/api/v1/push`)
 - Use same **Instance ID** and **API Key**
@@ -311,33 +317,35 @@ curl -X POST http://localhost:8788/v2/events \
 
 ### Environment Variables Reference
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OTEL_URL` | OTLP Exporter endpoint (Alloy) | `http://localhost:4317` |
-| `API_KEY` | Optional API key for /v2/events | `your-secret-key` |
-| `LOG_LEVEL` | Logging verbosity | `info`, `debug`, `error` |
-| `GIN_MODE` | Web framework mode | `release` or `debug` |
+| Variable    | Description                     | Example                  |
+| ----------- | ------------------------------- | ------------------------ |
+| `OTEL_URL`  | OTLP Exporter endpoint (Alloy)  | `http://localhost:4317`  |
+| `API_KEY`   | Optional API key for /v2/events | `your-secret-key`        |
+| `LOG_LEVEL` | Logging verbosity               | `info`, `debug`, `error` |
+| `GIN_MODE`  | Web framework mode              | `release` or `debug`     |
 
 #### Grafana Cloud Details
 
 If sending directly to Grafana Cloud without local Alloy:
 
-| Variable | Description |
-|----------|-------------|
-| `DESTINATION_TYPE` | Set to `GrafanaCloud` |
-| `GRAFANA_CLOUD_INSTANCE_ID` | Your Instance ID |
-| `GRAFANA_CLOUD_API_KEY` | Your Cloud API Key |
+| Variable                    | Description           |
+| --------------------------- | --------------------- |
+| `DESTINATION_TYPE`          | Set to `GrafanaCloud` |
+| `GRAFANA_CLOUD_INSTANCE_ID` | Your Instance ID      |
+| `GRAFANA_CLOUD_API_KEY`     | Your Cloud API Key    |
 
 ### Setting Secrets
 
 The Go worker reads secrets from environment variables or a `.env` file in the root of the `worker/` directory.
 
 **Environment Variable:**
+
 ```bash
 export API_KEY=your-secret-key
 ```
 
 **Local `.env` file:**
+
 ```bash
 API_KEY=your-secret-key
 ```
@@ -349,12 +357,14 @@ API_KEY=your-secret-key
 ### Test End-to-End Flow
 
 1. **Start Go Worker**
+
    ```bash
    cd worker
    ./openqoe-worker
    ```
 
 2. **Send Test Event**
+
    ```bash
    curl -X POST http://localhost:8788/v2/events \
      -H "Content-Type: application/json" \
@@ -373,14 +383,15 @@ API_KEY=your-secret-key
    ```
 
 3. **Verify in Grafana**
-   - Open http://localhost:3000
+   - Open [localhost:3000](http://localhost:3000)
    - Go to **Explore**
    - Select **Mimir** and query `openqoe_events_received_total`
    - Select **Tempo** to see traces
 
-5. **Verify Metrics**
+4. **Verify Metrics**
 
    **Self-Hosted:**
+
    ```bash
    # Check Mimir (query via Prometheus API)
    curl 'http://localhost:9009/prometheus/api/v1/query?query=openqoe_events_total'
@@ -403,6 +414,7 @@ API_KEY=your-secret-key
 The worker logs to standard output. You can pipe this to a file or use a logging aggregator.
 
 **Test Mimir endpoint:**
+
 ```bash
 # Self-hosted Mimir
 curl -X POST http://mimir:9009/api/v1/push
@@ -418,11 +430,13 @@ curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
 ### No Data in Grafana
 
 **Verify data sources:**
+
 - Go to Configuration → Data Sources
 - Click Test on each data source
 - Should see "Data source is working"
 
 **Check time range:**
+
 - Grafana defaults to last 6 hours
 - Your test data might be outside this range
 - Adjust time range to "Last 15 minutes"
@@ -430,6 +444,7 @@ curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
 ### Authentication Errors (Grafana Cloud)
 
 **Verify credentials:**
+
 ```bash
 # Test with curl
 curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
@@ -469,11 +484,13 @@ Error: 401 Unauthorized (check credentials)
 ### Self-Hosted
 
 **Infrastructure:**
+
 - Server: $20-100/month (depending on size)
 - Storage: $0.10/GB/month
 - Bandwidth: $0.05/GB
 
 **Estimated for 1M events/day:**
+
 - Storage: ~15GB/month → $1.50/month
 - Server: Small instance → $20-40/month
 - **Total: ~$25-45/month**
@@ -481,16 +498,19 @@ Error: 401 Unauthorized (check credentials)
 ### Grafana Cloud
 
 **Free Tier:**
+
 - 10K series metrics
 - 50GB logs
 - 14-day retention
 
 **Paid (Pro):**
+
 - $8/month base
 - $0.30/hour for metrics (10K active series)
 - $0.50/GB for logs
 
 **Estimated for 1M events/day:**
+
 - Metrics: ~5K series → $36/month
 - Logs: ~15GB/month → $7.50/month
 - **Total: ~$50-60/month**
