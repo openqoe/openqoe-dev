@@ -65,7 +65,7 @@ import { OpenQoE } from '@openqoe/core';
 const qoe = new OpenQoE({
   orgId: 'org_abc123',
   playerId: 'player_xyz789',
-  endpointUrl: 'https://ingest.openqoe.example.com/v1/events',
+  endpointUrl: 'https://ingest.openqoe.example.com/v2/events',
   env: 'prod',
   appName: 'MyVideoApp',
   appVersion: '2.1.0',
@@ -374,7 +374,7 @@ X-SDK-Version: 2.0.0
 
 Health check endpoint.
 
-**Endpoint:** `https://ingest.openqoe.example.com/v1/health`
+**Endpoint:** `https://ingest.openqoe.example.com/v2/health`
 
 **Method:** `GET`
 
@@ -383,7 +383,7 @@ Health check endpoint.
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "uptime": 86400,
   "dependencies": {
     "loki": "healthy",

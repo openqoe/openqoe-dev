@@ -499,7 +499,7 @@ sequenceDiagram
 
     Note over SDK: No secrets in SDK<br/>Token injected server-side
 
-    SDK->>Worker: POST /v1/events<br/>Header: X-API-Token
+    SDK->>Worker: POST /v2/events<br/>Header: X-API-Token
     Worker->>Worker: Extract token from header
     Worker->>KV: Lookup token
     KV-->>Worker: {valid: true, org_id: "org_123"}

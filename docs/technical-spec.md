@@ -850,9 +850,7 @@ Uses JSON Schema validation:
   "properties": {
     "event_type": {
       "type": "string",
-      "enum": ["playerready", "viewstart", "playing", "pause", "seek",
-               "stall_start", "stall_end", "quality_change", "ended",
-               "error", "quartile", "heartbeat"]
+      "enum": ["manifestload playerready canplay canplaythrough playing pause seek waitstart stallstart stallend ended error quartile heartbeat qualitychangerequested qualitychange fpsdrop fragmentloaded bufferlevelchange bandwidthchange playbackratechange playbackvolumechange playbackdetached moveaway moveback"]
     },
     "event_time": { "type": "number" },
     "org_id": { "type": "string", "minLength": 1 },
