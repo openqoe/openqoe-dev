@@ -2,7 +2,7 @@ package middlewares
 
 import (
 	"github.com/gin-gonic/gin"
-	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker/config"
 )
 
 type UnAuthorizedResponse struct {

@@ -7,9 +7,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/otelservice"
-	"openqoe.dev/worker_v2/requesthandlers"
+	"openqoe.dev/worker/config"
+	"openqoe.dev/worker/otelservice"
+	"openqoe.dev/worker/requesthandlers"
 )
 
 func NewMetricsService(config *config.Config, cardinality_service *config.CardinalityService, otelservice *otelservice.OpenTelemetryService, parent_logger *zap.Logger) *MetricsService {

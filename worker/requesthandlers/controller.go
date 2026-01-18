@@ -9,9 +9,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/middlewares"
-	"openqoe.dev/worker_v2/otelservice"
+	"openqoe.dev/worker/config"
+	"openqoe.dev/worker/middlewares"
+	"openqoe.dev/worker/otelservice"
 )
 
 type RequestHandlerService struct {

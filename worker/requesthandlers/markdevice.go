@@ -3,7 +3,7 @@ package requesthandlers
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker/config"
 )
 
 func markDevice(env *config.Env) gin.HandlerFunc {

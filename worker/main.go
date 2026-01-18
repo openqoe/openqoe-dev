@@ -12,12 +12,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"openqoe.dev/worker_v2/compute"
-	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/middlewares"
-	"openqoe.dev/worker_v2/otelservice"
-	"openqoe.dev/worker_v2/pool"
-	"openqoe.dev/worker_v2/requesthandlers"
+	"openqoe.dev/worker/compute"
+	"openqoe.dev/worker/config"
+	"openqoe.dev/worker/middlewares"
+	"openqoe.dev/worker/otelservice"
+	"openqoe.dev/worker/pool"
+	"openqoe.dev/worker/requesthandlers"
 )
 
 func main() {

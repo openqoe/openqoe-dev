@@ -6,7 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	datastructure "openqoe.dev/worker_v2/data_structure"
+	datastructure "openqoe.dev/worker/data_structure"
 )
 
 type RedisConnection struct {

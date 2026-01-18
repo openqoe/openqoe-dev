@@ -6,7 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/otelservice"
+	"openqoe.dev/worker/otelservice"
 )
 
 func MeasureSystemMetrics(otel_service *otelservice.OpenTelemetryService) {

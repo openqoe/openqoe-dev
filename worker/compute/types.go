@@ -5,8 +5,8 @@ import (
 
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/otelservice"
+	"openqoe.dev/worker/config"
+	"openqoe.dev/worker/otelservice"
 )
 
 type Label struct {

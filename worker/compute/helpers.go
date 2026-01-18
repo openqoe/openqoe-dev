@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/requesthandlers"
+	"openqoe.dev/worker/requesthandlers"
 )
 
 func (ms *MetricsService) extractBaseLabels(event requesthandlers.BaseEvent, marker string) map[string]string {

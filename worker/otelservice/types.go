@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const package_name = "openqoe.dev/worker_v2"
+const package_name = "openqoe.dev/worker"
 
 type OpenTelemetryService struct {
 	Tracer trace.Tracer

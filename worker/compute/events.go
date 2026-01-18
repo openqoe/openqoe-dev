@@ -8,8 +8,8 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	datastructure "openqoe.dev/worker_v2/data_structure"
-	"openqoe.dev/worker_v2/requesthandlers"
+	datastructure "openqoe.dev/worker/data_structure"
+	"openqoe.dev/worker/requesthandlers"
 )
 
 func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_lables map[string]string) {

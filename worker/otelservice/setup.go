@@ -21,7 +21,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker/config"
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.

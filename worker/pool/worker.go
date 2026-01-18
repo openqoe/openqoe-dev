@@ -6,10 +6,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"openqoe.dev/worker_v2/compute"
-	"openqoe.dev/worker_v2/config"
-	"openqoe.dev/worker_v2/otelservice"
-	"openqoe.dev/worker_v2/requesthandlers"
+	"openqoe.dev/worker/compute"
+	"openqoe.dev/worker/config"
+	"openqoe.dev/worker/otelservice"
+	"openqoe.dev/worker/requesthandlers"
 )
 
 type WorkerPool struct {

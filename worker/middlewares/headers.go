@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"openqoe.dev/worker_v2/config"
+	"openqoe.dev/worker/config"
 )
 
 func GlobalHeaders(env *config.Env) gin.HandlerFunc {

@@ -1,10 +1,10 @@
-# OpenQoE Go Worker
+# OpenQoE Worker
 
 High-performance OTLP ingestion worker for OpenQoE v2.
 
 ## Overview
 
-The Go Worker is the core ingestion component of OpenQoE v2. It replaces the legacy Cloudflare Worker with a more scalable, concurrent, and OTel-native implementation.
+The Go based Worker is the core ingestion component of OpenQoE v2. It replaces the legacy Cloudflare Worker with a more scalable, concurrent, and OTel-native implementation.
 
 ### Key Features
 

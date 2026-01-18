@@ -1,4 +1,4 @@
-module openqoe.dev/worker_v2
+module openqoe.dev/worker
 
 go 1.25.1
 
