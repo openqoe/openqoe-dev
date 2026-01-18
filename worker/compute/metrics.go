@@ -177,7 +177,7 @@ func (ms *MetricsService) transformEventsToMetrics(span_ctx context.Context, eve
 	case "pause":
 		ms.onPause(&event, span_ctx, &base_attributes)
 	case "moveaway":
-		ms.onMoveAway(&event, span_ctx, &base_attributes, base_labels)
+		ms.onMoveAway(&event, span_ctx, &base_attributes)
 	case "moveback":
 		ms.onMoveBack(&event, marker, span_ctx, &base_attributes)
 	default:

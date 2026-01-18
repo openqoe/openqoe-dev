@@ -390,7 +390,7 @@ func (ms *MetricsService) onQuartile(event *requesthandlers.BaseEvent, parent_sp
 	}
 }
 
-func (ms *MetricsService) onMoveAway(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
+func (ms *MetricsService) onMoveAway(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	redis_key := "metrics:session_analytics:" + event.SessionId
 	field_names := []string{"page_entry", "marker", "played_ts"}
 	res_map, _ := ms.config.Redis_client.GetHashFields(redis_key, field_names)
