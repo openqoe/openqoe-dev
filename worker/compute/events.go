@@ -14,46 +14,33 @@ import (
 
 func (ms *MetricsService) onFragmentLoaded(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_lables map[string]string) {
 	labels := map[string]string{
-		"media_type":       "",
-		"service_location": "",
-		"url":              "",
-		"frag_id":          "",
-		"is_outlier":       "false",
-	}
-	if val, ok := event.Data["media_type"]; ok && val != nil {
-		labels["media_type"] = val.(string)
-	}
-	if val, ok := event.Data["service_location"]; ok && val != nil {
-		labels["service_location"] = val.(string)
-	}
-	if val, ok := event.Data["url"]; ok && val != nil {
-		labels["url"] = val.(string)
-	}
-	if val, ok := event.Data["frag_id"]; ok && val != nil {
-		labels["frag_id"] = val.(string)
-	}
-	if val, ok := event.Data["is_outlier"]; ok && val != nil {
-		labels["is_outlier"] = strconv.FormatBool(val.(bool))
+		"media_type":       getString(event, "media_type", "", ms.logger),
+		"service_location": getString(event, "service_location", "", ms.logger),
+		"url":              getString(event, "url", "", ms.logger),
+		"frag_id":          getString(event, "frag_id", "", ms.logger),
+		"is_outlier":       strconv.FormatBool(getBool(event, "is_outlier", false, ms.logger)),
 	}
 	attributes := addAttributes(base_lables, labels)
-	if val, ok := event.Data["ttfb_ms"]; ok && val != nil {
-		num_val := int64(val.(float64))
+	num_val := getInt64(event, "ttfb_ms", 0, ms.logger)
+	if num_val > 0 {
 		ms.metrics.network_latency.Record(parent_span_ctx, num_val, metric.WithAttributeSet(attributes))
 	}
-	if val, ok := event.Data["z_score"]; ok && val != nil {
-		ms.metrics.network_latency_deviation.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(attributes))
+	z_score := getFloat64(event, "z_score", 0, ms.logger)
+	if z_score > 0 {
+		ms.metrics.network_latency_deviation.Record(parent_span_ctx, z_score, metric.WithAttributeSet(attributes))
 	}
-	if val, ok := event.Data["frag_duration"]; ok && val != nil {
-		num_val := int64(val.(float64))
-		ms.metrics.frag_duration.Record(parent_span_ctx, num_val, metric.WithAttributeSet(attributes))
-		ms.metrics.buffered_duration.Add(parent_span_ctx, num_val, metric.WithAttributeSet(attributes))
+	frag_duration := getInt64(event, "frag_duration", 0, ms.logger)
+	if frag_duration > 0 {
+		ms.metrics.frag_duration.Record(parent_span_ctx, frag_duration, metric.WithAttributeSet(attributes))
+		ms.metrics.buffered_duration.Add(parent_span_ctx, frag_duration, metric.WithAttributeSet(attributes))
 	}
 
 }
 
 func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marker string, parent_span_ctx context.Context, base_attributes *attribute.Set) {
-	if val, ok := event.Data["page_load_time"]; ok && val != nil {
-		ms.metrics.page_load_time.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+	page_load_time := getFloat64(event, "page_load_time", 0, ms.logger)
+	if page_load_time > 0 {
+		ms.metrics.page_load_time.Record(parent_span_ctx, page_load_time, metric.WithAttributeSet(*base_attributes))
 		page_entry := strconv.FormatInt(event.EventTime, 10)
 		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
 			map[string]datastructure.Pair[string, time.Duration]{
@@ -64,65 +51,55 @@ func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marke
 }
 
 func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
-	if val, ok := event.Data["player_startup_time"]; ok && val != nil {
-		ms.metrics.player_startup_time.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+	player_startup_time := getFloat64(event, "player_startup_time", 0, ms.logger)
+	if player_startup_time > 0 {
+		ms.metrics.player_startup_time.Record(parent_span_ctx, player_startup_time, metric.WithAttributeSet(*base_attributes))
 		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
-			"player_ready_ts": {First: strconv.FormatFloat(val.(float64), 'f', -1, 64), Second: 10 * time.Minute},
+			"player_ready_ts": {First: strconv.FormatFloat(player_startup_time, 'f', -1, 64), Second: 10 * time.Minute},
 		})
 	}
 }
 
 func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
-	labels := make(map[string]string)
-	attributes := *base_attributes
-	if val, ok := event.Data["media_type"]; ok && val != nil {
-		labels["media_type"] = val.(string)
+	labels := map[string]string{
+		"media_type": getString(event, "media_type", "", ms.logger),
+		"is_outlier": strconv.FormatBool(getBool(event, "is_outlier", false, ms.logger)),
 	}
-	if val, ok := event.Data["is_outlier"]; ok && val != nil {
-		labels["is_outlier"] = strconv.FormatBool(val.(bool))
+	attributes := addAttributes(base_labels, labels)
+	buffer_len_ms := getFloat64(event, "buffer_len_ms", 0, ms.logger)
+	if buffer_len_ms > 0 {
+		ms.metrics.buffer_length.Record(parent_span_ctx, buffer_len_ms, metric.WithAttributeSet(attributes))
 	}
-	attributes = addAttributes(base_labels, labels)
-	if val, ok := event.Data["buffer_len_ms"]; ok && val != nil {
-		ms.metrics.buffer_length.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(attributes))
-	}
-	if val, ok := event.Data["z_score"]; ok && val != nil {
-		ms.metrics.buffer_instability_index.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(attributes))
+	z_score := getFloat64(event, "z_score", 0, ms.logger)
+	if z_score > 0 {
+		ms.metrics.buffer_instability_index.Record(parent_span_ctx, z_score, metric.WithAttributeSet(attributes))
 	}
 }
 
 func (ms *MetricsService) onBandwidthChange(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
 	labels := map[string]string{
-		"media_type": "",
-		"codec":      "",
-	}
-	if val, ok := event.Data["media_type"]; ok && val != nil {
-		labels["media_type"] = val.(string)
-	}
-	if val, ok := event.Data["codec"]; ok && val != nil {
-		labels["codec"] = val.(string)
+		"media_type": getString(event, "media_type", "", ms.logger),
+		"codec":      getString(event, "codec", "", ms.logger),
 	}
 	attributes := addAttributes(base_labels, labels)
-	field := "bandwidth"
-	if val, ok := event.Data[field]; ok && val != nil {
-		cur_bandwidth := int64(val.(float64)) * 1000
-		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{field})
-		if err != nil || res_map[field] == "" {
+	bandwidth := getFloat64(event, "bandwidth", 0, ms.logger)
+	if bandwidth > 0 {
+		cur_bandwidth := int64(bandwidth) * 1000
+		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{"bandwidth"})
+		if err != nil || res_map["bandwidth"] == "" {
 			ms.metrics.network_bandwidth.Add(parent_span_ctx, cur_bandwidth, metric.WithAttributeSet(attributes))
 		}
-		prev_bandwidth, _ := strconv.ParseInt(res_map[field], 10, 64)
+		prev_bandwidth, _ := strconv.ParseInt(res_map["bandwidth"], 10, 64)
 		ms.metrics.network_bandwidth.Add(parent_span_ctx, cur_bandwidth-prev_bandwidth, metric.WithAttributeSet(attributes))
 		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
-			field: {First: strconv.FormatInt(cur_bandwidth, 10), Second: 15 * time.Minute},
+			"bandwidth": {First: strconv.FormatInt(cur_bandwidth, 10), Second: 15 * time.Minute},
 		})
 	}
 }
 
 func (ms *MetricsService) onQualityChangeRequested(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
 	labels := map[string]string{
-		"media_type": "",
-	}
-	if val, ok := event.Data["media_type"]; ok && val != nil {
-		labels["media_type"] = val.(string)
+		"media_type": getString(event, "media_type", "", ms.logger),
 	}
 	attributes := addAttributes(base_labels, labels)
 	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
@@ -132,38 +109,29 @@ func (ms *MetricsService) onQualityChangeRequested(event *requesthandlers.BaseEv
 	ms.metrics.quality_change_request_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(attributes))
 	bitrate_old := 0.00
 	bitrate_new := 0.00
-	if val, ok := event.Data["old"]; ok && val != nil {
-		old_rep := val.(map[string]any)
-		bitrate_old = old_rep["bitrate_kb"].(float64) * 1000
+	old_rep := getMap(event, "old", nil, ms.logger)
+	if old_rep != nil {
+		bitrate_old = getMapFloat64(old_rep, "bitrate_kb", 0, ms.logger) * 1000
 	}
-	if val, ok := event.Data["new"]; ok && val != nil {
-		new_rep := val.(map[string]any)
-		bitrate_new = new_rep["bitrate_kb"].(float64) * 1000
+	new_rep := getMap(event, "new", nil, ms.logger)
+	if new_rep != nil {
+		bitrate_new = getMapFloat64(new_rep, "bitrate_kb", 0, ms.logger) * 1000
 	}
 	ms.metrics.bitrate_change.Add(parent_span_ctx, bitrate_new-bitrate_old, metric.WithAttributeSet(attributes))
 }
 
 func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
-	// Pre-extract all event data once to avoid repeated map lookups
-	mediaType, _ := event.Data["media_type"].(string)
-	framerate, _ := event.Data["framerate"].(float64)
-	codec, _ := event.Data["codec"].(string)
-	bitrateKb, has_bitrate := event.Data["bitrate_kb"].(float64)
-	videoWidth, _ := event.Data["video_width"].(float64)
-	videoHeight, _ := event.Data["video_height"].(float64)
-	playerWidth := int64(1)
-	playerHeight := int64(1)
-	devicePixelRatio := 1.00
-
-	if val, ok := event.Data["player_width"].(float64); ok {
-		playerWidth = int64(val)
-	}
-	if val, ok := event.Data["player_height"].(float64); ok {
-		playerHeight = int64(val)
-	}
-	if val, ok := event.Data["device_pixel_ratio"].(float64); ok {
-		devicePixelRatio = val
-	}
+	// Pre-extract all event data once to avoid repeated map lookups using safe helpers
+	mediaType := getString(event, "media_type", "", ms.logger)
+	framerate := getFloat64(event, "framerate", 0, ms.logger)
+	codec := getString(event, "codec", "", ms.logger)
+	bitrateKb := getFloat64(event, "bitrate_kb", 0, ms.logger)
+	has_bitrate := bitrateKb > 0
+	videoWidth := getFloat64(event, "video_width", 0, ms.logger)
+	videoHeight := getFloat64(event, "video_height", 0, ms.logger)
+	playerWidth := getInt64(event, "player_width", 1, ms.logger)
+	playerHeight := getInt64(event, "player_height", 1, ms.logger)
+	devicePixelRatio := getFloat64(event, "device_pixel_ratio", 1.0, ms.logger)
 
 	// Build labels once with pre-allocated capacity
 	labels := make(map[string]string, 3)
@@ -279,19 +247,20 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, pare
 }
 
 func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
-	if val, ok := event.Data["video_startup_time"]; ok && val != nil {
+	video_startup_time := getFloat64(event, "video_startup_time", 0, ms.logger)
+	if video_startup_time > 0 {
 		player_ready_ts_field_name := "player_ready_ts"
 		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
 		if err != nil {
-			ms.metrics.video_startup_time.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
-		}
-		if res_map[player_ready_ts_field_name] != "" {
+			ms.metrics.video_startup_time.Record(parent_span_ctx, video_startup_time, metric.WithAttributeSet(*base_attributes))
+		} else if res_map[player_ready_ts_field_name] != "" {
 			player_ready_ts, err := strconv.ParseFloat(res_map[player_ready_ts_field_name], 64)
 			if err != nil {
-				ms.metrics.video_startup_time.Record(parent_span_ctx, val.(float64), metric.WithAttributeSet(*base_attributes))
+				ms.metrics.video_startup_time.Record(parent_span_ctx, video_startup_time, metric.WithAttributeSet(*base_attributes))
+			} else {
+				dur := video_startup_time - player_ready_ts
+				ms.metrics.video_startup_time.Record(parent_span_ctx, dur, metric.WithAttributeSet(*base_attributes))
 			}
-			dur := val.(float64) - player_ready_ts
-			ms.metrics.video_startup_time.Record(parent_span_ctx, dur, metric.WithAttributeSet(*base_attributes))
 		}
 		ms.config.Redis_client.DeleteHashField("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
 	}
@@ -306,7 +275,7 @@ func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, parent_spa
 
 func (ms *MetricsService) onPause(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.pause_events_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	playing_time := getFloat64(event, "playing_time", 0)
+	playing_time := getFloat64(event, "playing_time", 0, ms.logger)
 	if playing_time > 0 {
 		ms.metrics.pause_playing_time.Record(parent_span_ctx, playing_time, metric.WithAttributeSet(*base_attributes))
 	}
@@ -314,7 +283,7 @@ func (ms *MetricsService) onPause(event *requesthandlers.BaseEvent, parent_span_
 
 func (ms *MetricsService) onStallStart(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.rebuffer_events_count.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	buffer_length := getFloat64(event, "buffer_length", 0)
+	buffer_length := getFloat64(event, "buffer_length", 0, ms.logger)
 	if buffer_length > 0 {
 		ms.metrics.buffer_length.Record(parent_span_ctx, buffer_length, metric.WithAttributeSet(*base_attributes))
 	}
@@ -325,8 +294,9 @@ func (ms *MetricsService) onStallStart(event *requesthandlers.BaseEvent, parent_
 
 func (ms *MetricsService) onStallEnd(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.rebuffer_events_count.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	if val, ok := event.Data["stall_position_secs"]; ok && val != nil {
-		ms.metrics.stall_position.Record(parent_span_ctx, int64(val.(float64)), metric.WithAttributeSet(*base_attributes))
+	stall_position := getInt64(event, "stall_position_secs", 0, ms.logger)
+	if stall_position > 0 {
+		ms.metrics.stall_position.Record(parent_span_ctx, stall_position, metric.WithAttributeSet(*base_attributes))
 	}
 	redis_key := "metrics:session_analytics:" + event.SessionId
 	field_name := "stall_start_time"
@@ -341,7 +311,7 @@ func (ms *MetricsService) onStallEnd(event *requesthandlers.BaseEvent, parent_sp
 
 func (ms *MetricsService) onSeek(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.seek_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	seek_latency := getFloat64(event, "seek_latency", 0)
+	seek_latency := getFloat64(event, "seek_latency", 0, ms.logger)
 	if seek_latency > 0 {
 		ms.metrics.seek_latency.Record(parent_span_ctx, seek_latency, metric.WithAttributeSet(*base_attributes))
 	}
@@ -349,11 +319,11 @@ func (ms *MetricsService) onSeek(event *requesthandlers.BaseEvent, parent_span_c
 
 func (ms *MetricsService) onEnded(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.views_completed_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	playing_time := getFloat64(event, "playing_time", 0)
+	playing_time := getFloat64(event, "playing_time", 0, ms.logger)
 	if playing_time > 0 {
 		ms.metrics.playing_time.Record(parent_span_ctx, playing_time, metric.WithAttributeSet(*base_attributes))
 	}
-	completion_rate := getFloat64(event, "completion_rate", 0)
+	completion_rate := getFloat64(event, "completion_rate", 0, ms.logger)
 	if completion_rate > 0 {
 		ms.metrics.completion_rate.Record(parent_span_ctx, completion_rate, metric.WithAttributeSet(*base_attributes))
 	}
@@ -361,28 +331,28 @@ func (ms *MetricsService) onEnded(event *requesthandlers.BaseEvent, parent_span_
 
 func (ms *MetricsService) onError(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
 	labels := maps.Clone(base_labels)
-	labels["error_family"] = getString(event, "error_family", "unknown")
-	labels["error_code"] = getString(event, "error_code", "unknown")
+	labels["error_family"] = getString(event, "error_family", "unknown", ms.logger)
+	labels["error_code"] = getString(event, "error_code", "unknown", ms.logger)
 	ms.metrics.errors_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(mapToAttributeSet(ms.cardinality_service.ApplyGovernanceToLabels(labels))))
 }
 
 func (ms *MetricsService) onHeartbeat(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
-	playing_time := getFloat64(event, "playing_time", 0)
+	playing_time := getFloat64(event, "playing_time", 0, ms.logger)
 	if playing_time > 0 {
 		ms.metrics.heart_beat_playing_time.Record(parent_span_ctx, playing_time, metric.WithAttributeSet(*base_attributes))
 	}
-	bitrate := getFloat64(event, "bitrate", 0)
+	bitrate := getFloat64(event, "bitrate", 0, ms.logger)
 	if bitrate > 0 {
 		ms.metrics.heart_beat_bitrate.Record(parent_span_ctx, bitrate, metric.WithAttributeSet(*base_attributes))
 	}
-	dropped_frames := getFloat64(event, "dropped_frames", 0)
+	dropped_frames := getFloat64(event, "dropped_frames", 0, ms.logger)
 	if dropped_frames > 0 {
 		ms.metrics.dropped_frames_total.Record(parent_span_ctx, dropped_frames, metric.WithAttributeSet(*base_attributes))
 	}
 }
 
 func (ms *MetricsService) onQuartile(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
-	quartile := getFloat64(event, "quartile", 0)
+	quartile := getFloat64(event, "quartile", 0, ms.logger)
 	if quartile > 0 {
 		labels := maps.Clone(base_labels)
 		labels["quartile"] = strconv.FormatFloat(quartile, 'f', -1, 64)
