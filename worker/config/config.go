@@ -14,7 +14,7 @@ type Config struct {
 	env                 *Env
 	cardinality_config  *CardinalityConfig
 	destination_manager *DestinationManager
-	Redis_client        *RedisConnection
+	RedisClient         *RedisConnection
 }
 
 func loadCardinalityConfig(env *Env, parentLogger *zap.Logger) *CardinalityConfig {
@@ -92,7 +92,7 @@ func NewConfig(ctx context.Context, env *Env, parentLogger *zap.Logger) *Config 
 		env:                 env,
 		cardinality_config:  cardinalityConfig,
 		destination_manager: destinationManager,
-		Redis_client:        redisClient,
+		RedisClient:         redisClient,
 	}
 }
 

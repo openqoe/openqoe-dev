@@ -8,7 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	datastructure "openqoe.dev/worker/data_structure"
+	"openqoe.dev/worker/datastructure"
 	"openqoe.dev/worker/requesthandlers"
 )
 
@@ -42,7 +42,7 @@ func (ms *MetricsService) onManifestLoad(event *requesthandlers.BaseEvent, marke
 	if page_load_time > 0 {
 		ms.metrics.page_load_time.Record(parent_span_ctx, page_load_time, metric.WithAttributeSet(*base_attributes))
 		page_entry := strconv.FormatInt(event.EventTime, 10)
-		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+		ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
 			map[string]datastructure.Pair[string, time.Duration]{
 				"page_entry": {First: page_entry, Second: 24 * time.Hour},
 				"marker":     {First: marker, Second: 24 * time.Hour},
@@ -54,7 +54,7 @@ func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, parent
 	player_startup_time := getFloat64(event, "player_startup_time", 0, ms.logger)
 	if player_startup_time > 0 {
 		ms.metrics.player_startup_time.Record(parent_span_ctx, player_startup_time, metric.WithAttributeSet(*base_attributes))
-		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+		ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
 			"player_ready_ts": {First: strconv.FormatFloat(player_startup_time, 'f', -1, 64), Second: 10 * time.Minute},
 		})
 	}
@@ -85,13 +85,13 @@ func (ms *MetricsService) onBandwidthChange(event *requesthandlers.BaseEvent, pa
 	bandwidth := getFloat64(event, "bandwidth", 0, ms.logger)
 	if bandwidth > 0 {
 		cur_bandwidth := int64(bandwidth) * 1000
-		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{"bandwidth"})
+		res_map, err := ms.config.RedisClient.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{"bandwidth"})
 		if err != nil || res_map["bandwidth"] == "" {
 			ms.metrics.network_bandwidth.Add(parent_span_ctx, cur_bandwidth, metric.WithAttributeSet(attributes))
 		}
 		prev_bandwidth, _ := strconv.ParseInt(res_map["bandwidth"], 10, 64)
 		ms.metrics.network_bandwidth.Add(parent_span_ctx, cur_bandwidth-prev_bandwidth, metric.WithAttributeSet(attributes))
-		ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+		ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
 			"bandwidth": {First: strconv.FormatInt(cur_bandwidth, 10), Second: 15 * time.Minute},
 		})
 	}
@@ -102,7 +102,7 @@ func (ms *MetricsService) onQualityChangeRequested(event *requesthandlers.BaseEv
 		"media_type": getString(event, "media_type", "", ms.logger),
 	}
 	attributes := addAttributes(base_labels, labels)
-	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+	ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
 		map[string]datastructure.Pair[string, time.Duration]{
 			"qual_switch_req_ts_" + labels["media_type"]: {First: strconv.FormatInt(event.EventTime, 10), Second: 20 * time.Minute},
 		})
@@ -156,7 +156,7 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, pare
 		"last_resolution",
 		"last_resolution_rendered_ts",
 	}
-	resMap, _ := ms.config.Redis_client.GetHashFields(sessionKey, hashFields)
+	resMap, _ := ms.config.RedisClient.GetHashFields(sessionKey, hashFields)
 
 	// === Quality Switch Latency ===
 	if reqTsStr := resMap[qualSwitchReqTsKey]; reqTsStr != "" {
@@ -164,7 +164,7 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, pare
 			qsLat := event.EventTime - reqTs
 			ms.metrics.quality_switch_latency.Record(parent_span_ctx, qsLat, metric.WithAttributeSet(attributes))
 		}
-		ms.config.Redis_client.DeleteHashField(sessionKey, []string{qualSwitchReqTsKey})
+		ms.config.RedisClient.DeleteHashField(sessionKey, []string{qualSwitchReqTsKey})
 	}
 
 	// Record resolution metric
@@ -243,14 +243,14 @@ func (ms *MetricsService) onQualityChange(event *requesthandlers.BaseEvent, pare
 		}
 	}
 
-	ms.config.Redis_client.SetOrUpdateHash(sessionKey, updateFields)
+	ms.config.RedisClient.SetOrUpdateHash(sessionKey, updateFields)
 }
 
 func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	video_startup_time := getFloat64(event, "video_startup_time", 0, ms.logger)
 	if video_startup_time > 0 {
 		player_ready_ts_field_name := "player_ready_ts"
-		res_map, err := ms.config.Redis_client.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
+		res_map, err := ms.config.RedisClient.GetHashFields("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
 		if err != nil {
 			ms.metrics.video_startup_time.Record(parent_span_ctx, video_startup_time, metric.WithAttributeSet(*base_attributes))
 		} else if res_map[player_ready_ts_field_name] != "" {
@@ -262,13 +262,13 @@ func (ms *MetricsService) onCanPlay(event *requesthandlers.BaseEvent, parent_spa
 				ms.metrics.video_startup_time.Record(parent_span_ctx, dur, metric.WithAttributeSet(*base_attributes))
 			}
 		}
-		ms.config.Redis_client.DeleteHashField("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
+		ms.config.RedisClient.DeleteHashField("metrics:session_analytics:"+event.SessionId, []string{player_ready_ts_field_name})
 	}
 }
 
 func (ms *MetricsService) onPlaying(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	ms.metrics.views_started_total.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
-	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+	ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
 		"played_ts": {First: strconv.FormatInt(event.EventTime, 10), Second: 24 * time.Hour},
 	})
 }
@@ -287,7 +287,7 @@ func (ms *MetricsService) onStallStart(event *requesthandlers.BaseEvent, parent_
 	if buffer_length > 0 {
 		ms.metrics.buffer_length.Record(parent_span_ctx, buffer_length, metric.WithAttributeSet(*base_attributes))
 	}
-	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
+	ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId, map[string]datastructure.Pair[string, time.Duration]{
 		"stall_start_time": {First: strconv.FormatInt(event.EventTime, 10), Second: 30 * time.Minute},
 	})
 }
@@ -300,13 +300,13 @@ func (ms *MetricsService) onStallEnd(event *requesthandlers.BaseEvent, parent_sp
 	}
 	redis_key := "metrics:session_analytics:" + event.SessionId
 	field_name := "stall_start_time"
-	res_map, _ := ms.config.Redis_client.GetHashFields(redis_key, []string{field_name})
+	res_map, _ := ms.config.RedisClient.GetHashFields(redis_key, []string{field_name})
 	stall_start_time, _ := strconv.ParseInt(res_map[field_name], 10, 64)
 	stall_duration := event.EventTime - stall_start_time
 	if stall_duration > 0 {
 		ms.metrics.rebuffer_duration.Record(parent_span_ctx, stall_duration, metric.WithAttributeSet(*base_attributes))
 	}
-	ms.config.Redis_client.DeleteHashField(redis_key, []string{field_name})
+	ms.config.RedisClient.DeleteHashField(redis_key, []string{field_name})
 }
 
 func (ms *MetricsService) onSeek(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
@@ -363,21 +363,21 @@ func (ms *MetricsService) onQuartile(event *requesthandlers.BaseEvent, parent_sp
 func (ms *MetricsService) onMoveAway(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	redis_key := "metrics:session_analytics:" + event.SessionId
 	field_names := []string{"page_entry", "marker", "played_ts"}
-	res_map, _ := ms.config.Redis_client.GetHashFields(redis_key, field_names)
+	res_map, _ := ms.config.RedisClient.GetHashFields(redis_key, field_names)
 	if res_map["page_entry"] != "" && res_map["played_ts"] == "" {
 		ms.metrics.exit_without_play.Add(parent_span_ctx, 1, metric.WithAttributeSet(*base_attributes))
 	}
 	page_entry, _ := strconv.ParseInt(res_map["page_entry"], 10, 64)
 	stay_dur := event.EventTime - page_entry
 	ms.metrics.stay_duration.Record(parent_span_ctx, stay_dur, metric.WithAttributeSet(*base_attributes))
-	ms.config.Redis_client.DeleteHashField(redis_key, field_names)
+	ms.config.RedisClient.DeleteHashField(redis_key, field_names)
 }
 
 func (ms *MetricsService) onMoveBack(event *requesthandlers.BaseEvent, marker string, parent_span_ctx context.Context, base_attributes *attribute.Set) {
 	//user came back they have not exited so reducing count
 	ms.metrics.exit_without_play.Add(parent_span_ctx, -1, metric.WithAttributeSet(*base_attributes))
 	page_entry := strconv.FormatInt(event.EventTime, 10)
-	ms.config.Redis_client.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
+	ms.config.RedisClient.SetOrUpdateHash("metrics:session_analytics:"+event.SessionId,
 		map[string]datastructure.Pair[string, time.Duration]{
 			"page_entry": {First: page_entry, Second: 24 * time.Hour},
 			"marker":     {First: marker, Second: 24 * time.Hour},
