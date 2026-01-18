@@ -129,11 +129,14 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 func (ms *MetricsService) ComputeMetrics(events_chunk *requesthandlers.IngestRequestWithContext, tracer trace.Tracer, parent_span_ctx context.Context) {
 	logger := ms.logger.With(zap.String("method", "compute-metrics"))
 	for _, event := range events_chunk.Events {
-		span_ctx, span := tracer.Start(parent_span_ctx, "compute-metrics", trace.WithSpanKind(trace.SpanKindInternal), trace.WithAttributes(attribute.String("event-type", event.EventType)))
-		logger.Debug("Processing event", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
-		ms.transformEventsToMetrics(span_ctx, event, events_chunk.Marker)
-		logger.Debug("Event processing success", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
-		span.End()
+		func() {
+			span_ctx, span := tracer.Start(parent_span_ctx, "compute-metrics", trace.WithSpanKind(trace.SpanKindInternal), trace.WithAttributes(attribute.String("event-type", event.EventType)))
+			defer span.End()
+			logger.Debug("Processing event", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
+			ms.transformEventsToMetrics(span_ctx, event, events_chunk.Marker)
+			logger.Debug("Event processing success", zap.String("event-type", event.EventType), zap.String("view-id", event.ViewId))
+		}()
+
 	}
 }
 

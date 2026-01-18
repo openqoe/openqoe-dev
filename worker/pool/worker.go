@@ -36,11 +36,15 @@ func worker(worker_id int, parent_logger *zap.Logger, tracer trace.Tracer, metri
 	logger := parent_logger.With(zap.String("sub-component", "worker"), zap.Int("worker id", worker_id))
 	// For events in the channel
 	for events_chunk := range event_chan {
-		span_ctx, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.Int("worker.id", worker_id)))
-		logger.Debug("Received event for processing", zap.Int("worker id", worker_id))
-		// For each event chunk
-		metrics_service.ComputeMetrics(events_chunk, tracer, span_ctx)
-		logger.Info("Event processing complete", zap.Int("worker id", worker_id))
-		span.End()
+		do(tracer, events_chunk, worker_id, metrics_service, logger)
 	}
+}
+
+func do(tracer trace.Tracer, events_chunk *requesthandlers.IngestRequestWithContext, worker_id int, metrics_service *compute.MetricsService, logger *zap.Logger) {
+	span_ctx, span := tracer.Start(events_chunk.Ctx, "worker.work", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.Int("worker.id", worker_id)))
+	defer span.End()
+	logger.Debug("Received event for processing", zap.Int("worker id", worker_id))
+	// For each event chunk
+	metrics_service.ComputeMetrics(events_chunk, tracer, span_ctx)
+	logger.Info("Event processing complete", zap.Int("worker id", worker_id))
 }
