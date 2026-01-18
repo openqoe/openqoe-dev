@@ -631,7 +631,7 @@ export class HlsJsAdapter implements PlayerAdapter {
     const event = await this.eventCollector.createEvent(
       "stallstart",
       {
-        buffer_length: this.getBufferLength(),
+        buffer_len_ms: this.getBufferLength(),
         bitrate: this.getBitrate(),
       },
       this.video.currentTime * 1000,
@@ -741,7 +741,7 @@ export class HlsJsAdapter implements PlayerAdapter {
       this.video.currentTime * 1000,
     );
     this.batchManager.addEvent(event);
-    this.logger.debug("entry event fired");
+    this.logger.debug("moveback event fired");
   }
 
   /**

@@ -151,7 +151,7 @@ export class HTML5Adapter implements PlayerAdapter {
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("maanifestload event fired");
+    this.logger.debug("manifestload event fired");
   }
 
   /**
@@ -442,7 +442,7 @@ export class HTML5Adapter implements PlayerAdapter {
       this.video.currentTime * 1000,
     );
     this.batchManager.addEvent(event);
-    this.logger.debug("entry event fired");
+    this.logger.debug("moveback event fired");
   }
 
   /**

@@ -729,7 +729,7 @@ export class DashJsAdapter implements PlayerAdapter {
       this.video.currentTime * 1000,
     );
     this.batchManager.addEvent(event);
-    this.logger.debug("entry event fired");
+    this.logger.debug("moveback event fired");
   }
 
   /**
