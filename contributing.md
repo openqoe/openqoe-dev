@@ -40,11 +40,13 @@ We do not tolerate harassment, discrimination, or unprofessional behavior of any
 Found a bug? Help us fix it by submitting a detailed bug report.
 
 **Before submitting a bug report:**
+
 - Check the [existing issues](https://github.com/openqoe/openqoe-dev/issues) to avoid duplicates
 - Verify the bug exists in the latest version
 - Collect relevant information (logs, screenshots, environment details)
 
 **When submitting a bug report, include:**
+
 - **Clear title**: Descriptive summary of the issue
 - **Description**: Detailed explanation of what went wrong
 - **Steps to reproduce**: Exact steps to trigger the bug
@@ -53,6 +55,7 @@ Found a bug? Help us fix it by submitting a detailed bug report.
 - **Environment**:
   - OpenQoE version
   - Node.js version
+  - Go Version
   - Browser (if SDK-related)
   - Operating system
   - Deployment environment (self-hosted/Grafana Cloud)
@@ -60,35 +63,44 @@ Found a bug? Help us fix it by submitting a detailed bug report.
 - **Screenshots**: If applicable
 
 **Example Bug Report:**
+
 ### Description
+
 After deploying the Go worker, the Grafana dashboards show "No Data" despite events being sent from the SDK.
 
 ### Steps to Reproduce
-1. Start worker: `./openqoe-worker`
+
+1. Start all components: `docker compose up -d`
 2. Configure SDK with worker URL
 3. Generate test events
 4. Open VOD Monitoring dashboard
 5. All panels show "No Data"
 
 ### Expected Behavior
+
 Dashboard panels should display metrics within 1-2 minutes
 
 ### Actual Behavior
+
 All panels remain empty after 10 minutes
 
 ### Environment
+
 - OpenQoE version: 2.0.0
-- Go version: 1.21.x
+- Go version: 1.25.x
 - Deployment: Go Worker + Grafana Alloy + Mimir
 - Browser: Chrome 120
 
 ### Logs
+
 Worker logs show: `Sent 45 time series to Prometheus`
 Mimir logs show: `Authentication failed`
 
 ### Additional Context
+
 Using self-hosted Mimir with default configuration
-```
+
+````
 
 ---
 
@@ -131,7 +143,7 @@ A learning platform embeds YouTube videos and wants to monitor playback quality 
 ### Alternatives Considered
 - Using YouTube Analytics API (requires user OAuth, not suitable for real-time monitoring)
 - Generic iframe monitoring (doesn't provide detailed QoE metrics)
-```
+````
 
 ---
 
@@ -140,6 +152,7 @@ A learning platform embeds YouTube videos and wants to monitor playback quality 
 Documentation improvements are always welcome!
 
 **Areas where you can help:**
+
 - Fix typos, grammar, or formatting issues
 - Clarify confusing sections
 - Add missing examples or use cases
@@ -148,6 +161,7 @@ Documentation improvements are always welcome!
 - Create tutorials or guides
 
 **Documentation files:**
+
 - `README.md` - Main project overview
 - `DEPLOYMENT_GUIDE.md` - Deployment instructions
 - `SDK_INTEGRATION.md` - SDK integration guide
@@ -157,6 +171,7 @@ Documentation improvements are always welcome!
 - `observability/README.md` - Observability stack guide
 
 **For documentation PRs:**
+
 - Test any code examples you add
 - Verify all hyperlinks work
 - Follow the existing formatting style
@@ -172,6 +187,7 @@ Ready to write code? Awesome! Here's how to get started.
 Look for issues labeled `good first issue` or `help wanted` on our [issue tracker](https://github.com/openqoe/openqoe-dev/issues).
 
 **Areas where we need help:**
+
 - **SDK Adapters**: Support for additional video players
 - **Worker Enhancements**: New features or optimizations
 - **Dashboard Improvements**: New panels or visualizations
@@ -185,15 +201,16 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
 
 ### Prerequisites
 
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- **Docker**: For running observability stack
-- **Go**: v1.21.0 or higher
+- **Node.js**: v22.0.0 or higher
+- **npm**: v10.0.0 or higher
+- **Docker**: For running entire stack
+- **Go**: v1.25.0 or higher
 - **Git**: For version control
 
 ### Setup Instructions
 
 1. **Fork and Clone**
+
    ```bash
    # Fork the repo on GitHub, then clone your fork
    git clone https://github.com/YOUR_USERNAME/openqoe-dev.git
@@ -204,6 +221,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    ```
 
 1. **Install Dependencies**
+
    ```bash
    # Build Go worker
    cd worker
@@ -215,13 +233,15 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    npm install
    ```
 
-2. **Start Observability Stack**
+1. **Start Observability Stack**
+
    ```bash
    # From project root
    docker compose up -d
    ```
 
-3. **Run Worker Locally**
+1. **Run Worker Locally**
+
    ```bash
    cd worker
    cp .env.example .env
@@ -229,7 +249,8 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    ./openqoe-worker
    ```
 
-6. **Test Your Changes**
+1. **Test Your Changes**
+
    ```bash
    # Run TypeScript type checking
    npm run type-check
@@ -243,7 +264,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    # Visit http://localhost:8080 and test each player
    ```
 
-7. **Access Grafana**
+1. **Access Grafana**
    ```bash
    # Open http://localhost:3000
    # Login: admin / admin
@@ -257,6 +278,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
 ### Before Submitting
 
 1. **Create a feature branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -268,6 +290,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    - Update documentation if needed
 
 3. **Test your changes**
+
    ```bash
    # TypeScript compilation
    npm run type-check
@@ -279,6 +302,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    ```
 
 4. **Commit your changes**
+
    ```bash
    git add .
    git commit -m "feat: add support for YouTube IFrame API"
@@ -293,6 +317,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
 ### Submitting the PR
 
 1. **Push to your fork**
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -305,21 +330,26 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    - Mark as draft if work is in progress
 
 3. **PR Template**
+
    ```markdown
    ## Description
+
    Brief description of what this PR does
 
    ## Related Issues
+
    Fixes #123
    Related to #456
 
    ## Type of Change
+
    - [ ] Bug fix (non-breaking change that fixes an issue)
    - [ ] New feature (non-breaking change that adds functionality)
    - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
    - [ ] Documentation update
 
    ## Testing Done
+
    - [ ] Tested locally with demo pages
    - [ ] Verified TypeScript compilation passes
    - [ ] Ran validation script
@@ -329,6 +359,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    ## Screenshots (if applicable)
 
    ## Checklist
+
    - [ ] My code follows the project's coding standards
    - [ ] I have updated documentation accordingly
    - [ ] I have added/updated tests (if applicable)
@@ -372,6 +403,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
 ### Documentation
 
 - **Function comments**: Use JSDoc for public functions
+
   ```typescript
   /**
    * Transform events to Prometheus metrics
@@ -388,11 +420,11 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
   // Use histogram for accurate percentile calculations (P50, P95, P99)
   // Buckets: 0.5s, 1s, 2s, 3s, 5s, 10s, 15s, 30s
   const vstHistogram = await this.createHistogram(
-    'openqoe_video_startup_seconds',
+    "openqoe_video_startup_seconds",
     baseLabels,
     event.data.video_startup_time / 1000,
     timestamp,
-    [0.5, 1, 2, 3, 5, 10, 15, 30]
+    [0.5, 1, 2, 3, 5, 10, 15, 30],
   );
   ```
 
@@ -427,16 +459,16 @@ export class VideoMetricsService {
    */
   async calculateVSTPercentile(
     events: PlayingEvent[],
-    percentile: number
+    percentile: number,
   ): Promise<number> {
     if (events.length === 0) {
-      throw new Error('No events provided');
+      throw new Error("No events provided");
     }
 
     // Sort by video startup time
     const sortedTimes = events
-      .filter(e => e.data?.video_startup_time)
-      .map(e => e.data.video_startup_time / 1000)
+      .filter((e) => e.data?.video_startup_time)
+      .map((e) => e.data.video_startup_time / 1000)
       .sort((a, b) => a - b);
 
     // Calculate percentile index
@@ -454,6 +486,7 @@ export class VideoMetricsService {
 ### Manual Testing
 
 **For SDK changes:**
+
 1. Test with all 5 player demo pages
 2. Verify all 12 event types are captured
 3. Check browser console for errors
@@ -461,6 +494,7 @@ export class VideoMetricsService {
 5. Confirm metrics appear in Grafana dashboards
 
 **For Worker changes:**
+
 1. Run validation script: `./validate.sh`
 2. Test with sample events via curl:
    ```bash
@@ -476,6 +510,7 @@ export class VideoMetricsService {
 4. Check dashboard data in Grafana
 
 **For Dashboard changes:**
+
 1. Load rules: `./load-rules.sh`
 2. Generate test data
 3. Open dashboard in Grafana
@@ -486,21 +521,23 @@ export class VideoMetricsService {
 ### Unit Testing
 
 We use standard testing frameworks:
+
 - **Worker**: Vitest
 - **SDK**: Jest
 
 **Example unit test:**
-```typescript
-import { describe, it, expect } from 'vitest';
-import { PrometheusService } from './prometheus';
 
-describe('PrometheusService', () => {
-  it('should transform viewstart event to metric', async () => {
+```typescript
+import { describe, it, expect } from "vitest";
+import { PrometheusService } from "./prometheus";
+
+describe("PrometheusService", () => {
+  it("should transform viewstart event to metric", async () => {
     const service = new PrometheusService(config, cardinalityService);
     const event: BaseEvent = {
-      event_type: 'viewstart',
-      org_id: 'test-org',
-      player_id: 'test-player',
+      event_type: "viewstart",
+      org_id: "test-org",
+      player_id: "test-player",
       event_time: Date.now(),
       // ... other fields
     };
@@ -508,8 +545,9 @@ describe('PrometheusService', () => {
     const metrics = await service.eventToMetrics(event);
 
     expect(metrics).toHaveLength(2); // events_total + views_started_total
-    expect(metrics[1].labels.find(l => l.name === '__name__')?.value)
-      .toBe('openqoe_views_started_total');
+    expect(metrics[1].labels.find((l) => l.name === "__name__")?.value).toBe(
+      "openqoe_views_started_total",
+    );
   });
 });
 ```
@@ -517,6 +555,7 @@ describe('PrometheusService', () => {
 ### Integration Testing
 
 **Full end-to-end test:**
+
 1. Start observability stack
 2. Start worker locally
 3. Load SDK in browser (demo page)
@@ -557,6 +596,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) for clear
 ### Scope
 
 Optional, indicates what area of code is affected:
+
 - `sdk`: SDK changes
 - `worker`: Worker changes
 - `dashboards`: Dashboard changes
@@ -620,6 +660,7 @@ Reduced label processing time by 40% through caching and deduplication.
 ### Recognition
 
 We value all contributions and recognize contributors through:
+
 - **Contributors list**: All contributors listed in README
 - **Release notes**: Contributions acknowledged in release notes
 - **Shoutouts**: Recognition in project updates
@@ -629,6 +670,7 @@ We value all contributions and recognize contributors through:
 ## Questions?
 
 If you have questions about contributing, feel free to:
+
 - Open a [GitHub Discussion](https://github.com/openqoe/openqoe-dev/discussions)
 - Check our [FAQ](https://github.com/openqoe/openqoe-dev/wiki/FAQ)
 - Review existing [Pull Requests](https://github.com/openqoe/openqoe-dev/pulls) for examples
