@@ -69,7 +69,8 @@ export class HTML5Adapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.logger.info("HTML5Adapter attached");
   }
 
@@ -86,10 +87,18 @@ export class HTML5Adapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.logger.info("HTML5Adapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   /**
    * Attach all event listeners
@@ -410,6 +419,30 @@ export class HTML5Adapter implements PlayerAdapter {
 
     this.batchManager.addEvent(event);
     this.logger.debug("playbackvolumechange event fired");
+  }
+
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("entry event fired");
   }
 
   /**

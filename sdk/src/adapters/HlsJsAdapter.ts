@@ -40,12 +40,9 @@ export class HlsJsAdapter implements PlayerAdapter {
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
-  private currentLevel: number = -1;
-  private bandwidth: number | null = null;
   private currentBitrate: number | null = null;
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
-  private currentCodec: string | null = null;
   private bufferStats = { mean: 0, m2: 0, count: 0 };
   private bufferSampleRate = 0.05;
   private bufferZThreshold = 2.0;
@@ -94,6 +91,8 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
 
     this.logger.info("HlsJsAdapter attached");
   }
@@ -117,11 +116,19 @@ export class HlsJsAdapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.player = null;
     this.logger.info("HlsJsAdapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   private async resolveHlsJS(): Promise<any> {
     // 1. Browser UMD global
@@ -713,6 +720,30 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.logger.debug("playbackvolumechange event fired");
   }
 
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("entry event fired");
+  }
+
   /**
    * Error handler
    */
@@ -908,32 +939,5 @@ export class HlsJsAdapter implements PlayerAdapter {
     }
 
     return undefined;
-  }
-
-  // calculates median of available levels
-  private aggregateLevelsInManifest(levels: any[]): {
-    bitrates: number[];
-    resolution: Resolution[];
-    framerate: number[];
-  } {
-    const stats: {
-      bitrates: number[];
-      resolution: Resolution[];
-      framerate: number[];
-    } = {
-      bitrates: [],
-      resolution: [],
-      framerate: [],
-    };
-
-    for (const level of levels) {
-      stats.bitrates.push(level.bitrate || 0);
-      stats.resolution.push({
-        width: level.width || 0,
-        height: level.height || 0,
-      });
-      stats.framerate.push(level.frameRate || 0);
-    }
-    return stats;
   }
 }
