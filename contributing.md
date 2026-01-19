@@ -220,7 +220,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    git remote add upstream https://github.com/openqoe/openqoe-dev.git
    ```
 
-1. **Install Dependencies**
+2. **Install Dependencies**
 
    ```bash
    # Build Go worker
@@ -233,14 +233,14 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    npm install
    ```
 
-1. **Start Observability Stack**
+3. **Start Observability Stack**
 
    ```bash
    # From project root
    docker compose up -d
    ```
 
-1. **Run Worker Locally**
+4. **Run Worker Locally**
 
    ```bash
    cd worker
@@ -249,7 +249,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    ./openqoe-worker
    ```
 
-1. **Test Your Changes**
+5. **Test Your Changes**
 
    ```bash
    # Run TypeScript type checking
@@ -264,7 +264,7 @@ Look for issues labeled `good first issue` or `help wanted` on our [issue tracke
    # Visit http://localhost:8080 and test each player
    ```
 
-1. **Access Grafana**
+6. **Access Grafana**
    ```bash
    # Open http://localhost:3000
    # Login: admin / admin
