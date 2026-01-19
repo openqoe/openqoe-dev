@@ -72,7 +72,7 @@ func NewMetricsService(config *config.Config, cardinality_service *config.Cardin
 		metric.WithExplicitBucketBoundaries(100, 250, 500, 1000, 2000, 3000, 5000, 10000, 15000, 30000),
 	)
 	views_completed_total, _ := meter.Int64Counter("openqoe.views_completed_total", metric.WithDescription("Total number of viewers who completed watching the video"))
-	views_started_total, _ := meter.Int64Counter("openqoe.view_started_total", metric.WithDescription("Total number of viewers who started watching the video"))
+	views_started_total, _ := meter.Int64Counter("openqoe.views_started_total", metric.WithDescription("Total number of viewers who started watching the video"))
 
 	return &MetricsService{
 		config:              config,

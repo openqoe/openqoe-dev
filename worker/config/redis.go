@@ -67,16 +67,19 @@ func (r *RedisConnection) Delete(key string) error {
 }
 
 func (r *RedisConnection) GetHashFields(key string, fields []string) (map[string]string, error) {
-	res_map := make(map[string]string)
-	for _, f := range fields {
-		value, err := r.client.HGet(r.ctx, key, f).Result()
-		if err == redis.Nil {
-			res_map[f] = ""
+	values, err := r.client.HMGet(r.ctx, key, fields...).Result()
+	if err != nil {
+		return nil, err
+	}
+	res_map := make(map[string]string, len(fields))
+	for i, val := range values {
+		if val == nil {
+			res_map[fields[i]] = ""
+			continue
 		}
-		if err != nil {
-			return nil, err
+		if str, ok := val.(string); ok {
+			res_map[fields[i]] = str
 		}
-		res_map[f] = value
 	}
 	return res_map, nil
 }
