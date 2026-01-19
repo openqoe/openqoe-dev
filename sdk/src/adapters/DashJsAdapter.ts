@@ -29,6 +29,7 @@ export class DashJsAdapter implements PlayerAdapter {
   private lastPlaybackTime: number = 0;
   private playingTime: number = 0;
   private watchTime: number = 0;
+  private stallStartTime: number | null = null;
   private viewStartTime: number | null = null;
   private seekStartTime: number = 0;
   private rebufferCount: number = 0;
@@ -495,16 +496,19 @@ export class DashJsAdapter implements PlayerAdapter {
   private async onPlayingAfterWait(data: any): Promise<void> {
     if (!this.video) return;
     // If we were stalled, fire stallend
-    const event = await this.eventCollector.createEvent(
-      "stallend",
-      {
-        stall_position_secs: data.startTime,
-      },
-      this.video.currentTime * 1000,
-    );
+    if (this.stallStartTime !== null) {
+      const event = await this.eventCollector.createEvent(
+        "stallend",
+        {
+          stall_position_secs: data.startTime,
+        },
+        this.video.currentTime * 1000,
+      );
 
-    this.batchManager.addEvent(event);
-    this.logger.debug("stallend event fired");
+      this.batchManager.addEvent(event);
+      this.stallStartTime = null;
+      this.logger.debug("stallend event fired");
+    }
   }
 
   /**
@@ -617,7 +621,7 @@ export class DashJsAdapter implements PlayerAdapter {
    */
   private async onStallStart(): Promise<void> {
     if (!this.video) return;
-
+    this.stallStartTime = performance.now();
     const event = await this.eventCollector.createEvent(
       "stallstart",
       {

@@ -10,8 +10,8 @@ export class BatchManager {
   private maxBatchSize: number;
   private maxBatchInterval: number;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
-  private asyncFlushCallback: (events: BaseEvent[]) => Promise<void>;
-  private flushSyncCallback: (events: BaseEvent[]) => void;
+  private FlushCallback: (events: BaseEvent[]) => Promise<void>;
+  private syncFlushCallback: (events: BaseEvent[]) => void;
   private logger: Logger;
 
   constructor(
@@ -23,8 +23,8 @@ export class BatchManager {
   ) {
     this.maxBatchSize = maxBatchSize;
     this.maxBatchInterval = maxBatchInterval;
-    this.asyncFlushCallback = asyncFlushCallback;
-    this.flushSyncCallback = flushSyncCallback;
+    this.FlushCallback = asyncFlushCallback;
+    this.syncFlushCallback = flushSyncCallback;
     this.logger = logger;
 
     // Set up to flush on page unload
@@ -80,7 +80,7 @@ export class BatchManager {
     this.logger.debug(`Flushing batch of ${eventsToSend.length} events`);
 
     try {
-      await this.asyncFlushCallback(eventsToSend);
+      await this.FlushCallback(eventsToSend);
       this.logger.debug("Batch flushed successfully");
     } catch (error) {
       this.logger.error("Failed to flush batch:", error);
@@ -107,13 +107,14 @@ export class BatchManager {
     );
 
     // Use sendBeacon if available
-    if (
-      typeof navigator !== "undefined" &&
-      navigator.sendBeacon !== undefined
-    ) {
-      // The actual sending will be handled by the transport layer
-      // For now, just call the callback synchronously
-      this.flushSyncCallback(eventsToSend);
+    if (typeof navigator !== "undefined") {
+      if (navigator.sendBeacon !== undefined) {
+        // The actual sending will be handled by the transport layer
+        // For now, just call the callback synchronously
+        this.syncFlushCallback(eventsToSend);
+      } else {
+        this.FlushCallback(eventsToSend);
+      }
     }
   }
 

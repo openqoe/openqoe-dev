@@ -443,7 +443,7 @@ After deployment, you should see:
 
 ## Sign-Off
 
-✅ **SDK**: Dashjs SDK is complete and functional others are work in progress
+✅ **SDK**: Dash.js SDK is complete and functional others are work in progress
 ✅ **Worker**: Production-ready with histogram support
 ✅ **Dashboards**: 4 dashboards with comprehensive coverage
 ✅ **Rules**: 25 recording rules + 18 alert rules
