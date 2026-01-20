@@ -152,7 +152,7 @@ func (ms *MetricsService) transformEventsToMetrics(span_ctx context.Context, eve
 	case "playerready":
 		ms.onPlayerReady(&event, span_ctx, &base_attributes)
 	case "bufferlevelchange":
-		ms.onBufferLevelChange(&event, span_ctx, &base_attributes, base_labels)
+		ms.onBufferLevelChange(&event, span_ctx, base_labels)
 	case "bandwidthchange":
 		ms.onBandwidthChange(&event, span_ctx, base_labels)
 	case "qualitychangerequested":

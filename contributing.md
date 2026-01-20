@@ -488,7 +488,7 @@ export class VideoMetricsService {
 **For SDK changes:**
 
 1. Test with all 5 player demo pages
-2. Verify all 12 event types are captured
+2. Verify all 25 event types are captured
 3. Check browser console for errors
 4. Verify events reach worker (check worker logs)
 5. Confirm metrics appear in Grafana dashboards

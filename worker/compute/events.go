@@ -60,7 +60,7 @@ func (ms *MetricsService) onPlayerReady(event *requesthandlers.BaseEvent, parent
 	}
 }
 
-func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_attributes *attribute.Set, base_labels map[string]string) {
+func (ms *MetricsService) onBufferLevelChange(event *requesthandlers.BaseEvent, parent_span_ctx context.Context, base_labels map[string]string) {
 	labels := map[string]string{
 		"media_type": getString(event, "media_type", "", ms.logger),
 		"is_outlier": strconv.FormatBool(getBool(event, "is_outlier", false, ms.logger)),
