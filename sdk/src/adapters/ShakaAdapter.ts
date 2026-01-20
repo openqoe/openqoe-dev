@@ -285,7 +285,7 @@ export class ShakaAdapter implements PlayerAdapter {
       this.stallStartTime = performance.now();
 
       const stallEvent = await this.eventCollector.createEvent(
-        "stall_start",
+        "stallstart",
         {
           buffer_length: this.getBufferLength(),
           bitrate: this.getBitrate(),
@@ -294,7 +294,7 @@ export class ShakaAdapter implements PlayerAdapter {
       );
 
       this.batchManager.addEvent(stallEvent);
-      this.logger.debug("stall_start event fired");
+      this.logger.debug("stallstart event fired");
     } else if (!buffering && this.stallStartTime !== null) {
       // Stall ended
       const stallDuration = performance.now() - this.stallStartTime;
@@ -302,7 +302,7 @@ export class ShakaAdapter implements PlayerAdapter {
       this.rebufferCount++;
 
       const stallEvent = await this.eventCollector.createEvent(
-        "stall_end",
+        "stallend",
         {
           stall_duration: stallDuration,
           buffer_length: this.getBufferLength(),
@@ -312,7 +312,7 @@ export class ShakaAdapter implements PlayerAdapter {
 
       this.batchManager.addEvent(stallEvent);
       this.stallStartTime = null;
-      this.logger.debug("stall_end event fired");
+      this.logger.debug("stallend event fired");
     }
   }
 

@@ -4,32 +4,18 @@ Complete validation checklist for deploying OpenQoE to production.
 
 ## Pre-Deployment Validation
 
-### 1. Worker Code Validation
+- [ ] **Go code builds successfully**
 
-- [ ] **TypeScript compilation passes**
   ```bash
   cd worker
-  npm run type-check
+  go build -o openqoe-worker
   ```
 
-- [ ] **Pre-deployment validation script passes**
-  ```bash
-  cd worker
-  ./validate.sh
-  ```
-
-- [ ] **All environment variables documented** in `wrangler.toml`
-
-- [ ] **Secrets configured** (do NOT commit to git)
-  - [ ] `API_KEY` (if authentication enabled)
-  - [ ] Destination credentials (Mimir/Loki or Grafana Cloud)
-
-- [ ] **KV namespace IDs updated** in `wrangler.toml`
-  ```bash
-  # Create KV namespace
-  wrangler kv:namespace create CARDINALITY_KV
-  # Update ID in wrangler.toml
-  ```
+- [ ] **Environment variables configured** (.env or shell)
+  - [ ] `OTEL_URL` (Alloy endpoint)
+  - [ ] `API_KEY` (Ingest authentication)
+  - [ ] `DESTINATION_TYPE` (SelfHosted or GrafanaCloud)
+  - [ ] `LOG_LEVEL` (info/debug)
 
 ### 2. SDK Validation
 
@@ -41,6 +27,7 @@ Complete validation checklist for deploying OpenQoE to production.
   - [ ] Shaka Player adapter
 
 - [ ] **Demo pages work correctly**
+
   ```bash
   # Test each demo
   cd demo
@@ -48,35 +35,30 @@ Complete validation checklist for deploying OpenQoE to production.
   # Visit http://localhost:8080 and test each player
   ```
 
-- [ ] **All 12 event types captured**
+- [ ] **All 24+ event types captured**
   - [ ] playerready
   - [ ] viewstart
   - [ ] playing
-  - [ ] pause
-  - [ ] seek
-  - [ ] stall_start
-  - [ ] stall_end
-  - [ ] ended
-  - [ ] error
-  - [ ] quartile
-  - [ ] heartbeat
-  - [ ] quality_change
+  - [ ] ... (see API Reference for full list)
 
 ### 3. Observability Stack Validation
 
 - [ ] **Docker services healthy**
+
   ```bash
   docker compose ps
   # All services should show "Up (healthy)"
   ```
 
 - [ ] **Mimir accessible**
+
   ```bash
   curl http://localhost:9009/ready
   # Should return "ready"
   ```
 
 - [ ] **Loki accessible**
+
   ```bash
   curl http://localhost:3100/ready
   # Should return "ready"
@@ -91,12 +73,14 @@ Complete validation checklist for deploying OpenQoE to production.
 ### 4. Recording Rules Validation
 
 - [ ] **Recording rules loaded**
+
   ```bash
   cd observability/prometheus/rules
   ./load-rules.sh http://localhost:9009
   ```
 
 - [ ] **Verify rules are active**
+
   ```bash
   curl -s http://localhost:9009/prometheus/config/v1/rules/anonymous | jq '.data'
   # Should show recording rules configuration
@@ -111,6 +95,7 @@ Complete validation checklist for deploying OpenQoE to production.
 ### 5. Alert Rules Validation
 
 - [ ] **Alert rules loaded**
+
   ```bash
   curl -X POST \
     "http://localhost:9009/prometheus/config/v1/rules/anonymous" \
@@ -119,6 +104,7 @@ Complete validation checklist for deploying OpenQoE to production.
   ```
 
 - [ ] **Verify alert rules are active**
+
   ```bash
   curl -s http://localhost:9009/prometheus/api/v1/rules | jq '.data.groups[].name'
   # Should show: quality_critical, business_impact, performance, live_streaming, pipeline_health
@@ -153,12 +139,14 @@ Complete validation checklist for deploying OpenQoE to production.
 ### Option A: Self-Hosted with Docker
 
 1. [ ] **Start observability stack**
+
    ```bash
    docker compose up -d
    docker compose ps  # Verify all healthy
    ```
 
 2. [ ] **Load rules**
+
    ```bash
    cd observability/prometheus/rules
    ./load-rules.sh http://localhost:9009
@@ -170,6 +158,7 @@ Complete validation checklist for deploying OpenQoE to production.
    ```
 
 3. [ ] **Configure worker for local dev**
+
    ```bash
    cd worker
    cp .dev.vars.example .dev.vars
@@ -177,6 +166,7 @@ Complete validation checklist for deploying OpenQoE to production.
    ```
 
 4. [ ] **Run worker locally**
+
    ```bash
    npm run dev
    # Worker runs at http://localhost:8787
@@ -187,44 +177,17 @@ Complete validation checklist for deploying OpenQoE to production.
    - Play video
    - Check Grafana dashboards for data
 
-### Option B: Production Deployment to Cloudflare
+6. [ ] **Configure environment variables** (see Step 1)
 
-1. [ ] **Configure production secrets**
+7. [ ] **Build and start worker**
+
    ```bash
    cd worker
-
-   # For self-hosted with public endpoints
-   wrangler secret put MIMIR_URL
-   wrangler secret put LOKI_URL
-   wrangler secret put API_KEY
-
-   # OR for Grafana Cloud
-   wrangler secret put GRAFANA_CLOUD_INSTANCE_ID
-   wrangler secret put GRAFANA_CLOUD_API_KEY
-   wrangler secret put GRAFANA_CLOUD_METRICS_URL
-   wrangler secret put GRAFANA_CLOUD_LOGS_URL
-   wrangler secret put API_KEY
+   go build -o openqoe-worker
+   ./openqoe-worker
    ```
 
-2. [ ] **Update KV namespace IDs** in `wrangler.toml`
-
-3. [ ] **Deploy worker**
-   ```bash
-   wrangler deploy
-   # Note the worker URL
-   ```
-
-4. [ ] **Update SDK endpoint** in your application
-   ```javascript
-   OpenQoE.init({
-     orgId: 'your-org',
-     playerId: 'your-player',
-     endpointUrl: 'https://your-worker.workers.dev/v1/events',  // Update this
-     apiKey: 'your-api-key'
-   });
-   ```
-
-5. [ ] **Test production deployment**
+8. [ ] **Test production deployment**
    - Deploy SDK to staging environment
    - Generate test events
    - Verify metrics appear in Grafana
@@ -234,18 +197,21 @@ Complete validation checklist for deploying OpenQoE to production.
 ### 1. Data Flow Validation
 
 - [ ] **Events being received**
+
   ```bash
   # Check event ingestion rate
   curl -s 'http://localhost:9009/prometheus/api/v1/query?query=rate(openqoe_events_total[5m])'
   ```
 
 - [ ] **Histogram buckets populated**
+
   ```bash
   # Check VST histogram
   curl -s 'http://localhost:9009/prometheus/api/v1/query?query=openqoe_video_startup_seconds_bucket'
   ```
 
 - [ ] **Recording rules calculating**
+
   ```bash
   # Check P95 VST
   curl -s 'http://localhost:9009/prometheus/api/v1/query?query=openqoe:video_startup_seconds:p95'
@@ -285,6 +251,7 @@ Complete validation checklist for deploying OpenQoE to production.
 ### 3. Alert Validation
 
 - [ ] **Alert rules evaluating**
+
   ```bash
   # Check alert status
   curl -s http://localhost:9009/prometheus/api/v1/rules | jq '.data.groups[].rules[] | select(.type=="alerting") | {alert:.name, state:.state}'
@@ -303,6 +270,7 @@ Complete validation checklist for deploying OpenQoE to production.
   - Recording rule should be 10-50x faster
 
 - [ ] **Mimir ingestion keeping up**
+
   ```bash
   # Check ingestion lag
   docker compose logs mimir | grep "lag"
@@ -318,6 +286,7 @@ Complete validation checklist for deploying OpenQoE to production.
 ### 5. Cardinality Validation
 
 - [ ] **Check cardinality per dimension**
+
   ```bash
   # Via worker /stats endpoint
   curl 'http://localhost:8787/stats?dimension=video_id' \
@@ -363,16 +332,19 @@ Complete validation checklist for deploying OpenQoE to production.
 ### Health Checks
 
 - [ ] **Worker /health endpoint** returns 200
+
   ```bash
   curl -f http://localhost:8787/health
   ```
 
 - [ ] **Mimir /ready endpoint** returns "ready"
+
   ```bash
   curl http://localhost:9009/ready
   ```
 
 - [ ] **Loki /ready endpoint** returns "ready"
+
   ```bash
   curl http://localhost:3100/ready
   ```
@@ -387,6 +359,7 @@ Complete validation checklist for deploying OpenQoE to production.
 ### Issue: Dashboards show "No Data"
 
 **Diagnosis**:
+
 ```bash
 # 1. Check if worker is receiving events
 curl 'http://localhost:8787/stats' -H 'X-API-Key: your-api-key'
@@ -399,6 +372,7 @@ docker compose logs mimir | tail -50
 ```
 
 **Common Causes**:
+
 - Worker not deployed or wrong URL in SDK
 - Network connectivity (worker can't reach Mimir)
 - Authentication failing
@@ -407,12 +381,14 @@ docker compose logs mimir | tail -50
 ### Issue: P95/P99 showing incorrect values
 
 **Diagnosis**:
+
 ```bash
 # Check if histogram buckets exist
 curl 'http://localhost:9009/prometheus/api/v1/query?query=openqoe_video_startup_seconds_bucket'
 ```
 
 **Common Causes**:
+
 - Worker not using histogram format (old gauge-based metrics)
 - Recording rules not loaded
 - Incorrect histogram_quantile() query
@@ -420,6 +396,7 @@ curl 'http://localhost:9009/prometheus/api/v1/query?query=openqoe_video_startup_
 ### Issue: Alerts not firing
 
 **Diagnosis**:
+
 ```bash
 # Check if alert rules are loaded
 curl 'http://localhost:9009/prometheus/api/v1/rules'
@@ -429,6 +406,7 @@ docker compose logs mimir | grep "alert"
 ```
 
 **Common Causes**:
+
 - Alert rules not loaded via API
 - Alert thresholds too strict for current traffic
 - Alertmanager not configured
@@ -436,6 +414,7 @@ docker compose logs mimir | grep "alert"
 ### Issue: High memory usage
 
 **Diagnosis**:
+
 ```bash
 docker stats
 
@@ -444,6 +423,7 @@ curl 'http://localhost:9009/prometheus/api/v1/query?query=count(openqoe_events_t
 ```
 
 **Common Causes**:
+
 - Cardinality explosion (too many unique label combinations)
 - Cardinality governance not working
 - Retention period too long for available memory
@@ -453,18 +433,21 @@ curl 'http://localhost:9009/prometheus/api/v1/query?query=count(openqoe_events_t
 If deployment fails:
 
 1. [ ] **Rollback worker**
+
    ```bash
-   wrangler rollback
+   # Revert to previous stable container/binary version
    ```
 
 2. [ ] **Revert SDK changes** in your application
 
 3. [ ] **Stop Docker services** if needed
+
    ```bash
    docker compose down
    ```
 
 4. [ ] **Restore from backup** if data corruption
+
    ```bash
    # Restore Mimir
    tar xzf mimir-backup.tar.gz -C /
@@ -496,12 +479,12 @@ If deployment fails:
 
 ---
 
-**Deployment Date**: _______________
+**Deployment Date**: ******\_\_\_******
 
-**Deployed By**: _______________
+**Deployed By**: ******\_\_\_******
 
-**Approved By**: _______________
+**Approved By**: ******\_\_\_******
 
-**Production URL**: _______________
+**Production URL**: ******\_\_\_******
 
-**Monitoring URL**: _______________
+**Monitoring URL**: ******\_\_\_******

@@ -15,84 +15,21 @@ Complete guide for deploying OpenQoE with different destination configurations.
 
 ## Overview
 
-OpenQoE supports three deployment models:
+OpenQoE v2 uses a Go-based worker and an OTLP-based observability pipeline. It supports three deployment models:
 
-1. **Self-Hosted Docker Stack** - Complete stack in Docker (Mimir + Loki + Grafana)
-2. **Existing On-Prem** - Integrate with your existing Mimir/Prometheus and Grafana
-3. **Grafana Cloud** - Use Grafana Cloud Metrics (Mimir) and Logs (Loki)
+1. **Self-Hosted Docker Stack** - Complete stack in Docker (Mimir + Loki + Tempo + Alloy + Grafana)
+2. **Existing On-Prem** - Integrate with your existing OTLP-compatible backend
+3. **Grafana Cloud** - Use Grafana Cloud's managed OTel backends
 
-**Note:** We use **Grafana Mimir** for metrics storage (both self-hosted and cloud). Mimir is Prometheus-compatible and provides better scalability. It's the same backend that powers Grafana Cloud Metrics.
+**Note:** We use **Grafana Alloy** as our telemetry collector. It receives OTLP from the Go Worker and routes it to the appropriate backends.
 
 ---
 
-## Network Connectivity for Self-Hosted Deployments
+---
 
-### Important: Localhost Limitation
+## Deployment Strategy
 
-**Cloudflare Workers cannot access `localhost` or `127.0.0.1` URLs** because they run in Cloudflare's edge network, not on your local machine. If you're deploying the worker to Cloudflare and using self-hosted Mimir/Loki, you have three options:
-
-### Option A: Use Public Endpoints (Recommended for Production)
-
-Deploy your Mimir and Loki instances with public URLs or behind a reverse proxy:
-
-```bash
-# Example with public endpoints
-wrangler secret put MIMIR_URL
-# Enter: https://mimir.yourdomain.com/api/v1/push
-
-wrangler secret put LOKI_URL
-# Enter: https://loki.yourdomain.com/loki/api/v1/push
-```
-
-**Security:** Use authentication (Basic Auth or API keys) to secure your endpoints.
-
-### Option B: Use Cloudflare Tunnel (cloudflared)
-
-Expose your local Docker services to the internet via Cloudflare Tunnel:
-
-```bash
-# Install cloudflared
-brew install cloudflare/cloudflare/cloudflared  # macOS
-# or download from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/
-
-# Create a tunnel for Mimir
-cloudflared tunnel --url http://localhost:9009
-
-# Create a tunnel for Loki
-cloudflared tunnel --url http://localhost:3100
-```
-
-This generates public URLs (e.g., `https://abc-123.trycloudflare.com`) that you can use in your worker configuration.
-
-**Note:** These are temporary tunnels. For persistent tunnels, use [Cloudflare Tunnel with Named Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/).
-
-### Option C: Local Development with `wrangler dev`
-
-For local development and testing, use `wrangler dev` which runs the worker on your machine:
-
-```bash
-cd worker
-
-# Create .dev.vars with localhost URLs
-cat > .dev.vars << 'EOF'
-MIMIR_URL=http://localhost:9009/api/v1/push
-LOKI_URL=http://localhost:3100/loki/api/v1/push
-EOF
-
-# Run worker locally (can access localhost)
-npm run dev
-```
-
-The worker runs at `http://localhost:8787` and can access your local Docker services.
-
-### Which Option to Choose?
-
-| Scenario | Recommended Option |
-|----------|-------------------|
-| Local development/testing | **Option C** - Use `wrangler dev` with localhost URLs |
-| Self-hosted production | **Option A** - Deploy behind reverse proxy with proper auth |
-| Quick testing with deployed worker | **Option B** - Use cloudflared tunnels temporarily |
-| Production deployment | **Use Grafana Cloud** - No network setup required |
+OpenQoE v2 is designed to run anywhere Go can be compiled. For self-hosted environments, we recommend using Docker Compose as it orchestrates both the Go Worker and the full observability stack (Alloy, Mimir, Loki, Tempo, Grafana) in a unified virtual network.
 
 ---
 
@@ -118,39 +55,41 @@ docker compose ps
 ```
 
 Expected output:
+
 ```
-NAME                    STATUS              PORTS
-openqoe-mimir           Up (healthy)        0.0.0.0:9009->9009/tcp
-openqoe-loki            Up (healthy)        0.0.0.0:3100->3100/tcp
-openqoe-grafana         Up (healthy)        0.0.0.0:3000->3000/tcp
+NAME                STATUS              PORTS
+openqoe-mimir       Up (healthy)        0.0.0.0:9009->9009/tcp
+openqoe-loki        Up (healthy)        0.0.0.0:3100->3100/tcp
+openqoe-tempo       Up (healthy)        0.0.0.0:3200->3200/tcp
+openqoe-alloy       Up (healthy)        0.0.0.0:4317->4317/tcp
+openqoe-grafana     Up (healthy)        0.0.0.0:3000->3000/tcp
 ```
 
-### Step 2: Configure Worker
+### Step 2: Build & Start Go Worker
 
 ```bash
 cd worker
 
-# Create .dev.vars for local development
-cat > .dev.vars << 'EOF'
-MIMIR_URL=http://localhost:9009/api/v1/push
-LOKI_URL=http://localhost:3100/loki/api/v1/push
-EOF
+# Install dependencies
+go mod download
 
-# Or set secrets for production deployment
-wrangler secret put MIMIR_URL
-# Enter: http://your-mimir-server:9009/api/v1/push
+# Create .env from example
+cp .env.example .env
 
-wrangler secret put LOKI_URL
-# Enter: http://your-loki-server:3100/loki/api/v1/push
+# Set OTEL_URL to Alloy's endpoint
+# OTEL_URL=http://localhost:4317
 
-# Note: PROMETHEUS_URL still works for backward compatibility
+# Build and run
+go build -o openqoe-worker
+./openqoe-worker
 ```
 
 ### Step 3: Deploy Worker
 
 ```bash
-# Deploy to Cloudflare
-wrangler deploy
+# Deploy to Production
+# Build the worker
+go build -o openqoe-worker
 
 # Or run locally
 npm run dev
@@ -179,11 +118,13 @@ npm run dev
 ### Prerequisites
 
 **Option A - Mimir (Recommended):**
+
 - Grafana Mimir 2.0+
 - Loki 2.8+
 - Grafana 9.0+
 
 **Option B - Prometheus (Backward Compatible):**
+
 - Prometheus 2.40+ with remote write receiver enabled
 - Loki 2.8+
 - Grafana 9.0+
@@ -210,6 +151,7 @@ remote_write:
 ```
 
 Start Prometheus with:
+
 ```bash
 prometheus --config.file=prometheus.yml \
   --web.enable-remote-write-receiver \
@@ -248,27 +190,15 @@ curl -X POST http://localhost:9090/-/reload
 
 ### Step 4: Configure Worker
 
+The Go worker reads configuration from environment variables or a `.env` file within the `worker/` directory.
+
 ```bash
 cd worker
+cp .env.example .env
 
-# For production deployment with Mimir
-wrangler secret put MIMIR_URL
-# Enter: http://your-mimir:9009/api/v1/push
-
-# Or for Prometheus (backward compat)
-wrangler secret put PROMETHEUS_URL
-# Enter: http://your-prometheus:9090/api/v1/write
-
-wrangler secret put LOKI_URL
-# Enter: http://your-loki:3100/loki/api/v1/push
-
-# Optional: Add authentication
-wrangler secret put MIMIR_USERNAME
-wrangler secret put MIMIR_PASSWORD
-# Or use PROMETHEUS_USERNAME/PROMETHEUS_PASSWORD for backward compat
-
-# Deploy
-wrangler deploy
+# Configure your endpoints
+# OTEL_URL=http://your-mimir:9009
+# API_KEY=your-secret-key
 ```
 
 ### Step 5: Configure Grafana Data Sources
@@ -306,40 +236,27 @@ Add OpenQoE data to your existing Grafana:
 4. Navigate to **Details**
 
 **Get Metrics Details (Mimir):**
+
 - Go to **Prometheus** section
 - Copy **Remote Write Endpoint** (e.g., `https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push`)
 - Copy **Instance ID** (e.g., `123456`)
 - Generate **API Key** with MetricsPublisher permission
 
 **Get Logs Details (Loki):**
+
 - Go to **Loki** section
 - Copy **Loki URL** (e.g., `https://logs-prod-eu-west-0.grafana.net/loki/api/v1/push`)
 - Use same **Instance ID** and **API Key**
 
 ### Step 2: Configure Worker for Grafana Cloud
 
+Configure the Go worker with your Grafana Cloud credentials in `.env`:
+
 ```bash
-cd worker
-
-# Set Grafana Cloud credentials
-wrangler secret put GRAFANA_CLOUD_INSTANCE_ID
-# Enter: 123456 (your instance ID)
-
-wrangler secret put GRAFANA_CLOUD_API_KEY
-# Enter: glc_eyJv... (your API key)
-
-wrangler secret put GRAFANA_CLOUD_REGION
-# Enter: eu-west-0 (or your region)
-
-# Optional: Override URLs if needed
-wrangler secret put GRAFANA_CLOUD_METRICS_URL
-# Enter: https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push
-
-wrangler secret put GRAFANA_CLOUD_LOGS_URL
-# Enter: https://logs-prod-eu-west-0.grafana.net/loki/api/v1/push
-
-# Deploy
-wrangler deploy
+# In worker/.env
+DESTINATION_TYPE=GrafanaCloud
+GRAFANA_CLOUD_INSTANCE_ID=123456
+GRAFANA_CLOUD_API_KEY=your-api-key
 ```
 
 ### Step 3: Verify Configuration
@@ -362,19 +279,19 @@ curl https://your-worker.workers.dev/health
 ### Step 4: Send Test Event
 
 ```bash
-# Send test event
-curl -X POST https://your-worker.workers.dev/events \
+# Send test event to local Go worker
+curl -X POST http://localhost:8788/v2/events \
   -H "Content-Type: application/json" \
   -d '{
     "events": [{
-      "event_type": "test",
+      "event_type": "playerready",
       "event_time": '$(date +%s%3N)',
-      "viewer_time": '$(date +%s%3N)',
+      "viewer_time": 100,
       "org_id": "test-org",
       "player_id": "test-player",
-      "view_id": "test-view-'$(uuidgen)'",
-      "session_id": "test-session-'$(uuidgen)'",
-      "viewer_id": "test-viewer-'$(uuidgen)'"
+      "view_id": "test-view-123",
+      "session_id": "test-session-123",
+      "viewer_id": "test-viewer-123"
     }]
   }'
 ```
@@ -400,52 +317,37 @@ curl -X POST https://your-worker.workers.dev/events \
 
 ### Environment Variables Reference
 
-#### Self-Hosted Configuration
+| Variable    | Description                     | Example                  |
+| ----------- | ------------------------------- | ------------------------ |
+| `OTEL_URL`  | OTLP Exporter endpoint (Alloy)  | `http://localhost:4317`  |
+| `API_KEY`   | Optional API key for /v2/events | `your-secret-key`        |
+| `LOG_LEVEL` | Logging verbosity               | `info`, `debug`, `error` |
+| `GIN_MODE`  | Web framework mode              | `release` or `debug`     |
 
-```bash
-# Required - Mimir (Recommended)
-MIMIR_URL=http://mimir:9009/api/v1/push
-LOKI_URL=http://loki:3100/loki/api/v1/push
+#### Grafana Cloud Details
 
-# OR - Prometheus (Backward Compatible)
-PROMETHEUS_URL=http://prometheus:9090/api/v1/write
-LOKI_URL=http://loki:3100/loki/api/v1/push
+If sending directly to Grafana Cloud without local Alloy:
 
-# Optional - Authentication
-MIMIR_USERNAME=user
-MIMIR_PASSWORD=pass
-# Or use PROMETHEUS_USERNAME/PROMETHEUS_PASSWORD for backward compat
-LOKI_USERNAME=user
-LOKI_PASSWORD=pass
-
-# Optional - API Key for worker endpoint
-API_KEY=your-secret-key
-```
-
-#### Grafana Cloud Configuration
-
-```bash
-# Required
-GRAFANA_CLOUD_INSTANCE_ID=123456
-GRAFANA_CLOUD_API_KEY=glc_eyJv...
-
-# Optional
-GRAFANA_CLOUD_REGION=eu-west-0
-GRAFANA_CLOUD_METRICS_URL=https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push
-GRAFANA_CLOUD_LOGS_URL=https://logs-prod-eu-west-0.grafana.net/loki/api/v1/push
-```
+| Variable                    | Description           |
+| --------------------------- | --------------------- |
+| `DESTINATION_TYPE`          | Set to `GrafanaCloud` |
+| `GRAFANA_CLOUD_INSTANCE_ID` | Your Instance ID      |
+| `GRAFANA_CLOUD_API_KEY`     | Your Cloud API Key    |
 
 ### Setting Secrets
 
-**For Cloudflare Workers:**
+The Go worker reads secrets from environment variables or a `.env` file in the root of the `worker/` directory.
+
+**Environment Variable:**
+
 ```bash
-wrangler secret put SECRET_NAME
+export API_KEY=your-secret-key
 ```
 
-**For Local Development:**
-Create `.dev.vars` file:
+**Local `.env` file:**
+
 ```bash
-SECRET_NAME=secret_value
+API_KEY=your-secret-key
 ```
 
 ---
@@ -454,36 +356,42 @@ SECRET_NAME=secret_value
 
 ### Test End-to-End Flow
 
-1. **Start your chosen destination**
-   ```bash
-   # For Docker:
-   docker compose up -d
+1. **Start Go Worker**
 
-   # For Grafana Cloud: Already running
-   ```
-
-2. **Deploy Worker**
    ```bash
    cd worker
-   npm run dev  # Local testing
-   # OR
-   wrangler deploy  # Production
+   ./openqoe-worker
    ```
 
-3. **Run Demo Application**
+2. **Send Test Event**
+
    ```bash
-   cd examples/html5-demo
-   npx http-server -p 8080
+   curl -X POST http://localhost:8788/v2/events \
+     -H "Content-Type: application/json" \
+     -d '{
+       "events": [{
+         "event_type": "playerready",
+         "event_time": '$(date +%s%3N)',
+         "viewer_time": 100,
+         "org_id": "test-org",
+         "player_id": "test-player",
+         "view_id": "test-view-123",
+         "session_id": "test-session-123",
+         "viewer_id": "test-viewer-123"
+       }]
+     }'
    ```
 
-4. **Open Demo**
-   - Navigate to http://localhost:8080
-   - Click play on the video
-   - Watch events in the console
+3. **Verify in Grafana**
+   - Open [localhost:3000](http://localhost:3000)
+   - Go to **Explore**
+   - Select **Mimir** and query `openqoe_events_received_total`
+   - Select **Tempo** to see traces
 
-5. **Verify Metrics**
+4. **Verify Metrics**
 
    **Self-Hosted:**
+
    ```bash
    # Check Mimir (query via Prometheus API)
    curl 'http://localhost:9009/prometheus/api/v1/query?query=openqoe_events_total'
@@ -503,11 +411,10 @@ SECRET_NAME=secret_value
 ### Worker Not Sending to Mimir/Prometheus
 
 **Check worker logs:**
-```bash
-wrangler tail
-```
+The worker logs to standard output. You can pipe this to a file or use a logging aggregator.
 
 **Test Mimir endpoint:**
+
 ```bash
 # Self-hosted Mimir
 curl -X POST http://mimir:9009/api/v1/push
@@ -523,11 +430,13 @@ curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
 ### No Data in Grafana
 
 **Verify data sources:**
+
 - Go to Configuration → Data Sources
 - Click Test on each data source
 - Should see "Data source is working"
 
 **Check time range:**
+
 - Grafana defaults to last 6 hours
 - Your test data might be outside this range
 - Adjust time range to "Last 15 minutes"
@@ -535,6 +444,7 @@ curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
 ### Authentication Errors (Grafana Cloud)
 
 **Verify credentials:**
+
 ```bash
 # Test with curl
 curl -X POST https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push \
@@ -574,11 +484,13 @@ Error: 401 Unauthorized (check credentials)
 ### Self-Hosted
 
 **Infrastructure:**
+
 - Server: $20-100/month (depending on size)
 - Storage: $0.10/GB/month
 - Bandwidth: $0.05/GB
 
 **Estimated for 1M events/day:**
+
 - Storage: ~15GB/month → $1.50/month
 - Server: Small instance → $20-40/month
 - **Total: ~$25-45/month**
@@ -586,16 +498,19 @@ Error: 401 Unauthorized (check credentials)
 ### Grafana Cloud
 
 **Free Tier:**
+
 - 10K series metrics
 - 50GB logs
 - 14-day retention
 
 **Paid (Pro):**
+
 - $8/month base
 - $0.30/hour for metrics (10K active series)
 - $0.50/GB for logs
 
 **Estimated for 1M events/day:**
+
 - Metrics: ~5K series → $36/month
 - Logs: ~15GB/month → $7.50/month
 - **Total: ~$50-60/month**

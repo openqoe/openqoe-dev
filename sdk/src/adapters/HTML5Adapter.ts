@@ -35,6 +35,8 @@ export class HTML5Adapter implements PlayerAdapter {
   private rebufferDuration: number = 0;
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private seekFrom: number = 0;
+  private seekStartTime: number = 0;
 
   constructor(
     eventCollector: EventCollector,
@@ -67,7 +69,8 @@ export class HTML5Adapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.logger.info("HTML5Adapter attached");
   }
 
@@ -84,10 +87,18 @@ export class HTML5Adapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.logger.info("HTML5Adapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   /**
    * Attach all event listeners
@@ -95,21 +106,19 @@ export class HTML5Adapter implements PlayerAdapter {
   private attachEventListeners(): void {
     if (!this.video) return;
     this.addEventListener("loadstart", () => this.onLoadStart());
-    this.addEventListener("loadedmetadata", () => this.onLoadedMetaData());
     this.addEventListener("loadeddata", () => this.onPlayerReady());
     this.addEventListener("canplay", () => this.onCanPlay());
-    this.addEventListener("canplaythrough", () => this.onCanPlayThrough());
     this.addEventListener("play", () => this.onPlaying());
     this.addEventListener("pause", () => this.onPause());
+    this.addEventListener("playing", () => this.onPlayingAfterWait());
+    this.addEventListener("ended", () => this.onEnded());
+    this.addEventListener("error", () => this.onPlaybackError());
     this.addEventListener("seeking", () => this.onSeeking());
     this.addEventListener("seeked", () => this.onSeeked());
-    this.addEventListener("waiting", () => this.onWaiting());
+    this.addEventListener("waiting", () => this.onStallStart());
     this.addEventListener("stalled", () => this.onStallStart());
-    this.addEventListener("playing", () => this.onPlayingAfterWait());
     this.addEventListener("ratechange", () => this.onRateChange());
     this.addEventListener("volumechange", () => this.onVolumeChange());
-    this.addEventListener("ended", () => this.onEnded());
-    this.addEventListener("error", () => this.onErrorEvent());
     this.addEventListener("timeupdate", () => this.onTimeUpdate());
   }
 
@@ -137,29 +146,12 @@ export class HTML5Adapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent(
-      "manifestsloadingstart",
-      {
-        page_load_time: pageLoadTime,
-      },
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("viewstart event fired");
-  }
-
-  /**
-   * Metadata Load complete event
-   */
-  private async onLoadedMetaData(): Promise<void> {
-    if (!this.video) return;
-    const event = await this.eventCollector.createEvent("viewstart", {
-      preroll_requested: false,
-      buf_len: this.getBufferLength(),
+    const event = await this.eventCollector.createEvent("manifestload", {
+      page_load_time: pageLoadTime,
     });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("loadeddata event fired");
+    this.logger.debug("manifestload event fired");
   }
 
   /**
@@ -176,26 +168,19 @@ export class HTML5Adapter implements PlayerAdapter {
     this.logger.debug("playerready event fired");
   }
 
+  /**
+   * On Can Play
+   */
   private async onCanPlay(): Promise<void> {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent("canplay", {
       buf_len: this.getBufferLength(),
+      video_startup_time: performance.now(),
     });
 
     this.batchManager.addEvent(event);
     this.logger.debug("canplay event fired");
-  }
-
-  private async onCanPlayThrough(): Promise<void> {
-    if (!this.video) return;
-
-    const event = await this.eventCollector.createEvent("canplaythrough", {
-      buf_len: this.getBufferLength(),
-    });
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("canplaythrough event fired");
   }
 
   /**
@@ -204,15 +189,10 @@ export class HTML5Adapter implements PlayerAdapter {
   private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
-    // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : undefined;
-
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        video_startup_time: startupTime,
+        playing_time: this.video.currentTime * 1000,
         bitrate: this.getBitrate(),
         resolution: this.getVideoResolution(),
         framerate: undefined, // HTML5 doesn't expose framerate directly
@@ -250,138 +230,31 @@ export class HTML5Adapter implements PlayerAdapter {
   }
 
   /**
-   * Seeking event
-   */
-  private seekFrom: number = 0;
-
-  private async onSeeking(): Promise<void> {
-    if (!this.video) return;
-    this.seekFrom = this.video.currentTime * 1000;
-  }
-
-  /**
-   * Seeked event
-   */
-  private async onSeeked(): Promise<void> {
-    if (!this.video) return;
-
-    const seekTo = this.video.currentTime * 1000;
-    const seekLatency = performance.now() - (this.seekStartTime || 0);
-
-    const event = await this.eventCollector.createEvent(
-      "seek",
-      {
-        from: this.seekFrom,
-        to: seekTo,
-        seek_latency: seekLatency,
-      },
-      seekTo,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("seek event fired");
-  }
-
-  private seekStartTime: number = 0;
-
-  /**
-   * Stall Start (waiting) event
-   */
-  private async onWaiting(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent(
-      "stall_start",
-      {
-        buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
-  }
-
-  private async onStallStart(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent(
-      "stall_start",
-      {
-        buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
-  }
-
-  /**
    * Playing after waiting - Stall End
    */
   private async onPlayingAfterWait(): Promise<void> {
     if (!this.video) return;
 
-    // If we were stalled, fire stall_end
+    // If we were stalled, fire stallend
     if (this.stallStartTime !== null) {
       const stallDuration = performance.now() - this.stallStartTime;
       this.rebufferDuration += stallDuration;
       this.rebufferCount++;
 
       const event = await this.eventCollector.createEvent(
-        "stall_end",
+        "stallend",
         {
+          stall_position_secs: this.video.currentTime,
           stall_duration: stallDuration,
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
         },
         this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(event);
       this.stallStartTime = null;
-      this.logger.debug("stall_end event fired");
+      this.logger.debug("stallend event fired");
     }
-  }
-
-  /**
-   * Playback rate change
-   */
-  private async onRateChange(): Promise<void> {
-    if (!this.video) return;
-
-    const event = await this.eventCollector.createEvent(
-      "playbackratechange",
-      {
-        playback_rate: this.video.playbackRate,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("rate_change event fired");
-  }
-
-  private async onVolumeChange(): Promise<void> {
-    if (!this.video) return;
-
-    const event = await this.eventCollector.createEvent(
-      "playbackvolumechange",
-      {
-        playback_volume: this.video.volume * 100,
-        muted: this.video.muted,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("playbackvolumechange event fired");
   }
 
   /**
@@ -419,7 +292,7 @@ export class HTML5Adapter implements PlayerAdapter {
   /**
    * Error event
    */
-  private async onErrorEvent(): Promise<void> {
+  private async onPlaybackError(): Promise<void> {
     if (!this.video || !this.video.error) return;
 
     const errorCode = this.video.error.code;
@@ -456,6 +329,120 @@ export class HTML5Adapter implements PlayerAdapter {
         error_family: errorFamily,
       },
     });
+  }
+
+  /**
+   * Seeking event
+   */
+  private async onSeeking(): Promise<void> {
+    if (!this.video) return;
+    this.seekFrom = this.video.currentTime * 1000;
+    this.seekStartTime = performance.now();
+  }
+
+  /**
+   * Seeked event
+   */
+  private async onSeeked(): Promise<void> {
+    if (!this.video) return;
+
+    const seekTo = this.video.currentTime * 1000;
+    const seekLatency = performance.now() - (this.seekStartTime || 0);
+
+    const event = await this.eventCollector.createEvent(
+      "seek",
+      {
+        from: this.seekFrom,
+        to: seekTo,
+        seek_latency: seekLatency,
+      },
+      seekTo,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("seek event fired");
+  }
+
+  /**
+   * On Stall Start
+   */
+  private async onStallStart(): Promise<void> {
+    if (!this.video || this.stallStartTime !== null) return;
+
+    this.stallStartTime = performance.now();
+
+    const event = await this.eventCollector.createEvent(
+      "stallstart",
+      {
+        buffer_len_ms: this.getBufferLength(),
+        bitrate: this.getBitrate(),
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("stallstart event fired");
+  }
+
+  /**
+   * Playback rate change
+   */
+  private async onRateChange(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "playbackratechange",
+      {
+        playback_rate: this.video.playbackRate,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("rate_change event fired");
+  }
+
+  /**
+   * On Volume Change
+   */
+  private async onVolumeChange(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "playbackvolumechange",
+      {
+        volume: this.video.volume * 100,
+        muted: this.video.muted,
+      },
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("playbackvolumechange event fired");
+  }
+
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("moveback event fired");
   }
 
   /**
@@ -535,7 +522,7 @@ export class HTML5Adapter implements PlayerAdapter {
         {
           playing_time: this.playingTime,
           bitrate: this.getBitrate(),
-          buffer_length: this.getBufferLength(),
+          buffer_len_ms: this.getBufferLength(),
           dropped_frames: undefined, // HTML5 doesn't expose this
         },
         this.video.currentTime * 1000,

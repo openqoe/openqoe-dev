@@ -80,7 +80,7 @@ jobs:
       - name: Build and Push Worker
         uses: docker/build-push-action@v6
         with:
-          context: ./worker_v2
+          context: ./worker
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

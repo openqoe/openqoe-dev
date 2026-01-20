@@ -13,6 +13,7 @@ import {
 import { EventCollector } from "../core/EventCollector";
 import { BatchManager } from "../core/BatchManager";
 import { Logger } from "../utils/logger";
+import { PrivacyModule } from "../utils/privacy";
 
 export class HlsJsAdapter implements PlayerAdapter {
   private player: any = null;
@@ -39,12 +40,16 @@ export class HlsJsAdapter implements PlayerAdapter {
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
-  private currentLevel: number = -1;
-  private bandwidth: number | null = null;
   private currentBitrate: number | null = null;
   private currentResolution: Resolution | null = null;
   private currentFPS: number | null = null;
-  private currentCodec: string | null = null;
+  private bufferStats = { mean: 0, m2: 0, count: 0 };
+  private bufferSampleRate = 0.05;
+  private bufferZThreshold = 2.0;
+  private fragStats = { mean: 0, m2: 0, count: 0 };
+  private fragSampleRate = 0.1;
+  private fragZThreshold = 3.0;
+  private qualityLevelMap: Map<string, any> = new Map();
 
   constructor(
     eventCollector: EventCollector,
@@ -86,6 +91,8 @@ export class HlsJsAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
 
     this.logger.info("HlsJsAdapter attached");
   }
@@ -109,11 +116,19 @@ export class HlsJsAdapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.player = null;
     this.logger.info("HlsJsAdapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   private async resolveHlsJS(): Promise<any> {
     // 1. Browser UMD global
@@ -138,50 +153,41 @@ export class HlsJsAdapter implements PlayerAdapter {
   private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
     const hls = await this.resolveHlsJS();
-    this.onHls(hls.Events.MANIFEST_LOADING, (_event: any, data: any) =>
-      this.onManifestLoadingStart(data),
+    this.onHls(hls.Events.FRAG_LOADED, (_event: any, data: any) =>
+      this.onFragmentLoaded(data),
     );
-    this.onHls(hls.Events.MANIFEST_PARSED, (_event: any, data: any) =>
-      this.onManifestParsed(data),
-    );
-    this.onHls(hls.Events.MEDIA_ATTACHED, (_event: any, data: any) =>
-      this.onPlaybackInit(data),
-    );
-    this.onHls(hls.Events.MEDIA_DETACHED, (_event: any, data: any) =>
-      this.onPlaybackDetached(data),
+    this.onHls(hls.Events.MANIFEST_LOADED, () => this.onManifestLoaded());
+    this.onHls(hls.Events.MEDIA_ATTACHED, () => this.onPlayerReady());
+    this.onHls(hls.Events.BUFFER_APPENDED, (_event: any, data: any) =>
+      this.onBufferLevelChange(data),
     );
     this.onHls(hls.Events.LEVEL_SWITCHING, (_event: any, data: any) =>
       this.onQualityChangeRequested(data),
     );
     this.onHls(hls.Events.LEVEL_SWITCHED, (_event: any, data: any) =>
-      this.onLevelSwitched(data),
-    );
-    this.onHls(hls.Events.FRAG_BUFFERED, (_event: any, data: any) =>
-      this.onFragBuffered(data),
-    );
-    this.onHls(hls.Events.BUFFER_APPENDED, (_event: any, data: any) =>
-      this.onBufferAppended(data),
-    );
-    this.onHls(hls.Events.FPS_DROP, (_event: any, data: any) =>
-      this.onFPSDrop(data),
+      this.onQualityChangeRendered(data),
     );
     this.onHls(hls.Events.ERROR, (_event: any, data: any) =>
       this.onHlsError(data),
     );
+    this.onHls(hls.Events.MEDIA_DETACHED, (_event: any, data: any) =>
+      this.onPlaybackDetached(data),
+    );
 
     // Standard video element events
-    // this.addEventListener("loadstart", () => this.onViewStart());
+    this.addEventListener("canplay", () => this.onCanPlay());
     this.addEventListener("play", () => this.onPlaying());
     this.addEventListener("pause", () => this.onPause());
+    this.addEventListener("playing", () => this.onPlayingAfterWait());
+    this.addEventListener("ended", () => this.onEnded());
+    this.addEventListener("error", () => this.onPlaybackError());
     this.addEventListener("seeking", () => this.onSeeking());
     this.addEventListener("seeked", () => this.onSeeked());
     this.addEventListener("waiting", () => this.onStallStart());
-    this.addEventListener("playing", () => this.onPlayingAfterWait());
-    this.addEventListener("ended", () => this.onEnded());
-    this.addEventListener("timeupdate", () => this.onTimeUpdate());
+    this.addEventListener("stalled", () => this.onStallStart());
     this.addEventListener("ratechange", () => this.onPlaybackRateChanged());
     this.addEventListener("volumechange", () => this.onPlaybackVolumeChanged());
-    this.addEventListener("error", () => this.onMediaError());
+    this.addEventListener("timeupdate", () => this.onTimeUpdate());
   }
 
   /**
@@ -205,9 +211,66 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Event Handlers - Ordered by attachEventListeners() sequence
+   */
+
+  /**
+   * Fragment Buffered event
+   */
+  private async onFragmentLoaded(data: any): Promise<void> {
+    if (!this.video) return;
+    const endTime = data.frag.stats.loading.first;
+    const startTime = data.frag.stats.loading.start;
+    const ttfb = endTime - startTime;
+    this.fragStats.count++;
+    const delta = ttfb - this.fragStats.mean;
+    this.fragStats.mean += delta / this.fragStats.count;
+    const delta2 = ttfb - this.fragStats.mean;
+    this.fragStats.m2 += delta * delta2;
+    const stdDev =
+      this.fragStats.count > 1
+        ? Math.sqrt(this.fragStats.m2 / (this.fragStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(ttfb - this.fragStats.mean) / stdDev : 0;
+    const isOutlier = zScore > this.fragZThreshold;
+    const isRandomSample = Math.random() < this.fragSampleRate;
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "fragmentloaded",
+        {
+          frag_duration: data.frag.duration,
+          size_bytes: data.frag.stats.loaded,
+          time_to_load:
+            data.frag.stats.loading.end - data.frag.stats.loading.start,
+          ttfb_ms: ttfb,
+          z_score: zScore,
+          service_location: PrivacyModule.sanitizeUrl(data.frag.base.url),
+          bandwidth: data.frag.stats.bwEstimate,
+          url: PrivacyModule.sanitizeUrl(data.frag._url),
+          frag_id: data.frag.relurl,
+          media_type: data.frag.type,
+          type: "",
+          is_outlier: isOutlier,
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.logger.debug(
+        `Fragment loaded ${isOutlier ? "[OUTLIER]" : "[SAMPLE]"}`,
+        {
+          latency: ttfb,
+          z: zScore.toFixed(2),
+        },
+      );
+    }
+  }
+
+  /**
    * Manifest Loading Start
    */
-  private async onManifestLoadingStart(data: any): Promise<void> {
+  private async onManifestLoaded(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -217,165 +280,134 @@ export class HlsJsAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent(
-      "manifestsloadingstart",
-      {
-        ...data,
-        page_load_time: pageLoadTime,
-      },
-    );
+    const event = await this.eventCollector.createEvent("manifestload", {
+      page_load_time: pageLoadTime,
+    });
 
     this.batchManager.addEvent(event);
-    this.logger.debug("manifestsloadingstart event fired");
+    this.logger.debug("manifestload event fired");
   }
 
   /**
-   * Manifest Parsed event (Player Ready)
+   * On Player Ready
    */
-  private async onManifestParsed(data: any): Promise<void> {
+  private async onPlayerReady(): Promise<void> {
     const event = await this.eventCollector.createEvent("playerready", {
       player_startup_time: performance.now(),
-      bandwidth: data.stats?.bwEstimate,
-      aborted: data.stats?.aborted,
-      ...this.aggregateLevelsInManifest(data.levels),
     });
     this.batchManager.addEvent(event);
     this.logger.debug("playerready event fired");
   }
-  /**
-   * Media Attached event
-   */
-  private async onPlaybackInit(data: any): Promise<void> {
-    const event = await this.eventCollector.createEvent("viewstart", {
-      ...data,
-      preroll_requested: false,
-    });
-    this.batchManager.addEvent(event);
-    this.logger.debug("playbackinit event fired");
-  }
 
   /**
-   * Playback Detached event
+   * Buffer Append event
    */
-  private async onPlaybackDetached(data: any): Promise<void> {
-    this.logger.debug("Media detached: ", data);
-    const event = await this.eventCollector.createEvent("playbackdetached");
-    this.batchManager.addEvent(event);
-    this.logger.debug("playbackdetached event fired");
+  private async onBufferLevelChange(data: any): Promise<void> {
+    // Can be used for buffer analysis
+    if (!this.video) return;
+    const bufferAhead = this.getBufferAhead(data.timeRanges[data.type]);
+    const currentLevel = bufferAhead !== undefined ? bufferAhead : 0;
+    this.bufferStats.count++;
+    const delta = currentLevel - this.bufferStats.mean;
+    this.bufferStats.mean += delta / this.bufferStats.count;
+    const delta2 = currentLevel - this.bufferStats.mean;
+    this.bufferStats.m2 += delta * delta2;
+    const stdDev =
+      this.bufferStats.count > 1
+        ? Math.sqrt(this.bufferStats.m2 / (this.bufferStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(currentLevel - this.bufferStats.mean) / stdDev : 0;
+    const isOutlier = zScore > this.bufferZThreshold;
+    const isRandomSample = Math.random() < this.bufferSampleRate;
+
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "bufferlevelchange",
+        {
+          buffer_len_ms: currentLevel,
+          z_score: zScore,
+          is_outlier: isOutlier,
+          media_type: data.type,
+          url: data.frag.base.url,
+          rel_url: data.frag.relurl,
+          bandwidth: data.frag.stats?.bwEstimate,
+          buffer_gap: data.timeRanges[data.type].length > 1,
+        },
+        this.video.currentTime * 1000,
+      );
+
+      this.batchManager.addEvent(event);
+      this.logger.debug("Bufferappended event fired");
+    }
   }
 
   /**
    * Quality Change Request event
    */
   private async onQualityChangeRequested(data: any): Promise<void> {
-    this.bandwidth = data.averageBitrate;
-    this.currentBitrate = data.bitrate || null;
-    this.currentResolution = {
-      width: data.width || null,
-      height: data.height || null,
-    };
-    this.currentFPS = parseInt(data.attrs["FRAME-RATE"]) || null;
-    this.currentCodec = data.videoCodec || null;
-    const event = await this.eventCollector.createEvent(
+    if (!this.video) return;
+    this.qualityLevelMap.set(data.level, data);
+    const event1 = await this.eventCollector.createEvent(
       "qualitychangerequested",
       {
         new: {
-          bitrate_kb: data.bitrate,
-          bandwidth: this.bandwidth,
-          resolution: this.currentResolution,
-          codec: this.currentCodec,
-          framerate: this.currentFPS,
-          max_bitrate: data.maxBitrate,
-          requested_level: data.level,
-          audio_codec: data.audioCodec,
+          bitrate_kb: data.averageBitrate / 1000,
+          resolution: {
+            width: data.width,
+            height: data.height,
+          },
+          codec: data.codecSet,
+          framerate: data.attrs["FRAME-RATE"],
+          level: data.level,
         },
       },
-      this.video ? this.video.currentTime * 1000 : undefined,
+      this.video.currentTime * 1000,
     );
-    this.batchManager.addEvent(event);
+    const event2 = await this.eventCollector.createEvent(
+      "bandwidthchange",
+      {
+        media_type: data.mediaType,
+        bandwidth: parseFloat(data.attrs["AVERAGE-BANDWIDTH"]),
+        codec: data.codecSet,
+      },
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event1);
+    this.batchManager.addEvent(event2);
     this.logger.debug("qualitychangerequested event fired");
+    this.logger.debug("bandwidthchange event fired");
   }
 
   /**
-   * Level Switched event (Quality Change)
+   * Quality Change Rendered
    */
-  private async onLevelSwitched(data: any): Promise<void> {
+  private async onQualityChangeRendered(data: any): Promise<void> {
     if (!this.video) return;
-    this.currentLevel = data.level;
+    const reqData = this.qualityLevelMap.get(data.level);
     const event = await this.eventCollector.createEvent(
-      "qualitychangecompleted",
+      "qualitychange",
       {
-        bitrate_kb: this.currentBitrate,
-        bandwidth: this.bandwidth,
-        resolution: this.currentResolution,
-        framerate: this.currentFPS,
-        codec: this.currentCodec || null,
-        level: this.currentLevel,
+        bitrate_kb: reqData.averageBitrate / 1000,
+        media_type: "",
+        resolution: {
+          width: reqData.width,
+          height: reqData.height,
+        },
+        bits_per_pixel: null,
+        video_width: this.video.videoWidth,
+        video_height: this.video.videoHeight,
+        player_width: this.video.offsetWidth,
+        player_height: this.video.offsetHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+        framerate: reqData.attrs["FRAME-RATE"],
+        codec: data.codecSet,
       },
       this.video.currentTime * 1000,
     );
-
     this.batchManager.addEvent(event);
+    this.qualityLevelMap.delete(data.level);
     this.logger.debug("qualitychange event fired");
-  }
-
-  /**
-   * Fragment Buffered event
-   */
-  private async onFragBuffered(data: any): Promise<void> {
-    if (!this.video) return;
-    this.bandwidth = data.stats.bwEstimate;
-    const event = await this.eventCollector.createEvent(
-      "fragmentloaded",
-      {
-        duration: data.frag.duration,
-        bandwidth: this.bandwidth,
-        aborted: data.stats.aborted,
-        url: data.frag.base.url,
-        rel_url: data.frag.relurl,
-        media_type: data.frag.type,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("Fragmentbuffered event fired");
-  }
-
-  /**
-   * Buffer Append event
-   */
-  private async onBufferAppended(data: any): Promise<void> {
-    // Can be used for buffer analysis
-    if (!this.video) return;
-    const event = await this.eventCollector.createEvent(
-      "bufferlevelchange",
-      {
-        media_type: data.type,
-        url: data.frag.base.url,
-        rel_url: data.frag.relurl,
-        bandwidth: data.frag.stats?.bwEstimate,
-        buffer_length: this.getBufferAhead(data.timeRanges[data.type]),
-        buffer_gap: data.timeRanges[data.type].length > 1,
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("Bufferappended event fired");
-  }
-
-  private async onFPSDrop(data: any): Promise<void> {
-    if (!this.video) return;
-    this.logger.info("FPS dropped", data);
-    const event = await this.eventCollector.createEvent(
-      "fpsdrop",
-      data,
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("FPS dropped event fired");
   }
 
   /**
@@ -422,23 +454,37 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
+   * Playback Detached event
+   */
+  private async onPlaybackDetached(data: any): Promise<void> {
+    this.logger.debug("Media detached: ", data);
+    const event = await this.eventCollector.createEvent("playbackdetached");
+    this.batchManager.addEvent(event);
+    this.logger.debug("playbackdetached event fired");
+  }
+
+  /**
+   * Can Play Event
+   */
+  private async onCanPlay(): Promise<void> {
+    const event = await this.eventCollector.createEvent("canplay", {
+      video_startup_time: performance.now(),
+    });
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("canplay event fired");
+  }
+
+  /**
    * Playing event
    */
   private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
-    // Calculate video startup time if this is first play
-    const startupTime = this.viewStartTime
-      ? performance.now() - this.viewStartTime
-      : undefined;
-
     const event = await this.eventCollector.createEvent(
       "playing",
       {
-        video_startup_time: startupTime,
-        bitrate: this.getBitrate(),
-        resolution: this.getVideoResolution(),
-        framerate: this.getFramerate(),
+        playing_time: this.video.currentTime * 1000,
       },
       this.video.currentTime * 1000,
     );
@@ -473,82 +519,23 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Seeking event
-   */
-  private async onSeeking(): Promise<void> {
-    if (!this.video) return;
-    this.seekFrom = this.video.currentTime * 1000;
-    this.seekStartTime = performance.now();
-  }
-
-  /**
-   * Seeked event
-   */
-  private async onSeeked(): Promise<void> {
-    if (!this.video) return;
-
-    const seekTo = this.video.currentTime * 1000;
-    const seekLatency = performance.now() - (this.seekStartTime || 0);
-
-    const event = await this.eventCollector.createEvent(
-      "seek",
-      {
-        from: this.seekFrom,
-        to: seekTo,
-        seek_latency: seekLatency,
-      },
-      seekTo,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("seek event fired");
-  }
-
-  /**
-   * Stall Start (waiting) event
-   */
-  private async onStallStart(): Promise<void> {
-    if (!this.video || this.stallStartTime !== null) return;
-
-    this.stallStartTime = performance.now();
-
-    const event = await this.eventCollector.createEvent(
-      "stall_start",
-      {
-        buffer_length: this.getBufferLength(),
-        bitrate: this.getBitrate(),
-      },
-      this.video.currentTime * 1000,
-    );
-
-    this.batchManager.addEvent(event);
-    this.logger.debug("stall_start event fired");
-  }
-
-  /**
    * Playing after waiting - Stall End
    */
   private async onPlayingAfterWait(): Promise<void> {
     if (!this.video) return;
-
-    // If we were stalled, fire stall_end
+    // If we were stalled, fire stallend
     if (this.stallStartTime !== null) {
-      const stallDuration = performance.now() - this.stallStartTime;
-      this.rebufferDuration += stallDuration;
-      this.rebufferCount++;
-
       const event = await this.eventCollector.createEvent(
-        "stall_end",
+        "stallend",
         {
-          stall_duration: stallDuration,
-          buffer_length: this.getBufferLength(),
+          stall_position_secs: this.stallStartTime,
         },
         this.video.currentTime * 1000,
       );
 
       this.batchManager.addEvent(event);
       this.stallStartTime = null;
-      this.logger.debug("stall_end event fired");
+      this.logger.debug("stallend event fired");
     }
   }
 
@@ -585,24 +572,73 @@ export class HlsJsAdapter implements PlayerAdapter {
   }
 
   /**
-   * Error handler
+   * Playback error
    */
-  private async onError(error: PlayerError): Promise<void> {
+  private async onPlaybackError(): Promise<void> {
+    if (!this.video || !this.video.error) return;
+
+    const mediaError = this.video.error;
+    const errorMessage = `MediaError code ${mediaError.code}: ${mediaError.message}`;
+    this.onError({
+      code: mediaError.code,
+      message: errorMessage,
+      fatal: false,
+      context: {
+        error_family: "media",
+      },
+    });
+  }
+
+  /**   * Seeking event
+   */
+  private async onSeeking(): Promise<void> {
+    if (!this.video) return;
+    this.seekFrom = this.video.currentTime * 1000;
+    this.seekStartTime = performance.now();
+  }
+
+  /**
+   * Seeked event
+   */
+  private async onSeeked(): Promise<void> {
     if (!this.video) return;
 
+    const seekTo = this.video.currentTime * 1000;
+    const seekLatency = performance.now() - (this.seekStartTime || 0);
+
     const event = await this.eventCollector.createEvent(
-      "error",
+      "seek",
       {
-        error_family: error.context?.error_family || "source",
-        error_code: String(error.code),
-        error_message: error.message,
-        error_context: error.context,
+        from: this.seekFrom,
+        to: seekTo,
+        seek_latency: seekLatency,
+      },
+      seekTo,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("seek event fired");
+  }
+
+  /**
+   * Stall Start (waiting) event
+   */
+  private async onStallStart(): Promise<void> {
+    if (!this.video || this.stallStartTime !== null) return;
+
+    this.stallStartTime = this.video.currentTime;
+
+    const event = await this.eventCollector.createEvent(
+      "stallstart",
+      {
+        buffer_len_ms: this.getBufferLength(),
+        bitrate: this.getBitrate(),
       },
       this.video.currentTime * 1000,
     );
 
     this.batchManager.addEvent(event);
-    this.logger.debug("error event fired", error);
+    this.logger.debug("stallstart event fired");
   }
 
   /**
@@ -684,22 +720,49 @@ export class HlsJsAdapter implements PlayerAdapter {
     this.logger.debug("playbackvolumechange event fired");
   }
 
-  /**
-   * Playback error
-   */
-  private async onMediaError(): Promise<void> {
-    if (!this.video || !this.video.error) return;
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
 
-    const mediaError = this.video.error;
-    const errorMessage = `MediaError code ${mediaError.code}: ${mediaError.message}`;
-    this.onError({
-      code: mediaError.code,
-      message: errorMessage,
-      fatal: false,
-      context: {
-        error_family: "media",
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("moveback event fired");
+  }
+
+  /**
+   * Error handler
+   */
+  private async onError(error: PlayerError): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "error",
+      {
+        error_family: error.context?.error_family || "source",
+        error_code: String(error.code),
+        error_message: error.message,
+        error_context: error.context,
       },
-    });
+      this.video.currentTime * 1000,
+    );
+
+    this.batchManager.addEvent(event);
+    this.logger.debug("error event fired", error);
   }
 
   /**
@@ -876,32 +939,5 @@ export class HlsJsAdapter implements PlayerAdapter {
     }
 
     return undefined;
-  }
-
-  // calculates median of available levels
-  private aggregateLevelsInManifest(levels: any[]): {
-    bitrates: number[];
-    resolution: Resolution[];
-    framerate: number[];
-  } {
-    const stats: {
-      bitrates: number[];
-      resolution: Resolution[];
-      framerate: number[];
-    } = {
-      bitrates: [],
-      resolution: [],
-      framerate: [],
-    };
-
-    for (const level of levels) {
-      stats.bitrates.push(level.bitrate || 0);
-      stats.resolution.push({
-        width: level.width || 0,
-        height: level.height || 0,
-      });
-      stats.framerate.push(level.frameRate || 0);
-    }
-    return stats;
   }
 }

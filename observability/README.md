@@ -1,6 +1,6 @@
 # OpenQoE Observability Stack
 
-Complete monitoring solution for video Quality of Experience (QoE) metrics using Grafana Mimir (metrics) and Loki (logs).
+Complete OTLP-based monitoring solution for video Quality of Experience (QoE) metrics using Grafana Alloy (collector), Mimir (metrics), Loki (logs), and Tempo (traces).
 
 ## Quick Start
 
@@ -10,10 +10,6 @@ docker compose up -d
 
 # Verify all services are healthy
 docker compose ps
-
-# Access Grafana
-open http://localhost:3000
-# Login: admin / admin
 ```
 
 ## Components
@@ -21,8 +17,10 @@ open http://localhost:3000
 | Component | Port | Purpose |
 |-----------|------|---------|
 | **Grafana** | 3000 | Visualization and dashboards |
-| **Mimir** | 9009 | Metrics storage (Prometheus-compatible) |
+| **Alloy** | 4317 | OTLP collection and processing |
+| **Mimir** | 9009 | Metrics storage |
 | **Loki** | 3100 | Log aggregation |
+| **Tempo** | 3200 | Distributed tracing |
 
 ##What's Included
 
@@ -48,54 +46,40 @@ open http://localhost:3000
    - Watch time aggregates, completion rates, revenue impact
    - Quality-to-engagement correlation analysis
 
-### 📈 **Recording Rules** (`prometheus/rules/openqoe-recording-rules.yml`)
+### 🧵 **Distributed Tracing**
+End-to-end observability using Grafana Tempo. Track individual playback sessions from the SDK through the Go Worker to the storage backends.
 
+### 📈 **Recording Rules**
 25 pre-aggregated metrics for dashboard performance:
 - Video Startup Time percentiles (P50/P95/P99)
 - Rebuffer rate and duration
-- Completion rates by device/video
-- Error rates by type
 - Watch time aggregates
-- Concurrent viewer counts
 
-### 🚨 **Alert Rules** (`prometheus/rules/openqoe-alert-rules.yml`)
+### 🚨 **Alert Rules**
+18 production-ready alerts across 6 categories covering quality, business impact, and pipeline health.
 
-18 production-ready alerts across 6 categories:
-- **Critical Quality**: High VST, rebuffer rate, error rate
-- **Business Impact**: Low completion rate, dropping watch time
-- **Performance**: High seek latency, dropped frames
-- **Live Streaming**: No viewers, viewership drops
-- **Data Pipeline**: No events, ingestion drops
-
-### 🎯 **Histogram Metrics**
-
-Worker exports accurate histogram metrics for percentile calculations:
-- `openqoe_video_startup_seconds` - Buckets: [0.5, 1, 2, 3, 5, 10, 15, 30]
-- `openqoe_rebuffer_duration_seconds` - Buckets: [0.5, 1, 2, 3, 5, 10, 30]
-- `openqoe_seek_latency_seconds` - Buckets: [0.1, 0.25, 0.5, 1, 2, 5]
-
-Enables accurate P50/P95/P99 calculations via `histogram_quantile()`.
+### 🎯 **OTLP Native Metrics**
+OpenQoE v2 uses OTLP for metric export, ensuring compatibility with the wider OTel ecosystem.
+- `openqoe_video_startup_seconds`
+- `openqoe_rebuffer_duration_seconds`
+- `openqoe_seek_latency_seconds`
 
 ## Installation
 
-### Method 1: Docker Compose (Recommended)
+### Method 1: Docker Compose
 
 ```bash
-# Start everything
+# Start the stack (Mimir, Loki, Tempo, Alloy, Grafana)
 docker compose up -d
 
-# Load recording rules into Mimir
-cd prometheus/rules
-./load-rules.sh http://localhost:9009
-
-# Load alert rules
-curl -X POST \
-  "http://localhost:9009/prometheus/config/v1/rules/anonymous" \
-  -H "Content-Type: application/yaml" \
-  --data-binary "@openqoe-alert-rules.yml"
-
-# Dashboards auto-load via provisioning
+# Dashboards and data sources are auto-provisioned
 ```
+
+### Method 2: Manual Data Source Setup
+
+1. Login to Grafana (http://localhost:3000)
+2. Add OTLP, Mimir, Loki, and Tempo data sources.
+3. Import JSON files from `dashboards/` directory.
 
 ### Method 2: Manual Dashboard Import
 
