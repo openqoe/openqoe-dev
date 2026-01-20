@@ -10,7 +10,7 @@
 
 > **Production-grade video quality monitoring for web video players with comprehensive business and technical metrics, accurate percentile calculations, real-time alerting, and distributed tracing.**
 
-> **Guarantee of p90 request latency of 60ms for event insgestion**
+> **Guarantee of p90 request latency of <=30ms for event insgestion under any load**
 
 ---
 
@@ -90,7 +90,7 @@ OpenQoE is a complete, production-ready observability platform for video streami
 graph TD
     subgraph "Your Application"
         SDK[OpenQoE SDK]
-        P1["Dash.js - Ready"]
+        P1["Dash.js,HLS.js, HTML5 - Ready"]
         P2["Others - WIP"]
         P1 -.-> SDK
         P2 -.-> SDK

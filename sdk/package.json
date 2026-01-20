@@ -1,6 +1,6 @@
 {
   "name": "@openqoe/sdk",
-  "version": "0.1.2",
+  "version": "1.2.0",
   "description": "Production-grade video QoE/QoS observability SDK for web players",
   "publishConfig": {
     "access": "public",
