@@ -610,7 +610,7 @@ Optional, indicates what area of code is affected:
 # Feature
 feat(sdk): add YouTube IFrame API adapter
 
-Implements full YouTube IFrame API integration with support for all 12 QoE events.
+Implements full YouTube IFrame API integration with support for all 25 QoE events.
 Includes state tracking, quality change detection, and error handling.
 
 Closes #123
