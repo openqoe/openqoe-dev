@@ -80,7 +80,8 @@ export class ShakaAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.logger.info("ShakaAdapter attached");
   }
 
@@ -103,11 +104,19 @@ export class ShakaAdapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.player = null;
     this.logger.info("ShakaAdapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   /**
    * Attach all event listeners
@@ -494,6 +503,30 @@ export class ShakaAdapter implements PlayerAdapter {
 
     this.lastPlaybackTime = this.video.currentTime;
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
+  }
+
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("moveback event fired");
   }
 
   /**
