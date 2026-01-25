@@ -354,22 +354,29 @@ openqoe:video_startup_seconds:p95
 
 \*HTML5 doesn't support `quality_change` events (no native ABR)
 
-### Events Tracked (24+ Total)
+### Events Tracked (19 Total)
 
-| Event            | Description           | Business Value               |
-| ---------------- | --------------------- | ---------------------------- |
-| `playerready`    | Player initialized    | Time to interactive          |
-| `viewstart`      | Video load started    | View funnel entry            |
-| `playing`        | Playback started      | **Video Startup Time (VST)** |
-| `pause`          | User paused           | Engagement analysis          |
-| `seek`           | User scrubbed         | Navigation behavior          |
-| `stall_start`    | Buffering started     | **Rebuffering detection**    |
-| `stall_end`      | Buffering ended       | **Rebuffer duration**        |
-| `ended`          | Video completed       | **Completion rate**          |
-| `error`          | Playback error        | **Error tracking**           |
-| `quartile`       | 25/50/75/100% reached | **Drop-off analysis**        |
-| `heartbeat`      | Periodic update (10s) | **Watch time tracking**      |
-| `quality_change` | ABR switch            | Bitrate adaptation           |
+| Event                    | Description                                   | Business Value                                   |
+| ------------------------ | --------------------------------------------- | ------------------------------------------------ |
+| `playerready`            | Player initialized and ready for input        | **Time to interactive** - UI responsiveness      |
+| `manifestload`           | Manifest/playlist fetched and parsed          | **Content delivery measurement** - CDN perf      |
+| `fragmentloaded`         | Video fragment successfully downloaded        | **Buffer fill tracking** - Network efficiency    |
+| `canplay`                | Playback can begin (enough buffer)            | **Startup readiness** - Data availability        |
+| `playing`                | Playback actually started                     | **Video Startup Time (VST)** - P95 latency       |
+| `bandwidthchange`        | Network bandwidth measurement updated         | **ABR trigger analysis** - Adaptation triggers   |
+| `qualitychangerequested` | Quality switch requested by ABR algorithm     | **ABR responsiveness** - Algorithm effectiveness |
+| `qualitychange`          | Quality actually changed (new bitrate active) | **Bitrate adaptation** - User experience impact  |
+| `bufferlevelchange`      | Video buffer level changed                    | **Buffer health** - Stall prediction             |
+| `stallstart`             | Rebuffering event started                     | **Rebuffering detection** - QoE degradation      |
+| `stallend`               | Rebuffering event ended                       | **Rebuffer duration** - Stall metrics (P95)      |
+| `seek`                   | User seeked to different position             | **Seek latency** - Navigation UX                 |
+| `pause`                  | User paused playback                          | **Engagement measurement** - Watch patterns      |
+| `heartbeat`              | Periodic ping (typically 10s intervals)       | **Watch time tracking** - Accurate view metrics  |
+| `quartile`               | Playback reached 25%, 50%, 75%, or 100%       | **Drop-off analysis** - Viewer retention funnel  |
+| `ended`                  | Video playback completed                      | **Completion rate** - Content success metric     |
+| `error`                  | Playback error occurred                       | **Error tracking** - SLA monitoring & debugging  |
+| `moveaway`               | User navigated away from player               | **Session detection** - Window blur detection    |
+| `moveback`               | User returned to player after moving away     | **Re-engagement tracking** - Viewer behavior     |
 
 ---
 
