@@ -742,7 +742,7 @@
             const eventsContainer = document.getElementById("events-container");
 
             // Initialize Shaka Player
-            function initializePlayer() {
+            async function initializePlayer() {
                 // Install built-in polyfills
                 shaka.polyfill.installAll();
 
@@ -761,12 +761,12 @@
 
                 // Create new player
                 player = new shaka.Player(video);
+                await player.attach(video);
 
                 // Setup error handling
                 player.addEventListener("error", (error) => {
                     console.error("Shaka Player error:", error);
                 });
-
                 return player;
             }
 
@@ -794,7 +794,7 @@
                 }
 
                 // Initialize player
-                player = initializePlayer();
+                player = await initializePlayer();
 
                 if (!player) {
                     return;
