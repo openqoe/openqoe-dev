@@ -1,4 +1,5 @@
 # OpenQoE
+
 Open-Source Viewer Quality of Experience (QoE) Monitoring Platform for Video Streaming
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg?style=for-the-badge)](LICENSE)
@@ -7,14 +8,16 @@ Open-Source Viewer Quality of Experience (QoE) Monitoring Platform for Video Str
 [![Go](https://img.shields.io/badge/Go-1.25+-009EDB.svg?style=flat-square)](https://go.dev/)
 
 ## Value Propositions
+
 - Production-grade video quality monitoring for video players for all platforms(web, mobile, tv) with comprehensive business and technical metrics, accurate percentile calculations, real-time alerting, tracing and logging.
 - Fully compatible with your existing observability infrastructure and tools (uses Open Telemetry Protocol for data export and Grafana for visualization).
-- High Performance Low Latency Event Ingestion (Tested with p95 request latency of <=30ms for event ingestion under load of 10k requests per second in an AWS m7a.large instance)
+- High Performance Low Latency Event Ingestion (Tested with p95 request latency of 30ms for event ingestion under load of 10k requests per second in an AWS m7a.large instance)
 - Lightweight(from both compute and size perspective) SDK for player integration
 - Easily Deployable on Kubernetes or any other container orchestration platform (npm package and docker image available)
 
 ## Current Status
--  Web Player Integrations [Dash.js, Hls.js, HTML5 Player, Shaka Player, Video.js]: **Complete**
+
+- Web Player Integrations [Dash.js, Hls.js, HTML5 Player, Shaka Player, Video.js]: **Complete**
 - Worker Implementation: **Complete**
 - Open Telemetry Integration (Metrics, Traces, Logs): **Complete**
 - Grafana Integration[Dashboard, Alerts]: **Complete**
@@ -35,55 +38,57 @@ Open-Source Viewer Quality of Experience (QoE) Monitoring Platform for Video Str
 
 ---
 
-## 🎯 Overview
+## Overview
 
 OpenQoE is a complete, production-ready observability platform for video streaming that helps you:
 
 - **Monitor Quality of Experience**: Track video startup time, playback smoothness, playback quality and errors
-- **Understand Engagement**: Measure views, watch time, completion rates, and viewer behavior
+- **Understand Engagement**: Count views, watch time, completion rates, and viewer navigation behaviour
 - **Optimize Performance**: Identify bottlenecks with P50/P95/P99 percentile analysis
 - **Alert Proactively**: Get notified when different metrics degrade or business metrics drop
 - **Scale Globally**: Deploy on anywhere using docker image, Helm Chart (Planned)
 
 ### What's Included
+
 | Component               | Description                                  | Status                           |
 | ----------------------- | -------------------------------------------- | -------------------------------- |
-| **TypeScript SDK**      | 5 player adapters capturing 24+ event types  | ✅ Dash.js, HLS.js, HTML5 Player Integration Ready / 🏗️ Others WIP |
-| **Go Worker**           | High-performance OTLP ingestion & processing | ✅ Production Ready              |
-| **Grafana Alloy**       | Edge telemetry collector & processor         | ✅ Production Ready              |
-| **Grafana Dashboards**  | 4 comprehensive dashboards (58 panels total) | ✅ Production Ready              |
-| **Recording Rules**     | 25 pre-aggregated metrics for performance    | ✅ Production Ready              |
-| **Alert Rules**         | 18 production-ready alerts                   | ✅ Production Ready              |
-| **Distributed Tracing** | End-to-end tracing with Grafana Tempo        | ✅ Production Ready              |
-| **Docker Stack**        | Self-hosted Mimir + Loki + Tempo + Alloy     | ✅ Production Ready              |
+| **TypeScript SDK**      | 5 player adapters capturing 24+ event types  | Dash.js, HLS.js, HTML5 Player Integration Ready / Others WIP 🏗️ |
+| **Go Worker**           | High-performance OTLP ingestion & processing | Production Ready              |
+| **Grafana Alloy**       | Edge telemetry collector & processor         | Production Ready              |
+| **Grafana Dashboards**  | 4 comprehensive dashboards (58 panels total) | Production Ready              |
+| **Recording Rules**     | 25 pre-aggregated metrics for performance    | Production Ready              |
+| **Alert Rules**         | 18 production-ready alerts                   | Production Ready              |
+| **Distributed Tracing** | End-to-end tracing with Grafana Tempo        | Production Ready              |
+| **Docker Stack**        | Self-hosted Mimir + Loki + Tempo + Alloy     | Production Ready              |
 
 ## Features
 
 ### SDK Capabilities
 
-- ✅ **Multi-Player Support**: HTML5, Video.js, HLS.js, Dash.js, Shaka Player
-- ✅ **Comprehensive Events**: 24+ event types with full context capture
-- ✅ **Privacy-First**: SHA-256 hashing, configurable PII controls
-- ✅ **Lightweight**: ~10KB gzipped per adapter
-- ✅ **TypeScript**: Full type definitions included
+- **Multi-Player Support**: HTML5, Video.js, HLS.js, Dash.js, Shaka Player
+- **Comprehensive Events**: 24+ event types with full context capture
+- Statistical Event Production**: For high frequency events 
+- **Privacy-First**: SHA-256 hashing, configurable PII controls
+- **Lightweight**: ~10KB gzipped per adapter
+- **TypeScript**: Full type definitions included
 
 ### Go Worker Features
 
-- ✅ **OTLP Ingestion**: Native support for OpenTelemetry protocol
-- ✅ **High Concurrency**: Built with Go for scalable event processing
-- ✅ **Cardinality Governance**: Automatic high-cardinality dimension management
-- ✅ **Dual Destinations**: Self-hosted or Grafana Cloud
-- ✅ **Health Monitoring**: Integrated health and stats endpoints
+- **OTLP Ingestion**: Native support for OpenTelemetry protocol
+- **High Concurrency**: Built with Go for scalable event processing
+- **Cardinality Governance**: Automatic high-cardinality dimension management
+- **Dual Destinations**: Self-hosted or Grafana Cloud
+- **Health Monitoring**: Integrated health and stats endpoints
 
 ### Observability Stack
 
-- ✅ **Full OTLP Pipeline**: Alloy -> Mimir/Loki/Tempo
-- ✅ **Distributed Tracing**: End-to-end visibility with Tempo
-- ✅ **4 Production Dashboards**: Video Performance, Video QoE, Video QoS, Worker Metrics
-- ✅ **18 Alert Rules**: Critical quality and performance alerts
-- ✅ **Self-Hosted**: Complete Docker Compose stack (Mimir, Loki, Tempo, Alloy, Grafana)
+- **Full OTLP Pipeline**: Alloy -> Mimir/Loki/Tempo
+- **Distributed Tracing**: End-to-end visibility with Tempo
+- **4 Production Dashboards**: Video Performance, Video QoE, Video QoS, Worker Metrics
+- **18 Alert Rules**: Critical quality and performance alerts
+- **Self-Hosted**: Complete Docker Compose stack (Mimir, Loki, Tempo, Alloy, Grafana)
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -200,8 +205,8 @@ cp .env.example .env
 | [Architecture](docs/architecture.md)         | Distributed observability pipeline                   |
 | [Production Ready](docs/production-ready.md) | Production readiness report (Dash.js, HLS.js, HTML5) |
 
-3. Open **VOD Monitoring** dashboard
-4. Play a video and watch metrics appear in real-time!
+1. Open **VOD Monitoring** dashboard
+2. Play a video and watch metrics appear in real-time!
 
 **That's it!** Your video QoE monitoring is now live. 🎉
 
@@ -689,7 +694,7 @@ See [docs/production-ready.md](docs/production-ready.md) for complete production
 
 ---
 
-## 🙏 Star Us!
+## 🙏 Star Us
 
 If you find OpenQoE useful, please consider giving us a star ⭐ on GitHub. It helps others discover the project!
 
