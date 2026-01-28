@@ -1,20 +1,26 @@
 # OpenQoE
+Open-Source Viewer Quality of Experience (QoE) Monitoring Platform for Video Streaming
 
-**Open-Source Video Quality of Experience (QoE) Monitoring Platform**
+[![License](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg?style=for-the-badge)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-white.svg?style=for-the-badge)](docs/contributing.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-007acc.svg?style=flat-square)](https://www.typescriptlang.org/)
+[![Go](https://img.shields.io/badge/Go-1.25+-009EDB.svg?style=flat-square)](https://go.dev/)
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Production Ready](https://img.shields.io/badge/Status-Dash.js%20Ready-brightgreen.svg)](docs/production-ready.md)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)](https://go.dev/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/contributing.md)
+## Value Propositions
+- Production-grade video quality monitoring for video players for all platforms(web, mobile, tv) with comprehensive business and technical metrics, accurate percentile calculations, real-time alerting, tracing and logging.
+- Fully compatible with your existing observability infrastructure and tools (uses Open Telemetry Protocol for data export and Grafana for visualization).
+- High Performance Low Latency Event Ingestion (Tested with p95 request latency of <=30ms for event ingestion under load of 10k requests per second in an AWS m7a.large instance)
+- Lightweight(from both compute and size perspective) SDK for player integration
+- Easily Deployable on Kubernetes or any other container orchestration platform (npm package and docker image available)
 
-> **Production-grade video quality monitoring for web video players with comprehensive business and technical metrics, accurate percentile calculations, real-time alerting, and distributed tracing.**
+## Current Status
+-  Web Player Integrations [Dash.js, Hls.js, HTML5 Player, Shaka Player, Video.js]: **Complete**
+- Worker Implementation: **Complete**
+- Open Telemetry Integration (Metrics, Traces, Logs): **Complete**
+- Grafana Integration[Dashboard, Alerts]: **Complete**
+- Mobile Player Integration: Planned
 
-> **Guarantee of p90 request latency of <=30ms for event insgestion under any load**
-
----
-
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -33,17 +39,16 @@
 
 OpenQoE is a complete, production-ready observability platform for video streaming that helps you:
 
-- **Monitor Quality**: Track video startup time, rebuffering, errors, and playback quality
-- **Understand Engagement**: Measure watch time, completion rates, and viewer behavior
+- **Monitor Quality of Experience**: Track video startup time, playback smoothness, playback quality and errors
+- **Understand Engagement**: Measure views, watch time, completion rates, and viewer behavior
 - **Optimize Performance**: Identify bottlenecks with P50/P95/P99 percentile analysis
-- **Alert Proactively**: Get notified when quality degrades or business metrics drop
-- **Scale Globally**: Deploy on Cloudflare's edge network or self-host
+- **Alert Proactively**: Get notified when different metrics degrade or business metrics drop
+- **Scale Globally**: Deploy on anywhere using docker image, Helm Chart (Planned)
 
 ### What's Included
-
 | Component               | Description                                  | Status                           |
 | ----------------------- | -------------------------------------------- | -------------------------------- |
-| **JavaScript SDK**      | 5 player adapters capturing 24+ event types  | ✅ Dash.js Ready / 🏗️ Others WIP |
+| **TypeScript SDK**      | 5 player adapters capturing 24+ event types  | ✅ Dash.js, HLS.js, HTML5 Player Integration Ready / 🏗️ Others WIP |
 | **Go Worker**           | High-performance OTLP ingestion & processing | ✅ Production Ready              |
 | **Grafana Alloy**       | Edge telemetry collector & processor         | ✅ Production Ready              |
 | **Grafana Dashboards**  | 4 comprehensive dashboards (58 panels total) | ✅ Production Ready              |
@@ -52,15 +57,11 @@ OpenQoE is a complete, production-ready observability platform for video streami
 | **Distributed Tracing** | End-to-end tracing with Grafana Tempo        | ✅ Production Ready              |
 | **Docker Stack**        | Self-hosted Mimir + Loki + Tempo + Alloy     | ✅ Production Ready              |
 
----
-
-## ✨ Features
+## Features
 
 ### SDK Capabilities
 
 - ✅ **Multi-Player Support**: HTML5, Video.js, HLS.js, Dash.js, Shaka Player
-- ✅ **Dash.js Production Ready**: Robust integration for MPEG-DASH
-- 🏗️ **WIP Adapters**: Other players are in active development
 - ✅ **Comprehensive Events**: 24+ event types with full context capture
 - ✅ **Privacy-First**: SHA-256 hashing, configurable PII controls
 - ✅ **Lightweight**: ~10KB gzipped per adapter
@@ -78,11 +79,9 @@ OpenQoE is a complete, production-ready observability platform for video streami
 
 - ✅ **Full OTLP Pipeline**: Alloy -> Mimir/Loki/Tempo
 - ✅ **Distributed Tracing**: End-to-end visibility with Tempo
-- ✅ **4 Production Dashboards**: VOD, Live, Quality, Impact Explorer
+- ✅ **4 Production Dashboards**: Video Performance, Video QoE, Video QoS, Worker Metrics
 - ✅ **18 Alert Rules**: Critical quality and performance alerts
 - ✅ **Self-Hosted**: Complete Docker Compose stack (Mimir, Loki, Tempo, Alloy, Grafana)
-
----
 
 ## 🏗️ Architecture
 
