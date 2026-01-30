@@ -36,8 +36,6 @@ Open-Source Viewer Quality of Experience (QoE) Monitoring Platform for Video Str
 - [License](#license)
 - [Support](#support)
 
----
-
 ## Overview
 
 OpenQoE is a complete, production-ready observability platform for video streaming that helps you:
@@ -67,7 +65,7 @@ OpenQoE is a complete, production-ready observability platform for video streami
 
 - **Multi-Player Support**: HTML5, Video.js, HLS.js, Dash.js, Shaka Player
 - **Comprehensive Events**: 24+ event types with full context capture
-- Statistical Event Production**: For high frequency events 
+- **Statistical Event Production**: For high frequency events 
 - **Privacy-First**: SHA-256 hashing, configurable PII controls
 - **Lightweight**: ~10KB gzipped per adapter
 - **TypeScript**: Full type definitions included
@@ -116,7 +114,7 @@ graph TD
     end
 ```
 
-**Flow**:
+## Flow
 
 1. SDK captures events from video players (Dash.js production ready)
 2. Events batched and sent to Go Worker (`/v2/events`)
@@ -124,7 +122,7 @@ graph TD
 4. Alloy routes data to Mimir (metrics), Loki (logs), and Tempo (traces)
 5. Grafana visualizes with pre-built dashboards and unified observability
 
----
+## Local Setup
 
 ### 1. Clone Repository
 
@@ -133,7 +131,9 @@ git clone https://github.com/openqoe/openqoe-dev.git
 cd openqoe-dev
 ```
 
-### 2. Start Observability Stack
+### 2. You are an User (If you do not want to change anything)
+
+#### 1. Start Observability Stack
 
 ```bash
 # Start Mimir, Loki, Tempo, Alloy, and Grafana
@@ -143,7 +143,26 @@ docker compose up -d
 docker compose ps
 ```
 
-### 3. Start Go Worker
+#### 2. Run Examples
+
+```bash
+# while in root level
+npm install -g http-server
+http-server
+# Open http://localhost:8080
+```
+### 2. You are a developer (If you want to change something)
+
+#### 1. Build SDK
+
+```bash
+cd sdk
+npm install
+npm run build
+npm test
+```
+
+#### 2. Build Go Worker (Assumes you have Go installed)
 
 ```bash
 cd worker
@@ -160,7 +179,7 @@ cp .env.example .env
 # Worker available at http://localhost:8788
 ```
 
-### 4. Integrate SDK (Dash.js Example)
+### 3. Integrate SDK (Dash.js Example)
 
 ```html
 <script type="module">
@@ -189,11 +208,8 @@ cp .env.example .env
 3. Explore **VOD Monitoring** or **Impact Explorer**
 4. Use the **Explore** tab to view distributed traces in Tempo
 
-**OpenQoE v2 is ready!** 🚀
 
----
-
-## 📚 Documentation
+## Documentation
 
 ### Getting Started
 
@@ -236,57 +252,8 @@ cp .env.example .env
 | Worker    | [worker/README.md](worker/README.md)     |
 | Examples  | [examples/README.md](examples/README.md) |
 
----
 
-## 🌍 Deployment Options
-
-### Option 1: Self-Hosted (Docker)
-
-**Best for**: On-premise deployments, full control, data sovereignty
-
-```bash
-# Start complete stack
-docker compose up -d
-
-# Configure worker for localhost
-cd worker && npm run dev
-```
-
-**Includes**: Mimir (metrics), Loki (logs), Grafana (dashboards)
-
-**Docs**: [Self-Hosted Deployment](docs/deployment-guide.md#option-1-self-hosted-docker-stack)
-
----
-
-### Option 2: Grafana Cloud
-
-**Best for**: Managed service, zero infrastructure, global scale
-
-```bash
-# Configure worker in .env
-DESTINATION_TYPE=GrafanaCloud
-GRAFANA_CLOUD_INSTANCE_ID=123456
-GRAFANA_CLOUD_API_KEY=your-api-key
-
-# Run worker
-./openqoe-worker
-```
-
-**Docs**: [Grafana Cloud Deployment](docs/deployment-guide.md#option-3-grafana-cloud)
-
----
-
-### Option 3: Hybrid (Self-Hosted + Managed Worker)
-
-**Best for**: Distributed ingestion with on-premise storage
-
-Combine regional Go workers for global ingestion with a central self-hosted observability stack.
-
-**Docs**: [Hybrid Deployment](docs/deployment-guide.md#network-connectivity-for-self-hosted-deployments)
-
----
-
-## 📊 Metrics & Dashboards
+## Metrics & Dashboards
 
 ### Dashboard Overview
 
@@ -344,20 +311,6 @@ openqoe:video_startup_seconds:p95
 - **Rebuffer Duration**: [0.5, 1, 2, 3, 5, 10, 30] seconds
 - **Seek Latency**: [0.1, 0.25, 0.5, 1, 2, 5] seconds
 
----
-
-## 🎨 Supported Players
-
-| Player           | Adapter          | Status                  |
-| ---------------- | ---------------- | ----------------------- |
-| **Dash.js**      | `DashJsAdapter`  | ✅ **Production Ready** |
-| **HTML5**        | `HTML5Adapter`   | 🏗️ Work In Progress     |
-| **Video.js**     | `VideoJsAdapter` | 🏗️ Work In Progress     |
-| **HLS.js**       | `HlsJsAdapter`   | 🏗️ Work In Progress     |
-| **Shaka Player** | `ShakaAdapter`   | 🏗️ Work In Progress     |
-
-\*HTML5 doesn't support `quality_change` events (no native ABR)
-
 ### Events Tracked (19 Total)
 
 | Event                    | Description                                   | Business Value                                   |
@@ -381,208 +334,6 @@ openqoe:video_startup_seconds:p95
 | `error`                  | Playback error occurred                       | **Error tracking** - SLA monitoring & debugging  |
 | `moveaway`               | User navigated away from player               | **Session detection** - Window blur detection    |
 | `moveback`               | User returned to player after moving away     | **Re-engagement tracking** - Viewer behavior     |
-
----
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-openqoe/
-├── build
-│   ├── build.ninja
-│   ├── CMakeCache.txt
-│   ├── CMakeFiles
-│   │   ├── 3.28.3
-│   │   │   ├── CMakeCXXCompiler.cmake
-│   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
-│   │   │   ├── CMakeSystem.cmake
-│   │   │   └── CompilerIdCXX
-│   │   │       ├── a.out
-│   │   │       ├── CMakeCXXCompilerId.cpp
-│   │   │       └── tmp
-│   │   ├── cmake.check_cache
-│   │   ├── CMakeConfigureLog.yaml
-│   │   ├── OpenQoEWorker.dir
-│   │   │   └── src
-│   │   ├── pkgRedirects
-│   │   ├── rules.ninja
-│   │   └── TargetDirectories.txt
-│   ├── cmake_install.cmake
-│   ├── compile_commands.json
-│   └── OpenQoEWorker
-├── compose.yaml
-├── docs
-│   ├── api-reference.md
-│   ├── architecture.md
-│   ├── contributing.md
-│   ├── data-model.md
-│   ├── deployment-checklist.md
-│   ├── deployment-guide.md
-│   ├── observability
-│   │   ├── dashboards.md
-│   │   └── README.md
-│   ├── production-ready.md
-│   ├── sdk-integration.md
-│   └── technical-spec.md
-├── examples
-│   ├── dashjs-demo
-│   │   └── index.html
-│   ├── DEMO_TEMPLATE.md
-│   ├── hlsjs-demo
-│   │   └── index.html
-│   ├── html5-demo
-│   │   └── index.html
-│   ├── README.md
-│   ├── shaka-demo
-│   │   └── index.html
-│   └── videojs-demo
-│       └── index.html
-├── LICENSE
-├── observability
-│   ├── alloy
-│   │   └── config.alloy
-│   ├── dashboards
-│   │   ├── impact-explorer.json
-│   │   ├── live-streaming.json
-│   │   ├── quality-delivery.json
-│   │   └── vod-monitoring.json
-│   ├── grafana
-│   │   └── provisioning
-│   │       ├── dashboards
-│   │       │   └── dashboards.yml
-│   │       └── datasources
-│   │           └── datasources.yml
-│   ├── GRAFANA_DASHBOARDS.md
-│   ├── loki
-│   │   └── loki-config.yaml
-│   ├── mimir
-│   │   ├── mimir-config.yml
-│   │   └── runtime.yml
-│   ├── prometheus
-│   │   ├── prometheus.yml
-│   │   └── rules
-│   │       ├── load-rules.sh
-│   │       ├── openqoe-alert-rules.yml
-│   │       └── openqoe-recording-rules.yml
-│   ├── README.md
-│   └── tempo
-│       └── tempo-config.yaml
-├── openqoe-dev.code-workspace
-├── README.md
-├── sdk
-│   ├── jest.config.js
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── README.md
-│   ├── rollup.config.js
-│   ├── src
-│   │   ├── adapters
-│   │   │   ├── DashJsAdapter.ts
-│   │   │   ├── HlsJsAdapter.ts
-│   │   │   ├── HTML5Adapter.ts
-│   │   │   ├── ShakaAdapter.ts
-│   │   │   └── VideoJsAdapter.ts
-│   │   ├── core
-│   │   │   ├── BatchManager.ts
-│   │   │   ├── EventCollector.ts
-│   │   │   ├── QueueManager.ts
-│   │   │   ├── RetryManager.ts
-│   │   │   ├── SessionManager.ts
-│   │   │   └── Transport.ts
-│   │   ├── index.ts
-│   │   ├── OpenQoE.ts
-│   │   ├── types.ts
-│   │   └── utils
-│   │       ├── device.ts
-│   │       ├── logger.ts
-│   │       └── privacy.ts
-│   ├── tests
-│   │   ├── core
-│   │   │   ├── BatchManager.test.ts
-│   │   │   └── SessionManager.test.ts
-│   │   └── utils
-│   │       └── privacy.test.ts
-│   └── tsconfig.json
-├── sonar-project.properties
-├── test
-│   ├── dashjs-test
-│   │   └── index.html
-│   ├── hlsjs-test
-│   │   └── index.html
-│   ├── html5-test
-│   │   └── index.html
-│   ├── shaka-test
-│   │   └── index.html
-│   └── videojs-test
-│       └── index.html
-└── worker
-    ├── compute
-    │   ├── events.go
-    │   ├── helpers.go
-    │   ├── metrics.go
-    │   ├── system_metrics.go
-    │   └── types.go
-    ├── config
-    │   ├── auth.go
-    │   ├── cardinality.go
-    │   ├── config.go
-    │   ├── destination.go
-    │   ├── env.go
-    │   └── redis.go
-    ├── data_structure
-    │   ├── pair.go
-    │   └── set.go
-    ├── Dockerfile
-    ├── go.mod
-    ├── go.sum
-    ├── main.go
-    ├── middlewares
-    │   ├── auth.go
-    │   └── headers.go
-    ├── otelservice
-    │   ├── setup.go
-    │   ├── tracer.go
-    │   └── types.go
-    ├── pool
-    │   └── worker.go
-    ├── README.md
-    └── requesthandlers
-        ├── controller.go
-        ├── markdevice.go
-        ├── requestvalidation.go
-        └── types.go
-```
-
-### Build SDK
-
-```bash
-cd sdk
-npm install
-npm run build
-npm test
-```
-
-### Run Worker Locally
-
-```bash
-cd worker
-go build .
-./worker
-# Available at http://localhost:8788
-```
-
-### Run Examples
-
-```bash
-# while in root level
-npm install -g http-server
-http-server
-# Open http://localhost:8080
-```
-
----
 
 ## 🤝 Contributing
 
@@ -626,9 +377,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
----
-
-## 💬 Support
+## Support
 
 ### Community Support
 
@@ -645,9 +394,8 @@ limitations under the License.
 3. Check [troubleshooting guide](docs/observability/README.md#troubleshooting)
 4. Ask in [Discussions](https://github.com/openqoe/openqoe-dev/discussions)
 
----
 
-## 🌟 Acknowledgments
+## Acknowledgments
 
 OpenQoE is built with:
 
@@ -662,30 +410,21 @@ OpenQoE is built with:
 
 Inspired by commercial QoE monitoring solutions for continuous improvement and industry best practices.
 
----
 
-## 📈 Project Status
+## Future Roadmap
 
-**Current Version**: 2.0.0
-**Status**: ✅ **Dash.js, HLS.js, HTML5 Ready** / 🏗️ **Core v2 In Beta**
-**Last Updated**: January 2026
+#### Immediate Focus: Ecosystem Compatibility
+Our immediate target is to achieve broad compatibility with the remaining major web video players:
 
-See [docs/production-ready.md](docs/production-ready.md) for complete production readiness report.
+- video.js
+- Shaka Player
 
-### What's Production Ready
+This ensures fast adoption and positions the platform as player-agnostic.
 
-- ✅ SDK for all 5 major web players
-- ✅ Low Latency
-- ✅ 4 comprehensive Grafana dashboards (58 panels)
-- ✅ 25 recording rules for performance
-- ✅ 18 production-ready alerts
-- ✅ Self-hosted Docker stack
-- ✅ Grafana Cloud support
-- ✅ Complete documentation
-
-### Roadmap
-
-**Phase 2** (Optional):
+###  Strategic Direction: Two Core Verticals:
+Once baseline compatibility is achieved, the roadmap is divided into two verticals:
+- Lowering the bar for understanding the data
+- Advancing the underlying technology
 
 - Worker Health Dashboard (pipeline monitoring)
 - Advanced cardinality analytics

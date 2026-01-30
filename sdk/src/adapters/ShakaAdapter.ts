@@ -66,6 +66,7 @@ export class ShakaAdapter implements PlayerAdapter {
     }
 
     this.player = player;
+
     this.metadata = metadata;
 
     // Get video element (Shaka attaches to a video element)
@@ -134,7 +135,8 @@ export class ShakaAdapter implements PlayerAdapter {
     this.onShaka("segmentappended", (event: any) =>
       this.onFragmentLoaded(event),
     );
-    this.onShaka("manifestparsed", () => this.onManifestLoaded());
+    this.onShaka("manifestparsed", () => this.onManifestLoad());
+    this.onShaka("loaded", () => this.onPlayerReady());
     this.onShaka("adaptation", () => this.onAdaptation());
     this.onShaka("error", (event: any) => this.onShakaError(event));
     this.onShaka("buffering", (event: any) => this.onBuffering(event));
@@ -169,7 +171,7 @@ export class ShakaAdapter implements PlayerAdapter {
     this.eventListeners.set(event, handler);
   }
 
-  private async trackFragmentFrequency(data: any): Promise<void> {
+  private async onFragmentLoaded(data: any): Promise<void> {
     if (!this.video) return;
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
@@ -215,14 +217,10 @@ export class ShakaAdapter implements PlayerAdapter {
     }
   }
 
-  private async onFragmentLoaded(data: any): Promise<void> {
-    this.trackFragmentFrequency(data);
-  }
-
   /**
-   * Manifest Loaded event (Player Ready)
+   * Manifest Loaded event
    */
-  private async onManifestLoaded(): Promise<void> {
+  private async onManifestLoad(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -232,10 +230,21 @@ export class ShakaAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent("playerready", {
+    const event = await this.eventCollector.createEvent("manifestload", {
       page_load_time: pageLoadTime,
     });
 
+    this.batchManager.addEvent(event);
+    this.logger.debug("playerready event fired");
+  }
+
+  /**
+   * On Load event
+   */
+  private async onPlayerReady(): Promise<void> {
+    const event = await this.eventCollector.createEvent("playerready", {
+      player_startup_time: performance.now(),
+    });
     this.batchManager.addEvent(event);
     this.logger.debug("playerready event fired");
   }
