@@ -26,6 +26,7 @@ export class ShakaAdapter implements PlayerAdapter {
     EventListenerOrEventListenerObject
   > = new Map();
   private shakaEventHandlers: Map<string, Function> = new Map();
+  private callTimeStamps: number[] = [];
 
   // State tracking
   private lastPlaybackTime: number = 0;
@@ -39,6 +40,12 @@ export class ShakaAdapter implements PlayerAdapter {
   private quartileFired: Set<number> = new Set();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private seekFrom: number = 0;
+  private bufferStats = { mean: 0, m2: 0, count: 0 };
+  private bufferSampleRate = 0.05; // 5% baseline sampling
+  private bufferZThreshold = 2.0; // Report if data is > 2 standard deviations away
+  private fragStats = { mean: 0, m2: 0, count: 0 };
+  private fragSampleRate = 0.1; // 10% baseline (slightly higher than buffer for network visibility)
+  private fragZThreshold = 3.0; // Higher threshold (3.0) for network because latency is naturally jittery
 
   constructor(
     eventCollector: EventCollector,
@@ -59,6 +66,7 @@ export class ShakaAdapter implements PlayerAdapter {
     }
 
     this.player = player;
+
     this.metadata = metadata;
 
     // Get video element (Shaka attaches to a video element)
@@ -80,7 +88,8 @@ export class ShakaAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.logger.info("ShakaAdapter attached");
   }
 
@@ -103,23 +112,31 @@ export class ShakaAdapter implements PlayerAdapter {
       this.video?.removeEventListener(event, listener);
     });
     this.eventListeners.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.video = null;
     this.player = null;
     this.logger.info("ShakaAdapter detached");
   }
 
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
+
   /**
    * Attach all event listeners
    */
-  private attachEventListeners(): void {
+  private async attachEventListeners(): Promise<void> {
     if (!this.player || !this.video) return;
 
-    // Shaka Player events
-    // Access event types from the player's constructor
-    // const EventType = this.player.constructor.EventType || {};
-
-    this.onShaka("loaded", () => this.onManifestLoaded());
+    this.onShaka("segmentappended", (event: any) =>
+      this.onFragmentLoaded(event),
+    );
+    this.onShaka("manifestparsed", () => this.onManifestLoad());
+    this.onShaka("loaded", () => this.onPlayerReady());
     this.onShaka("adaptation", () => this.onAdaptation());
     this.onShaka("error", (event: any) => this.onShakaError(event));
     this.onShaka("buffering", (event: any) => this.onBuffering(event));
@@ -154,10 +171,56 @@ export class ShakaAdapter implements PlayerAdapter {
     this.eventListeners.set(event, handler);
   }
 
+  private async onFragmentLoaded(data: any): Promise<void> {
+    if (!this.video) return;
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    this.callTimeStamps.push(now);
+
+    this.callTimeStamps = this.callTimeStamps.filter((ts) => ts > oneMinuteAgo);
+    const fragLoadRate = this.callTimeStamps.length;
+    this.fragStats.count++;
+    const delta = fragLoadRate - this.fragStats.mean;
+    this.fragStats.mean += delta / this.fragStats.count;
+    const delta2 = fragLoadRate - this.fragStats.mean;
+    this.fragStats.m2 += delta * delta2;
+
+    const stdDev =
+      this.fragStats.count > 1
+        ? Math.sqrt(this.fragStats.m2 / (this.fragStats.count - 1))
+        : 0;
+    const zScore =
+      stdDev > 0 ? Math.abs(fragLoadRate - this.fragStats.mean) / stdDev : 0;
+    const isOutlier = zScore > this.fragZThreshold;
+    const isRandomSample = Math.random() < this.fragSampleRate;
+
+    if (isOutlier || isRandomSample) {
+      const event = await this.eventCollector.createEvent(
+        "fragmentloaded",
+        {
+          frag_duration: data.end - data.start,
+          z_score: parseFloat(zScore.toFixed(2)),
+          media_type: data.contentType,
+          type: data.type,
+          is_outlier: isOutlier,
+        },
+        this.video.currentTime * 1000,
+      );
+      this.batchManager.addEvent(event);
+      this.logger.debug(
+        `Fragment loaded ${isOutlier ? "[OUTLIER]" : "[SAMPLE]"}`,
+        {
+          fragment_load_rate: fragLoadRate,
+          z: zScore.toFixed(2),
+        },
+      );
+    }
+  }
+
   /**
-   * Manifest Loaded event (Player Ready)
+   * Manifest Loaded event
    */
-  async onManifestLoaded(): Promise<void> {
+  private async onManifestLoad(): Promise<void> {
     // Get page load time using Navigation Timing Level 2
     let pageLoadTime: number | undefined;
     const navigationTiming = performance.getEntriesByType(
@@ -167,7 +230,7 @@ export class ShakaAdapter implements PlayerAdapter {
       pageLoadTime =
         navigationTiming.loadEventEnd - navigationTiming.loadEventStart;
     }
-    const event = await this.eventCollector.createEvent("playerready", {
+    const event = await this.eventCollector.createEvent("manifestload", {
       page_load_time: pageLoadTime,
     });
 
@@ -176,9 +239,20 @@ export class ShakaAdapter implements PlayerAdapter {
   }
 
   /**
+   * On Load event
+   */
+  private async onPlayerReady(): Promise<void> {
+    const event = await this.eventCollector.createEvent("playerready", {
+      player_startup_time: performance.now(),
+    });
+    this.batchManager.addEvent(event);
+    this.logger.debug("playerready event fired");
+  }
+
+  /**
    * View Start event
    */
-  async onViewStart(): Promise<void> {
+  private async onViewStart(): Promise<void> {
     this.viewStartTime = performance.now();
 
     const event = await this.eventCollector.createEvent("viewstart", {
@@ -192,7 +266,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Playing event
    */
-  async onPlaying(): Promise<void> {
+  private async onPlaying(): Promise<void> {
     if (!this.video) return;
 
     // Calculate video startup time if this is first play
@@ -222,7 +296,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Pause event
    */
-  async onPause(): Promise<void> {
+  private async onPause(): Promise<void> {
     if (!this.video) return;
 
     // Stop heartbeat
@@ -243,7 +317,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Seeking event
    */
-  onSeeking(): void {
+  private async onSeeking(): Promise<void> {
     if (!this.video) return;
     this.seekFrom = this.video.currentTime * 1000;
     this.seekStartTime = performance.now();
@@ -252,7 +326,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Seeked event
    */
-  async onSeeked(): Promise<void> {
+  private async onSeeked(): Promise<void> {
     if (!this.video) return;
 
     const seekTo = this.video.currentTime * 1000;
@@ -275,9 +349,8 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Buffering event - Handles stalls
    */
-  async onBuffering(event: any): Promise<void> {
+  private async onBuffering(event: any): Promise<void> {
     if (!this.video) return;
-
     const buffering = event.buffering;
 
     if (buffering && this.stallStartTime === null) {
@@ -319,7 +392,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Ended event
    */
-  async onEnded(): Promise<void> {
+  private async onEnded(): Promise<void> {
     if (!this.video) return;
 
     this.stopHeartbeat();
@@ -351,7 +424,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Adaptation event (Quality Change)
    */
-  async onAdaptation(): Promise<void> {
+  private async onAdaptation(): Promise<void> {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
@@ -371,7 +444,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Shaka Error event
    */
-  async onShakaError(event: any): Promise<void> {
+  private async onShakaError(event: any): Promise<void> {
     if (!this.player) return;
 
     const detail = event.detail;
@@ -436,7 +509,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Error handler
    */
-  async onError(error: PlayerError): Promise<void> {
+  private async onError(error: PlayerError): Promise<void> {
     if (!this.video) return;
 
     const event = await this.eventCollector.createEvent(
@@ -457,7 +530,7 @@ export class ShakaAdapter implements PlayerAdapter {
   /**
    * Time Update - Track quartiles
    */
-  async onTimeUpdate(): Promise<void> {
+  private async onTimeUpdate(): Promise<void> {
     if (!this.video) return;
 
     const progress = this.video.currentTime / this.video.duration;
@@ -494,6 +567,30 @@ export class ShakaAdapter implements PlayerAdapter {
 
     this.lastPlaybackTime = this.video.currentTime;
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
+  }
+
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("moveback event fired");
   }
 
   /**

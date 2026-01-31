@@ -742,7 +742,7 @@
             const eventsContainer = document.getElementById("events-container");
 
             // Initialize Shaka Player
-            function initializePlayer() {
+            async function initializePlayer() {
                 // Install built-in polyfills
                 shaka.polyfill.installAll();
 
@@ -766,15 +766,25 @@
                 player.addEventListener("error", (error) => {
                     console.error("Shaka Player error:", error);
                 });
-
                 return player;
             }
 
-            // Load sample video
-            function loadSampleVideo(index) {
-                const sample = sampleVideos[index];
-                document.getElementById("video-url-input").value = sample.url;
-                loadVideo(sample);
+            // Clear logs
+            function clearLogs() {
+                eventsContainer.innerHTML = `
+                <div class="no-events">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
+                    </svg>
+                    <div>No events captured yet</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Load a stream and start playing to see events</div>
+                </div>
+            `;
+                eventCount = 0;
+                capturedEvents = [];
+                eventRate = 0;
+                document.getElementById("stat-events").textContent = "0";
+                document.getElementById("stat-rate").textContent = "0/s";
             }
 
             // Load video from URL
@@ -794,7 +804,7 @@
                 }
 
                 // Initialize player
-                player = initializePlayer();
+                player = await initializePlayer();
 
                 if (!player) {
                     return;
@@ -812,6 +822,23 @@
                     videoTitle = videoId.replace(/[-_]/g, " ");
                 }
 
+                // Initialize OpenQoE SDK (with fake endpoint to prevent actual sending)
+                qoe = new OpenQoE.OpenQoE({
+                    orgId: "demo-org",
+                    playerId: "shaka-event-tester",
+                    endpointUrl: "http://localhost:8788/v2/events", // Fake endpoint - won't send
+                    debug: true,
+                    logLevel: "debug",
+                });
+                // attach video element to player
+                await player.attach(video);
+
+                // Attach qoe sdk to player
+                qoe.attachPlayer("shaka", player, {
+                    videoId: videoId,
+                    videoTitle: videoTitle,
+                });
+
                 // Load stream
                 try {
                     await player.load(url);
@@ -821,21 +848,6 @@
                     alert("Error loading stream: " + error.message);
                     return;
                 }
-
-                // Initialize OpenQoE SDK (with fake endpoint to prevent actual sending)
-                qoe = new OpenQoE.OpenQoE({
-                    orgId: "demo-org",
-                    playerId: "shaka-event-tester",
-                    endpointUrl: "http://localhost:8788/v2/events", // Fake endpoint - won't send
-                    debug: true,
-                    logLevel: "debug",
-                });
-
-                // Attach to player
-                qoe.attachPlayer("shaka", player, {
-                    videoId: videoId,
-                    videoTitle: videoTitle,
-                });
 
                 // Update session info
                 setTimeout(() => {
@@ -851,6 +863,13 @@
 
                 // Reset stats
                 clearLogs();
+            }
+
+            // Load sample video
+            function loadSampleVideo(index) {
+                const sample = sampleVideos[index];
+                document.getElementById("video-url-input").value = sample.url;
+                loadVideo(sample);
             }
 
             // Clear video
@@ -941,24 +960,6 @@
                 while (eventsContainer.children.length > 50) {
                     eventsContainer.removeChild(eventsContainer.lastChild);
                 }
-            }
-
-            // Clear logs
-            function clearLogs() {
-                eventsContainer.innerHTML = `
-                <div class="no-events">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 112 0v4a1 1 0 11-2 0V9zm2-3a1 1 0 11-2 0 1 1 0 012 0z"/>
-                    </svg>
-                    <div>No events captured yet</div>
-                    <div style="font-size: 12px; margin-top: 5px;">Load a stream and start playing to see events</div>
-                </div>
-            `;
-                eventCount = 0;
-                capturedEvents = [];
-                eventRate = 0;
-                document.getElementById("stat-events").textContent = "0";
-                document.getElementById("stat-rate").textContent = "0/s";
             }
 
             // Update stats periodically

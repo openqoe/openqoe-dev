@@ -16,6 +16,7 @@ import { Logger } from "../utils/logger";
 
 export class VideoJsAdapter implements PlayerAdapter {
   private player: any = null;
+  private video: HTMLVideoElement | null = null;
   private eventCollector: EventCollector;
   private batchManager: BatchManager;
   private logger: Logger;
@@ -57,6 +58,15 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     this.player = player;
     this.metadata = metadata;
+
+    // Get video element
+    this.video = this.player.getVideoElement();
+    if (!this.video) {
+      throw new Error(
+        "DashJsAdapter: video.js player must be attached to a video element",
+      );
+    }
+
     // Set player info
     const version = player.constructor?.VERSION || player.VERSION || undefined;
     this.eventCollector.setPlayerInfo({
@@ -68,7 +78,8 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     // Attach event listeners
     this.attachEventListeners();
-
+    // Handle visibility change
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.logger.info("VideoJsAdapter attached");
   }
 
@@ -85,10 +96,18 @@ export class VideoJsAdapter implements PlayerAdapter {
       this.player?.off(event, handler);
     });
     this.eventHandlers.clear();
-
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.player = null;
     this.logger.info("VideoJsAdapter detached");
   }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      this.onMoveAway();
+    } else if (document.visibilityState === "visible") {
+      this.onMoveback();
+    }
+  };
 
   /**
    * Attach all event listeners
@@ -453,6 +472,30 @@ export class VideoJsAdapter implements PlayerAdapter {
 
     this.lastPlaybackTime = this.player.currentTime();
     this.watchTime = this.viewStartTime ? Date.now() - this.viewStartTime : 0;
+  }
+
+  private async onMoveAway(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveaway",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addBeaconEventAndSend(event);
+    this.logger.debug("moveaway event fired");
+  }
+
+  private async onMoveback(): Promise<void> {
+    if (!this.video) return;
+
+    const event = await this.eventCollector.createEvent(
+      "moveback",
+      {},
+      this.video.currentTime * 1000,
+    );
+    this.batchManager.addEvent(event);
+    this.logger.debug("moveback event fired");
   }
 
   /**
