@@ -205,8 +205,8 @@ cp .env.example .env
 
 1. Open Grafana: [localhost:3000](http://localhost:3000) (admin/admin)
 2. Navigate to **Dashboards** → **OpenQoE** folder
-3. Explore **VOD Monitoring** or **Impact Explorer**
-4. Use the **Explore** tab to view distributed traces in Tempo
+3. Explore **Video Performance**, **Video QoE** or **Video QoS**
+4. If you want to monitor the health of the worker, see **Worker Metrics**
 
 
 ## Documentation
@@ -220,11 +220,6 @@ cp .env.example .env
 | [SDK Integration](docs/sdk-integration.md)   | Dash.js, HLS.js, HTML5 focus (other players WIP)     |
 | [Architecture](docs/architecture.md)         | Distributed observability pipeline                   |
 | [Production Ready](docs/production-ready.md) | Production readiness report (Dash.js, HLS.js, HTML5) |
-
-1. Open **VOD Monitoring** dashboard
-2. Play a video and watch metrics appear in real-time!
-
-**That's it!** Your video QoE monitoring is now live. 🎉
 
 ### Architecture & Design
 
@@ -259,62 +254,18 @@ cp .env.example .env
 
 | Dashboard              | Panels | Purpose               | Key Metrics                               |
 | ---------------------- | ------ | --------------------- | ----------------------------------------- |
-| **VOD Monitoring**     | 21     | Real-time VOD quality | VST, rebuffering, completion, quartiles   |
-| **Live Streaming**     | 11     | Live event monitoring | Concurrent viewers, join time, geographic |
-| **Quality & Delivery** | 12     | Technical deep-dive   | Seek latency, dropped frames, ABR         |
-| **Impact Explorer**    | 14     | Business analysis     | Watch time, engagement, revenue           |
+| **Video Performance**  | 6      | Content Performance   | View Counting, Unique Viewers and repeated viewers count, user engagement and retention   |
+| **Video QoE**          | 15     | Quality of Experience | Page Load Time, Vidoe Startup time, Quality related metrics, Playback Quality Metrics etc |
+| **Video QoS**          | 4      | Quality of Service    | Network Bandwidth Change Rate, Network Latency Deviation, Video and Audio Fragment Latency and Bitrate         |
+| **Impact Explorer**    | 4      | Worker Health         | Request Processing Time, Stack Usage, Heap Usage |
 
-### Key Metrics Captured
+> More Raw Metrics can be found in Grafana's Drilldown section. Dashboards for those existing metrics and new metrics are on the way!
 
-**Business Metrics**:
-
-- Total views, completion rate, watch time
-- Revenue impact calculations
-- Engagement by quartile (25/50/75/100%)
-- Content performance comparison
-
-**Technical Metrics**:
-
-- Video Startup Time (P50/P95/P99 via histograms)
-- Rebuffer rate, duration, and frequency
-- Seek latency and performance
-- Error rates by type and family
-- Bitrate distribution and ABR behavior
-- Dropped frames and rendering quality
-- Resolution distribution (360p-8K)
-- Buffer health
-
-**Live Streaming**:
-
-- Concurrent viewers (real-time)
-- Join time (P95)
-- Geographic distribution
-- Viewer drop detection
-
-### Histogram Metrics
-
-OpenQoE uses **true histograms** (not gauges) for accurate percentile calculations:
-
-```promql
-# Accurate P95 Video Startup Time
-histogram_quantile(0.95,
-  sum(rate(openqoe_video_startup_seconds_bucket[5m])) by (le)
-)
-
-# Using pre-aggregated recording rule (10-50x faster)
-openqoe:video_startup_seconds:p95
-```
-
-**Histogram buckets configured**:
-
-- **VST**: [0.5, 1, 2, 3, 5, 10, 15, 30] seconds
-- **Rebuffer Duration**: [0.5, 1, 2, 3, 5, 10, 30] seconds
-- **Seek Latency**: [0.1, 0.25, 0.5, 1, 2, 5] seconds
 
 ### Events Tracked (19 Total)
 
 | Event                    | Description                                   | Business Value                                   |
-| ------------------------ | --------------------------------------------- | ------------------------------------------------ |
+| ------------------------ | --------------------------------------------- |------------------------------------------------ |
 | `playerready`            | Player initialized and ready for input        | **Time to interactive** - UI responsiveness      |
 | `manifestload`           | Manifest/playlist fetched and parsed          | **Content delivery measurement** - CDN perf      |
 | `fragmentloaded`         | Video fragment successfully downloaded        | **Buffer fill tracking** - Network efficiency    |
@@ -335,16 +286,16 @@ openqoe:video_startup_seconds:p95
 | `moveaway`               | User navigated away from player               | **Session detection** - Window blur detection    |
 | `moveback`               | User returned to player after moving away     | **Re-engagement tracking** - Viewer behavior     |
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Whether it's:
 
-- 🐛 Bug reports
-- ✨ Feature requests
-- 📝 Documentation improvements
-- 🔧 Code contributions
+- Bug reports
+- Feature requests
+- Documentation improvements
+- Code contributions
 
-Please read our [Contributing Guide](docs/contributing.md) for guidelines.
+Please read our [Contributing Guide](contributing.md) for guidelines.
 
 ### Quick Contribution Steps
 
@@ -357,7 +308,7 @@ Please read our [Contributing Guide](docs/contributing.md) for guidelines.
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
 
@@ -426,12 +377,12 @@ Once baseline compatibility is achieved, the roadmap is divided into two vertica
 - Lowering the bar for understanding the data
 - Advancing the underlying technology
 
-- Worker Health Dashboard (pipeline monitoring)
-- Advanced cardinality analytics
-- Custom metric extensions
-- Load testing framework
-
----
+###  Long-Term Vision
+The end state is a self-optimizing video delivery platform where:
+- Data is understandable without deep expertise
+- QoE is predicted, not just measured
+- Delivery paths adapt dynamically across players, CDNs, and network types
+- Monetization and experience are optimized together
 
 ## 🙏 Star Us
 
